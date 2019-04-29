@@ -1,0 +1,151 @@
+import os
+import time
+import numpy as np
+import scipy.io as sio
+import random
+import torch
+from IPython.display import display
+from PIL import Image
+
+
+def recursiveFilesWithSuffix(rootDir = '.', suffix = ''):
+
+    return [os.path.join(looproot, filename)
+        for looproot, _, filenames in os.walk(rootDir)
+        for filename in filenames if filename.endswith(suffix)]
+
+
+def listFolders(rootDir = '.'):
+
+    return [os.path.join(rootDir, filename)
+        for filename in os.listdir(rootDir) if os.path.isdir(os.path.join(rootDir, filename))]
+
+
+def listFilesWithSuffix(rootDir = '.', suffix = None):
+
+    if suffix:
+        res = [os.path.join(rootDir, filename) 
+            for filename in os.listdir(rootDir) 
+                if os.path.isfile(os.path.join(rootDir, filename)) and filename.endswith(suffix)]    
+    else:
+        res = [os.path.join(rootDir, filename) 
+            for filename in os.listdir(rootDir) 
+                if os.path.isfile(os.path.join(rootDir, filename))]    
+
+    return res
+
+
+def load_h5(filename, varname='data'):
+
+    import h5py
+    with h5py.File(filename, 'r') as f:
+        data = f[varname][:]
+
+    return data
+
+
+def load_mat(filename, varname='data'):
+
+    try:
+        f = sio.loadmat(filename)
+        data = f[varname]        
+    except:
+        data = load_h5(filename, varname=varname)
+        if data.ndim == 4:
+            data = data.transpose(3,2,1,0)
+        elif data.ndim == 3:
+            data = data.transpose(2,1,0)
+
+    return data
+
+
+def r2c(img):
+    """
+    for both images with and without batch dim, return an image with batch dim
+    """
+    if img.dtype == 'float32':
+        dtype = np.complex64
+    else:
+        dtype = np.complex128
+
+    if len(img.shape) == 3:
+        img = img[np.newaxis, ...]
+
+    out = np.zeros((img.shape[0], img.shape[2], img.shape[3]), dtype=dtype)
+    if img.shape[1] == 1:
+        out = img[:, 0, ...]
+    else:
+        out = img[:, 0, ...] + 1j*img[:, 1, ...]
+
+    return out
+
+
+def c2r(img):
+    """
+    for single image, no batch dim
+    """
+    if img.dtype == 'complex64':
+        dtype = np.float32
+    else:
+        dtype = np.float64
+    
+    out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
+    out[0, ...] = img.real
+    out[1, ...] = img.imag
+
+    return out
+
+
+def cplx_mlpy(a, b):
+    """
+    multiply two 'complex' tensors (with the last dim = 2, representing real and imaginary parts)
+    """
+    out = torch.empty(a.shape)
+    out[..., 0] = a[..., 0]*b[..., 0] - a[..., 1]*b[..., 1]
+    out[..., 1] = a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
+
+    return out
+
+
+def cplx_cong(a):
+    """
+    conjugate of a complex number
+    """
+    out = torch.empyt(a.shape)
+    out[..., 0] = a[..., 0]
+    out[..., 1] = -a[..., 1]
+
+    return out
+
+
+def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
+
+    img = np.asarray(img)
+    if len(img.shape) == 4:
+        img = r2c(img)
+        img = abs(img)
+
+    numShow = np.amin((numShow, img.shape[0]))
+
+    batch_size, nrow, ncol = img.shape[0:3]
+    int_img = (img*255).clip(0, 255).astype('uint8')
+    int_img = np.repeat(int_img[..., np.newaxis], 3, axis=3)
+    imgstack = np.ones((nrow, numShow*ncol, 3)).astype('uint8')
+
+    if sampling:
+        idxs = random.sample(range(batch_size), numShow)
+    else:
+        idxs = idxs
+
+    for x in range(len(idxs)):
+        idx = idxs[x]
+        imgstack[:, x*ncol:(x+1)*ncol, :] = int_img[idx, ...]
+
+    display(Image.fromarray(imgstack))
+
+    return imgstack, idxs
+    
+
+
+
+
