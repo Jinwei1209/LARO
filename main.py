@@ -40,7 +40,7 @@ if __name__ == '__main__':
     netD.to(device)
 
     optimizerD, optimizerG = get_optimizers(netG, netD, lrG, lrD)
-    print(netD)
+    print(netG)
     
     while epoch < niter: 
         
@@ -62,10 +62,11 @@ if __name__ == '__main__':
                 outputs_np = np.squeeze(np.asarray(outputs.cpu().detach()))
                 # outputs_show, idxs = showImage(outputs_np, idxs=idxs, sampling=sampling)
 
-                print('epochs: [%d/%d], batchs: [%d/%d], Loss_D: %f, Loss_G: %f, loss_L1: %f, time: %ds'
-                % (epoch, niter, idx, 8800//batch_size+1, errD_sum/display_iters, 
-                errG_sum/display_iters, errL1_sum/display_iters, time.time()-t0))
-                errL1_sum = errG_sum = errD_sum = 0
+                print('epochs: [%d/%d], batchs: [%d/%d], Loss_D: %f, Loss_G: %f, loss_L1: %f, loss_dc: %f, time: %ds'
+                % (epoch, niter, idx, 8800//batch_size+1, errD_sum/display_iters, errG_sum/display_iters, 
+                errL1_sum/display_iters, errdc_sum/display_iters, time.time()-t0))
+                
+                errL1_sum = errG_sum = errD_sum = errdc_sum = 0
                 
             inputs = inputs.to(device)
             targets = targets.to(device)
@@ -75,11 +76,9 @@ if __name__ == '__main__':
             errD = netD_train(inputs, targets, netD, netG, optimizerD)
             errD_sum += errD
 
-            AtA = Back_forward(csms, masks, lambda_dc).AtA
-            coilComb = AtA(targets)
-            print(coilComb.shape)
-
-            errG, errL1, errdc = netG_train(inputs, targets, csms, masks, netD, netG, optimizerG, lambda_l1)
+            AtA = Back_forward(csms, masks, lambda_dll2).AtA
+            errG, errL1, errdc = netG_train(inputs, targets, AtA, \
+                netD, netG, optimizerG, lambda_l1, lambda_dc)
             errG_sum += errG
             errL1_sum += errL1
             errdc_sum += errdc

@@ -73,19 +73,8 @@ def loss_classificaiton():
     return nn.BCELoss()
 
 
-def loss_data_consistency(inputs, outputs, csms, masks):
-    
-    nslices, ncoil, nrow, ncol = csms.shape
-    atb = torch.empty(inputs.shape)
-
-    for i in range(nslices):
-        A = lambda z: forward_operator(z, csms[i], masks[i], ncoil, nrow, ncol)
-        At = lambda z: backward_operator(z, csms[i], masks[i], ncoil, nrow, ncol)
-
-        y = A(outputs[i])
-        atb[i] = c2r(At(y))
-
-    return nn.MSELoss(atb, inputs)
+def lossL2():
+    return nn.MSELoss()
 
     
 

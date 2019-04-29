@@ -16,8 +16,7 @@ def get_optimizers(netG, netD, lrG, lrD):
 def netG_train(
     inputs, 
     targets, 
-    csms, 
-    masks, 
+    AtA,
     netD, 
     netG, 
     optimizerG, 
@@ -28,14 +27,17 @@ def netG_train(
     optimizerG.zero_grad()
     outputs_G = netG(inputs)
     output_D_fake = netD(inputs, outputs_G)
+    output_AtA_G = AtA(outputs_G)
 
     one = Variable(torch.ones(*output_D_fake.size()).cuda())
 
     loss = loss_classificaiton()
     lossl1 = lossL1()
+    lossl2 = lossL2()
+
     errG_fake = loss(output_D_fake, one)
     errG_l1 = lossl1(outputs_G, targets)
-    errG_dc = loss_data_consistency(inputs, outputs_G, csms, masks)
+    errG_dc = lossl2(output_AtA_G, inputs)
     errG = errG_fake + lambda_l1 * errG_l1 + lambda_dc*errG_dc
 
     errG.backward()
