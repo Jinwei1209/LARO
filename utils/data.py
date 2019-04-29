@@ -100,18 +100,20 @@ def cplx_mlpy(a, b):
     """
     multiply two 'complex' tensors (with the last dim = 2, representing real and imaginary parts)
     """
-    out = torch.empty(a.shape)
+    device = a.get_device()
+    out = torch.empty(a.shape).to(device)
     out[..., 0] = a[..., 0]*b[..., 0] - a[..., 1]*b[..., 1]
     out[..., 1] = a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
 
     return out
 
 
-def cplx_cong(a):
+def cplx_conj(a):
     """
     conjugate of a complex number
     """
-    out = torch.empyt(a.shape)
+    device = a.get_device()
+    out = torch.empty(a.shape).to(device)
     out[..., 0] = a[..., 0]
     out[..., 1] = -a[..., 1]
 

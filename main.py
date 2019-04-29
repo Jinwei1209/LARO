@@ -25,6 +25,7 @@ if __name__ == '__main__':
     
     display_iters = 10
     lambda_l1 = 1000
+    lambda_dll2 = 1000
     lambda_dc = 1000
 
     t0 = time.time()
@@ -71,13 +72,12 @@ if __name__ == '__main__':
             csms = csms.to(device)
             masks = masks.to(device)
 
-            tmp = cplx_mlpy(csms, masks)
-
             errD = netD_train(inputs, targets, netD, netG, optimizerD)
             errD_sum += errD
 
             AtA = Back_forward(csms, masks, lambda_dc).AtA
-            tmp = AtA(targets)
+            coilComb = AtA(targets)
+            print(coilComb.shape)
 
             errG, errL1, errdc = netG_train(inputs, targets, csms, masks, netD, netG, optimizerG, lambda_l1)
             errG_sum += errG

@@ -85,7 +85,7 @@ class real_data_loader():
         # for real-valued images
         org = np.float32(np.concatenate((org, np.zeros(org.shape)), axis=0))
         csm = np.float32(np.concatenate((csm[..., np.newaxis], np.zeros(csm.shape+(1,))), axis=-1))
-        mask = np.float32(np.tile(mask[..., np.newaxis], (1, 1, 1, 2)))
+        mask = np.float32(np.concatenate((mask[..., np.newaxis], np.zeros(mask.shape+(1,))), axis=-1))
         
         return atb, org, csm, mask
 

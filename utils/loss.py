@@ -10,7 +10,7 @@ class Back_forward():
         self,
         csm,
         mask,
-        lambda_dc
+        lambda_dll2,
     ):
 
         self.ncoil = csm.shape[1]
@@ -21,21 +21,28 @@ class Back_forward():
         self.csm = csm
         self.mask = mask
         self.factor = torch.sqrt(self.npixels)
-        self.lambda_dc = lambda_dc
-        print(csm.shape)
-        print(mask.shape)
+        self.lambda_dll2 = lambda_dll2
 
-    def AtA(self, img):
+    def AtA(self, img, use_dll2=False):
 
-        print(img.shape)
         img = img.permute(0, 2, 3, 1)
         img = img[:, None, ...]
-        print(img.shape)
-
         coilImages = cplx_mlpy(self.csm, img)
-        kspace = torch.fft(coilImages, 2)
+        kspace = torch.fft(coilImages, 2)/self.factor
+        temp = cplx_mlpy(kspace, self.mask)
+        coilImgs = torch.ifft(temp, 2)*self.factor
+        coilComb = torch.sum(
+            cplx_mlpy(coilImgs, cplx_conj(self.csm)),
+            dim=1,
+            keepdim=False
+        )
+        if use_dll2:
+            coilComb = coilComb[:, None, ...]
+            coilComb = coilComb + self.lambda_dll2*img
+        else:
+            coilComb = coilComb.permute(0, 3, 1, 2)
 
-        return kspace
+        return coilComb
 
 
 def forward_operator(img, csm, mask, ncoil, nrow, ncol):
