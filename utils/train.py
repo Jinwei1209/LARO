@@ -5,14 +5,6 @@ from torch.autograd import Variable
 from utils.loss import *
 
 
-def get_optimizers(netG, netD, lrG, lrD):
-
-    optimizerD = optim.Adam(netD.parameters(), lr = lrD, betas=(0.5, 0.999))
-    optimizerG = optim.Adam(netG.parameters(), lr = lrG, betas=(0.5, 0.999))
-
-    return optimizerD, optimizerG
-
-
 def netG_train(
     inputs, 
     targets, 
@@ -68,3 +60,33 @@ def netD_train(inputs, targets, netD, netG, optimizerD):
     optimizerD.step()
 
     return errD_real.item(), errD_fake.item()
+
+
+def netG_dc_train(
+    inputs, 
+    targets,
+    csms,
+    masks,
+    netD, 
+    netG_dc, 
+    optimizerG_dc, 
+    lambda_l1=1000
+):
+
+    optimizerG_dc.zero_grad()
+    outputs_G_dc = netG_dc(inputs, csms, masks)
+    output_D_fake = netD(inputs, outputs_G_dc)
+
+    one = Variable(torch.ones(*output_D_fake.size()).cuda())
+
+    loss = loss_classificaiton()
+    lossl1 = lossL1()
+
+    errG_dc_fake = loss(output_D_fake, one)
+    errG_dc_l1 = lossl1(outputs_G_dc, targets)
+    errG_dc = errG_dc_fake + lambda_l1 * errG_dc_l1
+
+    errG_dc.backward()
+    optimizerG_dc.step()
+
+    return  errG_dc_fake.item(), errG_dc_l1.item()
