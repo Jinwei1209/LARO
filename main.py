@@ -12,22 +12,24 @@ from utils.train import *
 from IPython.display import clear_output
 from utils.loss import *
 from models.dc_blocks import *
+from models.unet_with_dc import *
 
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     lrG = lrD = 2e-4
     niter = 150
     batch_size = 16
     epoch = 0
     gen_iterations = 0
-    errL1_sum = errG_sum = errD_sum = errdc_sum = 0
+    errL1_sum = errG_sum = errD_real_sum = errD_fake_sum = errdc_sum = 0
     
     display_iters = 10
     lambda_l1 = 1000
-    lambda_dll2 = 0
+    lambda_dll2 = 0.001
     lambda_dc = 1000
+    K = 1
 
     t0 = time.time()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -37,11 +39,18 @@ if __name__ == '__main__':
 
     netG = Unet(input_channels=2, output_channels=2, num_filters=[2**i for i in range(5, 10)])
     netD = Basic_D(input_channels=2, output_channels=2, num_filters=[32, 64, 128, 256])
+    unet_dc = Unet_with_DC(
+        input_channels=2, 
+        output_channels=2, 
+        num_filters=[2**i for i in range(5, 10)],
+        lambda_dll2=lambda_dll2)
+
     netG.to(device)
     netD.to(device)
+    unet_dc.to(device)
 
     optimizerD, optimizerG = get_optimizers(netG, netD, lrG, lrD)
-    print(netG)
+    print(unet_dc)
     
     while epoch < niter: 
         
@@ -53,29 +62,42 @@ if __name__ == '__main__':
                     clear_output()
                 
                 sampling = True
-                # inputs_show, idxs = showImage(inputs, sampling=sampling)
+                inputs_show, idxs = showImage(inputs, sampling=sampling)
                 
                 sampling = False
-                # targets_show, idxs = showImage(targets, idxs=idxs, sampling=sampling)
+                targets_show, idxs = showImage(targets, idxs=idxs, sampling=sampling)
 
                 inputs = inputs.to(device)
+                targets = targets.to(device)
+                csms = csms.to(device)
+                masks = masks.to(device)
+                
                 outputs = netG(inputs)
                 outputs_np = np.squeeze(np.asarray(outputs.cpu().detach()))
-                # outputs_show, idxs = showImage(outputs_np, idxs=idxs, sampling=sampling)
+                outputs_show, idxs = showImage(outputs_np, idxs=idxs, sampling=sampling)
 
-                print('epochs: [%d/%d], batchs: [%d/%d], Loss_D: %f, Loss_G: %f, loss_L1: %f, loss_dc: %f, time: %ds'
-                % (epoch, niter, idx, 8800//batch_size+1, errD_sum/display_iters, errG_sum/display_iters, 
-                errL1_sum/display_iters, errdc_sum/display_iters, time.time()-t0))
+                print('epochs: [%d/%d], batchs: [%d/%d], Loss_D_real: %f, Loss_D_fake: %f, ' \
+                      'Loss_G: %f, loss_L1: %f, loss_dc: %f, time: %ds'
+                % (epoch, niter, idx, 8800//batch_size+1, errD_real_sum/display_iters, errD_fake_sum/display_iters,
+                   errG_sum/display_iters, errL1_sum/display_iters, errdc_sum/display_iters, time.time()-t0))
 
-                errL1_sum = errG_sum = errD_sum = errdc_sum = 0
+                errL1_sum = errG_sum = errD_real_sum = errD_fake_sum = errdc_sum = 0
+                
+                A = Back_forward(csms, masks, lambda_dll2)
+                rhs = lambda_dll2*outputs + inputs
+                dc_layer = DC_layer(A, rhs)
+                tmp_images = dc_layer.CG_iter()
+                tmp_images_np = np.squeeze(np.asarray(tmp_images.cpu().detach()))
+                tmp_show, idxs = showImage(tmp_images_np, idxs=idxs, sampling=sampling)
                 
             inputs = inputs.to(device)
             targets = targets.to(device)
             csms = csms.to(device)
             masks = masks.to(device)
 
-            errD = netD_train(inputs, targets, netD, netG, optimizerD)
-            errD_sum += errD
+            errD_real, errD_fake = netD_train(inputs, targets, netD, netG, optimizerD)
+            errD_real_sum += errD_real
+            errD_fake_sum += errD_fake
 
             AtA = Back_forward(csms, masks, lambda_dll2).AtA
             errG, errL1, errdc = netG_train(inputs, targets, AtA, \
@@ -85,12 +107,5 @@ if __name__ == '__main__':
             errdc_sum += errdc
 
             gen_iterations += 1
-
-            A = Back_forward(csms, masks, lambda_dll2)
-            rhs = lambda_dll2*outputs + inputs
-            dc_layer = DC_layer(A, rhs)
-            tmp_images = dc_layer.CG_iter()
-            
-            print(tmp1.shape)
 
 
