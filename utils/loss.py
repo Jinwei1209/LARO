@@ -25,9 +25,9 @@ class Back_forward():
 
     def AtA(self, img, use_dll2=False):
 
-        img = img.permute(0, 2, 3, 1)
-        img = img[:, None, ...]
-        coilImages = cplx_mlpy(self.csm, img)
+        img_new = img.permute(0, 2, 3, 1)
+        img_new = img_new[:, None, ...]
+        coilImages = cplx_mlpy(self.csm, img_new)
         kspace = torch.fft(coilImages, 2)/self.factor
         temp = cplx_mlpy(kspace, self.mask)
         coilImgs = torch.ifft(temp, 2)*self.factor
@@ -36,11 +36,9 @@ class Back_forward():
             dim=1,
             keepdim=False
         )
+        coilComb = coilComb.permute(0, 3, 1, 2)
         if use_dll2:
-            coilComb = coilComb[:, None, ...]
             coilComb = coilComb + self.lambda_dll2*img
-        else:
-            coilComb = coilComb.permute(0, 3, 1, 2)
 
         return coilComb
 

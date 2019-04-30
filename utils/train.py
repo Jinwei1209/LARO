@@ -67,4 +67,4 @@ def netD_train(inputs, targets, netD, netG, optimizerD):
 
     optimizerD.step()
 
-    return errD.item()/2
+    return errD_real.item(), errD_fake.item()

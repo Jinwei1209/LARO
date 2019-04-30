@@ -11,21 +11,22 @@ from models.discriminator import Basic_D
 from utils.train import *
 from IPython.display import clear_output
 from utils.loss import *
+from models.dc_blocks import *
 
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG = lrD = 2e-4
     niter = 150
-    batch_size = 32
+    batch_size = 16
     epoch = 0
     gen_iterations = 0
     errL1_sum = errG_sum = errD_sum = errdc_sum = 0
     
     display_iters = 10
     lambda_l1 = 1000
-    lambda_dll2 = 1000
+    lambda_dll2 = 0
     lambda_dc = 1000
 
     t0 = time.time()
@@ -65,7 +66,7 @@ if __name__ == '__main__':
                 print('epochs: [%d/%d], batchs: [%d/%d], Loss_D: %f, Loss_G: %f, loss_L1: %f, loss_dc: %f, time: %ds'
                 % (epoch, niter, idx, 8800//batch_size+1, errD_sum/display_iters, errG_sum/display_iters, 
                 errL1_sum/display_iters, errdc_sum/display_iters, time.time()-t0))
-                
+
                 errL1_sum = errG_sum = errD_sum = errdc_sum = 0
                 
             inputs = inputs.to(device)
@@ -84,3 +85,12 @@ if __name__ == '__main__':
             errdc_sum += errdc
 
             gen_iterations += 1
+
+            A = Back_forward(csms, masks, lambda_dll2)
+            rhs = lambda_dll2*outputs + inputs
+            dc_layer = DC_layer(A, rhs)
+            tmp_images = dc_layer.CG_iter()
+            
+            print(tmp1.shape)
+
+

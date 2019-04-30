@@ -108,6 +108,24 @@ def cplx_mlpy(a, b):
     return out
 
 
+def cplx_dvd(a, b):
+    """
+    division between a and b
+    """
+    device = a.get_device()
+
+    denom = torch.empty(a.shape).to(device)
+    denom[..., 0] = b[..., 0]**2 + b[..., 1]**2
+    denom[..., 1] = denom[..., 0]
+
+    out = torch.empty(a.shape).to(device)
+    out[..., 0] = a[..., 0]*b[..., 0] + a[..., 1]*b[..., 1]
+    out[..., 1] = -a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
+    out = out/denom
+
+    return out
+
+
 def cplx_conj(a):
     """
     conjugate of a complex number
