@@ -41,7 +41,7 @@ if __name__ == '__main__':
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
     dataLoader_val = real_data_loader(split='val')
-    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
+    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size//2, shuffle=True)
 
     # netG = Unet(input_channels=2, output_channels=2, num_filters=[2**i for i in range(5, 10)])
     netD = Basic_D(input_channels=2, output_channels=2, num_filters=[32, 64, 128, 256])
@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
                 print('Average PSNR in Training dataset is %.2f' % (np.mean(np.asarray(metrices_train.PSNRs))))
                 if epoch > 1:
-                    print('Average PSNR in Validation dataset is %d' % (np.mean(np.asarray(metrices_test.PSNRs))))
+                    print('Average PSNR in Validation dataset is %.2f' % (np.mean(np.asarray(metrices_test.PSNRs))))
 
                 errD_real_sum = errD_fake_sum = 0
                 errL1_sum = errG_sum = errdc_sum = 0
@@ -147,6 +147,7 @@ if __name__ == '__main__':
             outputs = unet_dc(inputs, csms, masks)
             metrices_train.get_metrices(outputs, targets)
 
+            
         # validation phase
         metrices_test = Metrices()
         for idx, (inputs, targets, csms, masks) in enumerate(valLoader):
@@ -159,5 +160,3 @@ if __name__ == '__main__':
             #calculating metrices
             outputs = unet_dc(inputs, csms, masks)
             metrices_test.get_metrices(outputs, targets)
-
-        print('Average PSNR in Validation dataset is %d' % (np.mean(np.asarray(metrices_test.PSNRs))))
