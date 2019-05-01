@@ -38,7 +38,7 @@ def netG_train(
     return  errG_fake.item(), errG_l1.item(), errG_dc.item()
 
 
-def netD_train(inputs, targets, netD, netG, optimizerD):
+def netD_train(inputs, targets, csms, masks, netD, netG, optimizerD, dc_layer=True):
 
     loss = loss_classificaiton()
 
@@ -47,8 +47,10 @@ def netD_train(inputs, targets, netD, netG, optimizerD):
     one = Variable(torch.ones(*output_D_real.size()).cuda())
     errD_real = loss(output_D_real, one)
     # errD_real.backward()
-
-    outputs_G = netG(inputs)
+    if dc_layer:
+        outputs_G = netG(inputs, csms, masks)
+    else:
+        outputs_G = netG(inputs)
     output_D_fake = netD(inputs, outputs_G)
     zero = Variable(torch.zeros(*output_D_real.size()).cuda())
     errD_fake = loss(output_D_fake, zero)

@@ -31,7 +31,6 @@ def listFilesWithSuffix(rootDir = '.', suffix = None):
         res = [os.path.join(rootDir, filename) 
             for filename in os.listdir(rootDir) 
                 if os.path.isfile(os.path.join(rootDir, filename))]    
-
     return res
 
 
@@ -40,7 +39,6 @@ def load_h5(filename, varname='data'):
     import h5py
     with h5py.File(filename, 'r') as f:
         data = f[varname][:]
-
     return data
 
 
@@ -55,8 +53,22 @@ def load_mat(filename, varname='data'):
             data = data.transpose(3,2,1,0)
         elif data.ndim == 3:
             data = data.transpose(2,1,0)
-
     return data
+
+
+def div0(a, b):
+    """handling division by zero"""
+    c = np.divide(a, b, out=np.zeros_like(a), where=b!=0)
+    return c
+
+
+def normalization(img):
+    """ normalizing images (batchsize*nrow*ncol)"""
+    img_new = np.empty(img.shape, dtype=img.dtype)
+    for i in range(len(img)):
+        img_new[i] = div0(img[i]-img[i].min(), img[i].ptp())
+    return img_new
+
 
 
 def r2c(img):
@@ -76,7 +88,6 @@ def r2c(img):
         out = img[:, 0, ...]
     else:
         out = img[:, 0, ...] + 1j*img[:, 1, ...]
-
     return out
 
 
@@ -92,7 +103,6 @@ def c2r(img):
     out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
     out[0, ...] = img.real
     out[1, ...] = img.imag
-
     return out
 
 
@@ -104,7 +114,6 @@ def cplx_mlpy(a, b):
     out = torch.empty(a.shape).to(device)
     out[..., 0] = a[..., 0]*b[..., 0] - a[..., 1]*b[..., 1]
     out[..., 1] = a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
-
     return out
 
 
@@ -122,7 +131,6 @@ def cplx_dvd(a, b):
     out[..., 0] = a[..., 0]*b[..., 0] + a[..., 1]*b[..., 1]
     out[..., 1] = -a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
     out = out/denom
-
     return out
 
 
@@ -134,7 +142,6 @@ def cplx_conj(a):
     out = torch.empty(a.shape).to(device)
     out[..., 0] = a[..., 0]
     out[..., 1] = -a[..., 1]
-
     return out
 
 
@@ -162,7 +169,6 @@ def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
         imgstack[:, x*ncol:(x+1)*ncol, :] = int_img[idx, ...]
 
     display(Image.fromarray(imgstack))
-
     return imgstack, idxs
     
 

@@ -1,10 +1,11 @@
 import os
 import numpy as np
+from torch.utils import data
 from utils.data import *
 from utils.loss import *
 
 
-class real_data_loader():
+class real_data_loader(data.Dataset):
 
 
     folderMatcher = {
@@ -71,8 +72,8 @@ class real_data_loader():
         org = load_mat(self.dataFD + '%d.mat' %(idx), 'a')
         org = np.float32(org[np.newaxis, ...]) 
 
-        # csm = np.ones((self.ncoil, self.nrow, self.ncol))
-        csm = abs(org) > 1e-1
+        csm = np.ones((self.ncoil, self.nrow, self.ncol))
+        # csm = abs(org) > 1e-1
         csm = np.float32(csm)
 
         mask = load_mat(self.rootDir + 'mask/random_30.mat', 'mask')
