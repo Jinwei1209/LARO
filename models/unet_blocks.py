@@ -29,8 +29,6 @@ def ConvBlock(
     return layers
 
 
-
-
 class DownConvBlock(nn.Module):
 
     def __init__(

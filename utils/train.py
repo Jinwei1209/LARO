@@ -82,7 +82,7 @@ def netG_dc_train(
     one = Variable(torch.ones(*output_D_fake.size()).cuda())
 
     loss = loss_classificaiton()
-    lossl1 = lossL1()
+    lossl1 = lossL2()
 
     errG_dc_fake = loss(output_D_fake, one)
     errG_dc_l1 = lossl1(outputs_G_dc, targets)
@@ -92,3 +92,30 @@ def netG_dc_train(
     optimizerG_dc.step()
 
     return  errG_dc_fake.item(), errG_dc_l1.item()
+
+
+def Unet_train(
+    inputs, 
+    targets, 
+    AtA,
+    netG, 
+    optimizerG, 
+    lambda_l1=1000, 
+    lambda_dc=1000
+):
+
+    optimizerG.zero_grad()
+    outputs_G = netG(inputs)
+    output_AtA_G = AtA(outputs_G)
+
+    lossl1 = lossL1()
+    lossl2 = lossL2()
+
+    errG_l1 = lossl1(outputs_G, targets)
+    errG_dc = lossl2(output_AtA_G, inputs)
+    errG = lambda_l1 * errG_l1 + lambda_dc*errG_dc
+
+    errG.backward()
+    optimizerG.step()
+
+    return errG_l1.item(), errG_dc.item()

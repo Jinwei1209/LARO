@@ -22,8 +22,11 @@ class Metrices():
     def get_metrices(self, outputs, targets):
         outputs = np.squeeze(np.asarray(outputs.cpu().detach()))
         targets = np.squeeze(np.asarray(targets.cpu().detach()))
-        outputs = normalization(abs(r2c(outputs)))
-        targets = normalization(abs(r2c(targets)))
+        # outputs = normalization(abs(r2c(outputs)))
+        # targets = normalization(abs(r2c(targets)))
+        outputs = abs(r2c(outputs))
+        targets = abs(r2c(targets))
+        # weights = targets > 1e-1
         for i in range(len(targets)):
             self.PSNRs.append(psnr(outputs[i], targets[i]))
 

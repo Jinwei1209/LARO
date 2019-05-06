@@ -13,20 +13,21 @@ from IPython.display import clear_output
 from utils.loss import *
 from models.dc_blocks import *
 from models.unet_with_dc import *
+from models.resnet_with_dc import *
 from utils.test import *
 
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
     lrG = lrD = lrG_dc = 2e-4
     niter = 150
-    batch_size = 32
+    batch_size = 8
     display_iters = 10
     lambda_l1 = 1000
-    lambda_dll2 = 0.001
+    lambda_dll2 = 0.01
     lambda_dc = 1000
-    K = 1
+    K = 10
 
     epoch = 0
     gen_iterations = 1
@@ -44,21 +45,25 @@ if __name__ == '__main__':
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size//2, shuffle=True)
 
     # netG = Unet(input_channels=2, output_channels=2, num_filters=[2**i for i in range(5, 10)])
-    netD = Basic_D(input_channels=2, output_channels=2, num_filters=[32, 64, 128, 256])
-    unet_dc = Unet_with_DC(
-        input_channels=2, 
-        output_channels=2, 
-        num_filters=[2**i for i in range(5, 10)],
-        lambda_dll2=lambda_dll2,
-        K=K)
+    netD = Basic_D(input_channels=2, output_channels=2, num_filters=[2**i for i in range(3, 9)])
+    
+    netG_dc = Resnet_with_DC(input_channels=2, filter_channels=32, lambda_dll2=lambda_dll2, K=K)
+    # netG_dc = Unet_with_DC(
+    #     input_channels=2, 
+    #     output_channels=2, 
+    #     num_filters=[2**i for i in range(5, 10)],
+    #     lambda_dll2=lambda_dll2,
+    #     K=K)
+
+    print(netG_dc)
 
     # netG.to(device)
     netD.to(device)
-    unet_dc.to(device)
+    netG_dc.to(device)
 
     optimizerD = optim.Adam(netD.parameters(), lr = lrD, betas=(0.5, 0.999))
     # optimizerG = optim.Adam(netG.parameters(), lr = lrG, betas=(0.5, 0.999))
-    optimizerG_dc = optim.Adam(unet_dc.parameters(), lr = lrG_dc, betas=(0.5, 0.999))
+    optimizerG_dc = optim.Adam(netG_dc.parameters(), lr = lrG_dc, betas=(0.5, 0.999))
     
     while epoch < niter:
         
@@ -72,10 +77,10 @@ if __name__ == '__main__':
                     clear_output()
                 
                 sampling = True
-                inputs_show, idxs = showImage(inputs, sampling=sampling)
+                # inputs_show, idxs = showImage(inputs, sampling=sampling)
                 
                 sampling = False
-                targets_show, idxs = showImage(targets, idxs=idxs, sampling=sampling)
+                # targets_show, idxs = showImage(targets, idxs=idxs, sampling=sampling)
 
                 inputs = inputs.to(device)
                 targets = targets.to(device)
@@ -83,14 +88,14 @@ if __name__ == '__main__':
                 masks = masks.to(device)
                 
                 # outputs = netG(inputs)
-                outputs = unet_dc(inputs, csms, masks)
+                outputs = netG_dc(inputs, csms, masks)
                 outputs_np = np.squeeze(np.asarray(outputs.cpu().detach()))
-                outputs_show, idxs = showImage(outputs_np, idxs=idxs, sampling=sampling)
+                # outputs_show, idxs = showImage(outputs_np, idxs=idxs, sampling=sampling)
 
                 print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                 % (epoch, niter, idx, 8800//batch_size+1, time.time()-t0))
 
-                print('Lambda_dll2: %f' % (unet_dc.lambda_dll2))
+                print('Lambda_dll2: %f' % (netG_dc.lambda_dll2))
 
                 print('Discriminator --- Loss_D_real: %f, Loss_D_fake: %f'
                 % (errD_real_sum/display_iters, errD_fake_sum/display_iters))
@@ -98,7 +103,7 @@ if __name__ == '__main__':
                 # print('Unet --- Loss_G: %f, loss_L1: %f, loss_fidelity: %f'
                 # % (errG_sum/display_iters, errL1_sum/display_iters, errdc_sum/display_iters))
 
-                print('Unet_dc --- Loss_G_dc: %f, loss_L1_dc: %f'
+                print('netG_dc --- Loss_G_dc: %f, loss_L2_dc: %f'
                 % (errG_dc_sum/display_iters, errL1_dc_sum/display_iters))
 
                 print('Average PSNR in Training dataset is %.2f' % (np.mean(np.asarray(metrices_train.PSNRs))))
@@ -124,29 +129,30 @@ if __name__ == '__main__':
 
             # train discriminator
             errD_real, errD_fake = netD_train(inputs, targets, csms, masks, \
-                                                netD, unet_dc, optimizerD)
+                                              netD, netG_dc, optimizerD, dc_layer=True)
             errD_real_sum += errD_real
             errD_fake_sum += errD_fake
 
-            # # train generator without dc layer, but with fidelity loss
-            # AtA = Back_forward(csms, masks, lambda_dll2).AtA
-            # errG, errL1, errdc = netG_train(inputs, targets, AtA, \
-            #     netD, netG, optimizerG, lambda_l1, lambda_dc)
-            # errG_sum += errG
-            # errL1_sum += errL1
-            # errdc_sum += errdc
+            ## train generator without dc layer, but with fidelity loss
+            #AtA = Back_forward(csms, masks, lambda_dll2).AtA
+            #errG, errL1, errdc = netG_train(inputs, targets, AtA, \
+            #                                netD, netG, optimizerG, lambda_l1, lambda_dc)
+            #errG_sum += errG
+            #errL1_sum += errL1
+            #errdc_sum += errdc
 
             # train generator with dc layer, but without fidelity loss
             errG_dc, errL1_dc = netG_dc_train(inputs, targets, csms, masks, \
-                                              netD, unet_dc, optimizerG_dc, lambda_l1)
+                                              netD, netG_dc, optimizerG_dc, lambda_l1)
             errG_dc_sum += errG_dc
             errL1_dc_sum = errL1_dc 
-            gen_iterations += 1
 
-            #calculating metrices
-            outputs = unet_dc(inputs, csms, masks)
+            # calculating metrices
+            outputs = netG_dc(inputs, csms, masks)
+            # outputs = netG(inputs)
             metrices_train.get_metrices(outputs, targets)
 
+            gen_iterations += 1
             
         # validation phase
         metrices_test = Metrices()
@@ -157,6 +163,7 @@ if __name__ == '__main__':
             csms = csms.to(device)
             masks = masks.to(device)
 
-            #calculating metrices
-            outputs = unet_dc(inputs, csms, masks)
+            # calculating metrices
+            outputs = netG_dc(inputs, csms, masks)
+            # outputs = netG(inputs, csms, masks)
             metrices_test.get_metrices(outputs, targets)
