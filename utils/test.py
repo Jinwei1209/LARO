@@ -30,6 +30,12 @@ class Metrices():
         for i in range(len(targets)):
             self.PSNRs.append(psnr(outputs[i], targets[i]))
 
+    
+
+
+    
+
+
 
 
 

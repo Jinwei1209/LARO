@@ -82,7 +82,7 @@ def netG_dc_train(
     one = Variable(torch.ones(*output_D_fake.size()).cuda())
 
     loss = loss_classificaiton()
-    lossl1 = lossL2()
+    lossl1 = lossL1()
 
     errG_dc_fake = loss(output_D_fake, one)
     errG_dc_l1 = lossl1(outputs_G_dc, targets)

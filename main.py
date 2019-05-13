@@ -19,21 +19,25 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     lrG = lrD = lrG_dc = 2e-4
-    niter = 150
-    batch_size = 8
+    niter = 50
+    batch_size = 4
     display_iters = 10
     lambda_l1 = 1000
     lambda_dll2 = 0.01
     lambda_dc = 1000
     K = 10
+    folderName = '{0}_rolls'.format(K)
+    rootName = '/home/sdc/Jinwei/FINE_GAN'
+    logger = Logger(folderName, rootName) 
 
     epoch = 0
     gen_iterations = 1
     errD_real_sum = errD_fake_sum = 0
     errL1_sum = errG_sum = errdc_sum = 0
     errL1_dc_sum = errG_dc_sum = 0
+    PSNRs_val = []
 
     t0 = time.time()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -103,17 +107,18 @@ if __name__ == '__main__':
                 # print('Unet --- Loss_G: %f, loss_L1: %f, loss_fidelity: %f'
                 # % (errG_sum/display_iters, errL1_sum/display_iters, errdc_sum/display_iters))
 
-                print('netG_dc --- Loss_G_dc: %f, loss_L2_dc: %f'
+                print('netG_dc --- Loss_G_dc: %f, loss_L1_dc: %f'
                 % (errG_dc_sum/display_iters, errL1_dc_sum/display_iters))
 
-                print('Average PSNR in Training dataset is %.2f' % (np.mean(np.asarray(metrices_train.PSNRs))))
+                print('Average PSNR in Training dataset is %.2f' 
+                % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
                 if epoch > 1:
-                    print('Average PSNR in Validation dataset is %.2f' % (np.mean(np.asarray(metrices_test.PSNRs))))
+                    print('Average PSNR in Validation dataset is %.2f' 
+                    % (np.mean(np.asarray(metrices_val.PSNRs))))
 
                 errD_real_sum = errD_fake_sum = 0
                 errL1_sum = errG_sum = errdc_sum = 0
                 errL1_dc_sum = errG_dc_sum = 0
-                metrices_train = Metrices()
                 
                 # A = Back_forward(csms, masks, lambda_dll2)
                 # rhs = lambda_dll2*outputs + inputs
@@ -155,7 +160,7 @@ if __name__ == '__main__':
             gen_iterations += 1
             
         # validation phase
-        metrices_test = Metrices()
+        metrices_val = Metrices()
         for idx, (inputs, targets, csms, masks) in enumerate(valLoader):
 
             inputs = inputs.to(device)
@@ -166,4 +171,18 @@ if __name__ == '__main__':
             # calculating metrices
             outputs = netG_dc(inputs, csms, masks)
             # outputs = netG(inputs, csms, masks)
-            metrices_test.get_metrices(outputs, targets)
+            metrices_val.get_metrices(outputs, targets)
+
+        # save log
+        logger.print_and_save('Epoch: [%d/%d], PSNR in Training: %.2f' 
+        % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs))))
+        logger.print_and_save('Epoch: [%d/%d], PSNR in Validation: %.2f' 
+        % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs))))
+
+        # save weights
+        PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
+        if PSNRs_val[-1] == max(PSNRs_val):
+            torch.save(netG_dc.state_dict(), logger.logPath+'/weights.pt')
+
+            
+

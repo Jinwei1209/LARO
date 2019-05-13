@@ -4,6 +4,7 @@ import numpy as np
 import scipy.io as sio
 import random
 import torch
+import datetime
 from IPython.display import display
 from PIL import Image
 
@@ -170,6 +171,51 @@ def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
 
     display(Image.fromarray(imgstack))
     return imgstack, idxs
+
+
+class Logger():
+
+    def __init__(self, folderName, rootName, flagFrint=True, flagSave=True):
+        
+        self.flagFrint = flagFrint
+        self.flagSave = flagSave
+
+        self.folderName = folderName
+        self.rootName = rootName
+
+        if(not os.path.exists(self.rootName)):
+            os.mkdir(self.rootName)
+        self.logPath = os.path.join(self.rootName, self.folderName)
+
+        self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
+        print(self.t0)
+        self.fileName = 'logs_begining_at_' + self.t0 + '.log'
+        self.filePath = os.path.join(self.logPath, self.fileName)
+
+        if self.flagSave:
+            if not os.path.exists(self.logPath):
+                os.mkdir(self.logPath)
+            self.file = open(self.filePath, 'w')
+
+    def print_and_save(self, string, *args):
+
+        if not isinstance(string, str):
+            string = str(string)
+
+        if self.flagFrint:
+            print(string % (args))
+
+        if self.flagSave:
+            self.file.write(string % (args))
+            self.file.write('\n')
+
+    def close(self):
+
+        self.flagFrint = False
+        self.flagSave = False
+        self.file.close()
+
+
     
 
 
