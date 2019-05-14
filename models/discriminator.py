@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from models.utils import init_weights
+from models.initialization import init_weights
 
 
 def conv_block(

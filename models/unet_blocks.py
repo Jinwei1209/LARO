@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.autograd import Variable
-from models.utils import init_weights
+from models.initialization import init_weights
 
 
 def ConvBlock(

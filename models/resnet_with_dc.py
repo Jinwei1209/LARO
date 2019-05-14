@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.dc_blocks import *
 from models.unet_blocks import *
-from models.utils import *
+from models.initialization import *
 
 
 def ResBlock(
