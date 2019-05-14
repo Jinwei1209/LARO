@@ -6,7 +6,7 @@ from torch.utils import data
 from loader.real_data_loader import real_data_loader
 from utils.data import *
 from models.unet import Unet
-from models.utils import *
+from models.initialization import *
 from models.discriminator import Basic_D
 from utils.train import *
 from IPython.display import clear_output
@@ -19,7 +19,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     lrG = lrD = lrG_dc = 2e-4
     niter = 50
     batch_size = 6
