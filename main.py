@@ -29,7 +29,7 @@ if __name__ == '__main__':
     lambda_dc = 1000
     K = 10
     folderName = '{0}_rolls'.format(K)
-    rootName = '/home/sdc/Jinwei/FINE_GAN'
+    rootName = '../'
     logger = Logger(folderName, rootName) 
 
     epoch = 0
