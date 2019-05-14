@@ -19,10 +19,10 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG = lrD = lrG_dc = 2e-4
     niter = 50
-    batch_size = 4
+    batch_size = 6
     display_iters = 10
     lambda_l1 = 1000
     lambda_dll2 = 0.01

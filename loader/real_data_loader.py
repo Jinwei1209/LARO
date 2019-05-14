@@ -22,7 +22,7 @@ class real_data_loader(data.Dataset):
 
 
     def __init__(self,
-        rootDir = '/home/sdc/Jinwei/Contrast_Transform/Data/',
+        rootDir = '/data/Jinwei/T2_slice_recon/',
         contrast = 'T2',
         split = 'train',
         batchSize = 1,
