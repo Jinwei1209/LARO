@@ -15,7 +15,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 10
     lambda_dll2 = 0.01
@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     netG_dc = Resnet_with_DC(input_channels=2, filter_channels=32, lambda_dll2=lambda_dll2, K=K)
     netG_dc.to(device)
-    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights.pt'))
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights_sigma=0.01.pt'))
     netG_dc.eval()
     print(netG_dc.lambda_dll2)
     metrices_test = Metrices()

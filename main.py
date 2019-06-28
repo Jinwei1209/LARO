@@ -29,8 +29,7 @@ if __name__ == '__main__':
     lambda_dc = 1000
     K = 10
     folderName = '{0}_rolls'.format(K)
-    rootName = '../'
-    logger = Logger(folderName, rootName) 
+    rootName = '/data/Jinwei/T2_slice_recon'
 
     epoch = 0
     gen_iterations = 1
@@ -49,7 +48,7 @@ if __name__ == '__main__':
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size//2, shuffle=True)
 
     # netG = Unet(input_channels=2, output_channels=2, num_filters=[2**i for i in range(5, 10)])
-    netD = Basic_D(input_channels=2, output_channels=2, num_filters=[2**i for i in range(3, 9)])
+    # netD = Basic_D(input_channels=2, output_channels=2, num_filters=[2**i for i in range(3, 9)])
     
     netG_dc = Resnet_with_DC(input_channels=2, filter_channels=32, lambda_dll2=lambda_dll2, K=K)
     # netG_dc = Unet_with_DC(
@@ -62,16 +61,18 @@ if __name__ == '__main__':
     print(netG_dc)
 
     # netG.to(device)
-    netD.to(device)
+    # netD.to(device)
     netG_dc.to(device)
 
-    optimizerD = optim.Adam(netD.parameters(), lr = lrD, betas=(0.5, 0.999))
+    # optimizerD = optim.Adam(netD.parameters(), lr = lrD, betas=(0.5, 0.999))
     # optimizerG = optim.Adam(netG.parameters(), lr = lrG, betas=(0.5, 0.999))
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr = lrG_dc, betas=(0.5, 0.999))
+
+    logger = Logger(folderName, rootName)
     
     while epoch < niter:
         
-        epoch += 1
+        epoch += 1 
         # training phase
         metrices_train = Metrices()
         for idx, (inputs, targets, csms, masks) in enumerate(trainLoader):
@@ -101,14 +102,16 @@ if __name__ == '__main__':
 
                 print('Lambda_dll2: %f' % (netG_dc.lambda_dll2))
 
-                print('Discriminator --- Loss_D_real: %f, Loss_D_fake: %f'
-                % (errD_real_sum/display_iters, errD_fake_sum/display_iters))
+                # print('Discriminator --- Loss_D_real: %f, Loss_D_fake: %f'
+                # % (errD_real_sum/display_iters, errD_fake_sum/display_iters))
 
                 # print('Unet --- Loss_G: %f, loss_L1: %f, loss_fidelity: %f'
                 # % (errG_sum/display_iters, errL1_sum/display_iters, errdc_sum/display_iters))
 
-                print('netG_dc --- Loss_G_dc: %f, loss_L1_dc: %f'
-                % (errG_dc_sum/display_iters, errL1_dc_sum/display_iters))
+                # print('netG_dc --- Loss_G_dc: %f, loss_L1_dc: %f'
+                # % (errG_dc_sum/display_iters, errL1_dc_sum/display_iters))
+
+                print('netG_dc --- loss_L1_dc: %f' % (errL1_dc_sum/display_iters))
 
                 print('Average PSNR in Training dataset is %.2f' 
                 % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
@@ -116,8 +119,8 @@ if __name__ == '__main__':
                     print('Average PSNR in Validation dataset is %.2f' 
                     % (np.mean(np.asarray(metrices_val.PSNRs))))
 
-                errD_real_sum = errD_fake_sum = 0
-                errL1_sum = errG_sum = errdc_sum = 0
+                # errD_real_sum = errD_fake_sum = 0
+                # errL1_sum = errG_sum = errdc_sum = 0
                 errL1_dc_sum = errG_dc_sum = 0
                 
                 # A = Back_forward(csms, masks, lambda_dll2)
@@ -132,11 +135,11 @@ if __name__ == '__main__':
             csms = csms.to(device)
             masks = masks.to(device)
 
-            # train discriminator
-            errD_real, errD_fake = netD_train(inputs, targets, csms, masks, \
-                                              netD, netG_dc, optimizerD, dc_layer=True)
-            errD_real_sum += errD_real
-            errD_fake_sum += errD_fake
+            # # train discriminator
+            # errD_real, errD_fake = netD_train(inputs, targets, csms, masks, \
+            #                                   netD, netG_dc, optimizerD, dc_layer=True)
+            # errD_real_sum += errD_real
+            # errD_fake_sum += errD_fake
 
             ## train generator without dc layer, but with fidelity loss
             #AtA = Back_forward(csms, masks, lambda_dll2).AtA
@@ -146,11 +149,13 @@ if __name__ == '__main__':
             #errL1_sum += errL1
             #errdc_sum += errdc
 
+            # # train generator with dc layer, but without fidelity loss
+            # errG_dc, errL1_dc = netG_dc_train(inputs, targets, csms, masks, \
+            #                                   netD, netG_dc, optimizerG_dc, lambda_l1)
+
             # train generator with dc layer, but without fidelity loss
-            errG_dc, errL1_dc = netG_dc_train(inputs, targets, csms, masks, \
-                                              netD, netG_dc, optimizerG_dc, lambda_l1)
-            errG_dc_sum += errG_dc
-            errL1_dc_sum = errL1_dc 
+            errL1_dc = netG_dc_train_no_D(inputs, targets, csms, masks, netG_dc, optimizerG_dc)
+            errL1_dc_sum += errL1_dc 
 
             # calculating metrices
             outputs = netG_dc(inputs, csms, masks)
@@ -182,7 +187,7 @@ if __name__ == '__main__':
         # save weights
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if PSNRs_val[-1] == max(PSNRs_val):
-            torch.save(netG_dc.state_dict(), logger.logPath+'/weights.pt')
+            torch.save(netG_dc.state_dict(), logger.logPath+'/weights_sigma=0.01.pt')
 
-            
+        logger.close()
 

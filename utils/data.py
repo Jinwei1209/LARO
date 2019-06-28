@@ -206,13 +206,14 @@ class Logger():
             print(string % (args))
 
         if self.flagSave:
+            self.file = open(self.filePath, 'w')
             self.file.write(string % (args))
             self.file.write('\n')
 
     def close(self):
 
-        self.flagFrint = False
-        self.flagSave = False
+        # self.flagFrint = False
+        # self.flagSave = False
         self.file.close()
 
 

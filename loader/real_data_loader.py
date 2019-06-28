@@ -81,7 +81,7 @@ class real_data_loader(data.Dataset):
         mask = np.tile(mask, (self.ncoil, 1, 1))
         mask = np.float32(mask)
 
-        atb = self.generateUndersampled(org, csm, mask, sigma=0.)
+        atb = self.generateUndersampled(org, csm, mask, sigma=0.01)
 
         # for real-valued images
         org = np.float32(np.concatenate((org, np.zeros(org.shape)), axis=0))
@@ -91,7 +91,7 @@ class real_data_loader(data.Dataset):
         return atb, org, csm, mask
 
 
-    def generateUndersampled(self, org, csm, mask, sigma=0.):
+    def generateUndersampled(self, org, csm, mask, sigma=0.01):
 
         A = lambda z: forward_operator(z, csm, mask, self.ncoil, self.nrow, self.ncol)
         At = lambda z: backward_operator(z, csm, mask, self.ncoil, self.nrow, self.ncol)

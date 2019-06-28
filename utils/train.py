@@ -94,6 +94,25 @@ def netG_dc_train(
     return  errG_dc_fake.item(), errG_dc_l1.item()
 
 
+def netG_dc_train_no_D(
+    inputs,
+    targets,
+    csms,
+    masks,
+    netG_dc,
+    optimizerG_dc
+):
+
+    optimizerG_dc.zero_grad()
+    outputs_G_dc = netG_dc(inputs, csms, masks)
+    lossl1 = lossL1()
+    errG_dc_l1 = lossl1(outputs_G_dc, targets)
+    errG_dc_l1.backward()
+    optimizerG_dc.step()
+
+    return  errG_dc_l1.item()
+
+
 def Unet_train(
     inputs, 
     targets, 
