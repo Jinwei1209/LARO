@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     netG_dc = Resnet_with_DC(input_channels=2, filter_channels=32, lambda_dll2=lambda_dll2, K=K)
     netG_dc.to(device)
-    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights_sigma=0.01.pt'))
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights_sigma=0.01_200_train.pt'))
     netG_dc.eval()
     print(netG_dc.lambda_dll2)
     metrices_test = Metrices()
@@ -42,7 +42,7 @@ if __name__ == '__main__':
         # calculating metrices
         outputs = netG_dc(inputs, csms, masks)
         # outputs = netG(inputs, csms, masks)
-        metrices_test.get_metrices(outputs, targets)
+        metrices_test.get_metrices(outputs[-1], targets)
     print(np.mean(np.asarray(metrices_test.PSNRs)))
 
 

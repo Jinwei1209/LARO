@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
+from models.prob_mask import *
 
 
 def ResBlock(
@@ -13,7 +14,8 @@ def ResBlock(
     stride=1,
     padding=1, 
     use_bn=1,
-    N = 5
+    N=5,
+    unc_map=False
 ):  
     layers = []
 
@@ -27,10 +29,10 @@ def ResBlock(
         if use_bn:
             layers.append(nn.BatchNorm2d(filter_dim))
         layers.append(nn.ReLU(inplace=True))
-
-    layers.append(nn.Conv2d(filter_dim, input_dim, kernel_size, stride, padding))
-    if use_bn:
-        layers.append(nn.BatchNorm2d(input_dim))
+    if unc_map:
+        layers.append(nn.Conv2d(filter_dim, input_dim+1, 1))
+    else:
+        layers.append(nn.Conv2d(filter_dim, input_dim, 1))
 
     return layers
 
@@ -43,20 +45,22 @@ class Resnet_with_DC(nn.Module):
         input_channels,
         filter_channels,
         lambda_dll2, # initializing lambda_dll2
-        K=1
+        K=1,
+        unc_map=False,
+        
     ):
         super(Resnet_with_DC, self).__init__()
         self.resnet_block = []
-        layers = ResBlock(input_channels, filter_channels)
+        layers = ResBlock(input_channels, filter_channels, unc_map=unc_map)
         for layer in layers:
             self.resnet_block.append(layer)
         self.resnet_block = nn.Sequential(*self.resnet_block)
         self.resnet_block.apply(init_weights)
-
         self.K = K
+        self.unc_map = unc_map
         self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         # self.lambda_dll2 = torch.tensor(lambda_dll2)
-
+        self.prob_mask = Prob_Mask()
 
     def forward(self, x, csms, masks):
 
@@ -64,11 +68,18 @@ class Resnet_with_DC(nn.Module):
         x_start = x
         self.lambda_dll2 = self.lambda_dll2.to(device)
         A = Back_forward(csms, masks, self.lambda_dll2)
+        Xs = []
+        Unc_maps = []
         for i in range(self.K):
             x_block = self.resnet_block(x)
-            x_block = x - x_block
-            rhs = x_start + self.lambda_dll2*x_block
+            x_block1 = x - x_block[:, 0:2, ...]
+            rhs = x_start + self.lambda_dll2*x_block1
             dc_layer = DC_layer(A, rhs)
             x = dc_layer.CG_iter()
-            
-        return x
+            Xs.append(x)
+            if self.unc_map:
+                Unc_maps.append(x_block[:, 2, ...])
+        if self.unc_map:
+            return Xs, Unc_maps
+        else:
+            return Xs

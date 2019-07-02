@@ -19,7 +19,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     lrG = lrD = lrG_dc = 2e-4
     niter = 50
     batch_size = 6
@@ -28,6 +28,7 @@ if __name__ == '__main__':
     lambda_dll2 = 0.01
     lambda_dc = 1000
     K = 10
+    use_uncertainty = False
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T2_slice_recon'
 
@@ -50,7 +51,13 @@ if __name__ == '__main__':
     # netG = Unet(input_channels=2, output_channels=2, num_filters=[2**i for i in range(5, 10)])
     # netD = Basic_D(input_channels=2, output_channels=2, num_filters=[2**i for i in range(3, 9)])
     
-    netG_dc = Resnet_with_DC(input_channels=2, filter_channels=32, lambda_dll2=lambda_dll2, K=K)
+    netG_dc = Resnet_with_DC(
+        input_channels=2, 
+        filter_channels=32, 
+        lambda_dll2=lambda_dll2,
+        K=K, 
+        unc_map=use_uncertainty
+    )
     # netG_dc = Unet_with_DC(
     #     input_channels=2, 
     #     output_channels=2, 
@@ -94,7 +101,7 @@ if __name__ == '__main__':
                 
                 # outputs = netG(inputs)
                 outputs = netG_dc(inputs, csms, masks)
-                outputs_np = np.squeeze(np.asarray(outputs.cpu().detach()))
+                # outputs_np = np.squeeze(np.asarray(outputs.cpu().detach()))
                 # outputs_show, idxs = showImage(outputs_np, idxs=idxs, sampling=sampling)
 
                 print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
@@ -154,13 +161,14 @@ if __name__ == '__main__':
             #                                   netD, netG_dc, optimizerG_dc, lambda_l1)
 
             # train generator with dc layer, but without fidelity loss
-            errL1_dc = netG_dc_train_no_D(inputs, targets, csms, masks, netG_dc, optimizerG_dc)
+            errL1_dc = netG_dc_train_intermediate(inputs, targets, csms, masks, netG_dc, \
+                                                  optimizerG_dc, use_uncertainty)
             errL1_dc_sum += errL1_dc 
 
             # calculating metrices
             outputs = netG_dc(inputs, csms, masks)
             # outputs = netG(inputs)
-            metrices_train.get_metrices(outputs, targets)
+            metrices_train.get_metrices(outputs[-1], targets)
 
             gen_iterations += 1
             
@@ -176,7 +184,7 @@ if __name__ == '__main__':
             # calculating metrices
             outputs = netG_dc(inputs, csms, masks)
             # outputs = netG(inputs, csms, masks)
-            metrices_val.get_metrices(outputs, targets)
+            metrices_val.get_metrices(outputs[-1], targets)
 
         # save log
         logger.print_and_save('Epoch: [%d/%d], PSNR in Training: %.2f' 
@@ -187,7 +195,7 @@ if __name__ == '__main__':
         # save weights
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if PSNRs_val[-1] == max(PSNRs_val):
-            torch.save(netG_dc.state_dict(), logger.logPath+'/weights_sigma=0.01.pt')
+            torch.save(netG_dc.state_dict(), logger.logPath+'/weights_sigma=0.01_new2.pt')
 
         logger.close()
 

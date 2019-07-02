@@ -113,6 +113,42 @@ def netG_dc_train_no_D(
     return  errG_dc_l1.item()
 
 
+def netG_dc_train_intermediate(
+    inputs,
+    targets,
+    csms,
+    masks,
+    netG_dc,
+    optimizerG_dc,
+    unc_map
+):
+
+    optimizerG_dc.zero_grad()
+    if unc_map:
+        Xs, Unc_maps = netG_dc(inputs, csms, masks)
+    else:
+        Xs = netG_dc(inputs, csms, masks)
+    lossl2 = lossL2()
+    lossl2_sum = 0
+    loss_unc_sum = 0
+
+    if unc_map:
+        for i in range(len(Xs)):
+            temp = (Xs[i] - targets)**2
+            lossl2_sum += torch.mean(torch.sum(temp, dim=1)/torch.exp(Unc_maps[i]))
+            loss_unc_sum += torch.mean(Unc_maps[i])
+        loss_total = lossl2_sum + loss_unc_sum
+        loss_total.backward()
+        optimizerG_dc.step()
+        return lossl2_sum.item(), loss_unc_sum.item()
+    else:
+        for i in range(len(Xs)):
+            lossl2_sum += lossl2(Xs[i], targets)
+        lossl2_sum.backward()
+        optimizerG_dc.step()
+        return  lossl2_sum.item()
+
+
 def Unet_train(
     inputs, 
     targets, 
