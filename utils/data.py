@@ -71,7 +71,6 @@ def normalization(img):
     return img_new
 
 
-
 def r2c(img):
     """
     for both images with and without batch dim, return an image with batch dim
@@ -104,6 +103,17 @@ def c2r(img):
     out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
     out[0, ...] = img.real
     out[1, ...] = img.imag
+    return out
+
+
+def c2r_kdata(kdata):
+    """
+    for multi-coil kdata, no batch dim
+    """
+    dtype = np.float32
+    out = np.zeros((kdata.shape+(2,)), dtype=dtype)
+    out[..., 0] = kdata.real
+    out[..., 1] = kdata.imag
     return out
 
 

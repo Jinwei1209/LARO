@@ -19,7 +19,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG = lrD = lrG_dc = 2e-4
     niter = 50
     batch_size = 6

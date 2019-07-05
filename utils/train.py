@@ -64,6 +64,33 @@ def netD_train(inputs, targets, csms, masks, netD, netG, optimizerD, dc_layer=Tr
     return errD_real.item(), errD_fake.item()
 
 
+def Unet_train(
+    inputs, 
+    targets, 
+    AtA,
+    netG, 
+    optimizerG, 
+    lambda_l1=1000, 
+    lambda_dc=1000
+):
+
+    optimizerG.zero_grad()
+    outputs_G = netG(inputs)
+    output_AtA_G = AtA(outputs_G)
+
+    lossl1 = lossL1()
+    lossl2 = lossL2()
+
+    errG_l1 = lossl1(outputs_G, targets)
+    errG_dc = lossl2(output_AtA_G, inputs)
+    errG = lambda_l1 * errG_l1 + lambda_dc*errG_dc
+
+    errG.backward()
+    optimizerG.step()
+
+    return errG_l1.item(), errG_dc.item()
+
+
 def netG_dc_train(
     inputs, 
     targets,
@@ -149,28 +176,40 @@ def netG_dc_train_intermediate(
         return  lossl2_sum.item()
 
 
-def Unet_train(
-    inputs, 
-    targets, 
-    AtA,
-    netG, 
-    optimizerG, 
-    lambda_l1=1000, 
-    lambda_dc=1000
+def netG_dc_train_pmask(
+    inputs,
+    targets,
+    csms,
+    netG_dc,
+    optimizerG_dc,
+    unc_map,
+    lambda_Pmask
 ):
 
-    optimizerG.zero_grad()
-    outputs_G = netG(inputs)
-    output_AtA_G = AtA(outputs_G)
-
-    lossl1 = lossL1()
+    optimizerG_dc.zero_grad()
+    if unc_map:
+        Xs, Unc_maps = netG_dc(inputs, csms)
+    else:
+        Xs = netG_dc(inputs, csms)
     lossl2 = lossL2()
+    lossl2_sum = 0
+    loss_unc_sum = 0
 
-    errG_l1 = lossl1(outputs_G, targets)
-    errG_dc = lossl2(output_AtA_G, inputs)
-    errG = lambda_l1 * errG_l1 + lambda_dc*errG_dc
-
-    errG.backward()
-    optimizerG.step()
-
-    return errG_l1.item(), errG_dc.item()
+    if unc_map:
+        for i in range(len(Xs)):
+            temp = (Xs[i] - targets)**2
+            lossl2_sum += torch.mean(torch.sum(temp, dim=1)/torch.exp(Unc_maps[i]))
+            loss_unc_sum += torch.mean(Unc_maps[i])
+        loss_Pmask = lambda_Pmask*torch.sum(netG_dc.Pmask)
+        loss_total = lossl2_sum + loss_unc_sum + loss_Pmask
+        loss_total.backward()
+        optimizerG_dc.step()
+        return lossl2_sum.item(), loss_unc_sum.item(), loss_Pmask.item()
+    else:
+        for i in range(len(Xs)):
+            lossl2_sum += lossl2(Xs[i], targets)
+        loss_Pmask = lambda_Pmask*torch.sum(netG_dc.Pmask)
+        loss_total = lossl2_sum + loss_Pmask
+        loss_total.backward()
+        optimizerG_dc.step()
+        return  lossl2_sum.item(), loss_Pmask.item()

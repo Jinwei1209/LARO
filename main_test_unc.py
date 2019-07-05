@@ -15,9 +15,10 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 10
+    use_uncertainty = True
     lambda_dll2 = 0.01
     batch_size = 6
     folderName = '{0}_rolls'.format(K)
@@ -26,9 +27,15 @@ if __name__ == '__main__':
     dataLoader_test = real_data_loader(split='test')
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
-    netG_dc = Resnet_with_DC(input_channels=2, filter_channels=32, lambda_dll2=lambda_dll2, K=K)
+    netG_dc = Resnet_with_DC(
+        input_channels=2, 
+        filter_channels=32, 
+        lambda_dll2=lambda_dll2, 
+        K=K,
+        unc_map=use_uncertainty
+    )
     netG_dc.to(device)
-    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights_sigma=0.01_new.pt'))
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights_sigma=0.01_uncertain.pt'))
     netG_dc.eval()
     print(netG_dc.lambda_dll2)
     metrices_test = Metrices()
@@ -40,8 +47,8 @@ if __name__ == '__main__':
         csms = csms.to(device)
         masks = masks.to(device)
         # calculating metrices
-        outputs = netG_dc(inputs, csms, masks)
-        metrices_test.get_metrices(outputs[-1], targets)
+        Xs, Unc_maps = netG_dc(inputs, csms, masks)
+        metrices_test.get_metrices(Xs[-1], targets)
     print(np.mean(np.asarray(metrices_test.PSNRs)))
 
 

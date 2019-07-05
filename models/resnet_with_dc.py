@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
-from models.prob_mask import *
 
 
 def ResBlock(
@@ -46,8 +45,7 @@ class Resnet_with_DC(nn.Module):
         filter_channels,
         lambda_dll2, # initializing lambda_dll2
         K=1,
-        unc_map=False,
-        
+        unc_map=False
     ):
         super(Resnet_with_DC, self).__init__()
         self.resnet_block = []
@@ -60,7 +58,6 @@ class Resnet_with_DC(nn.Module):
         self.unc_map = unc_map
         self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         # self.lambda_dll2 = torch.tensor(lambda_dll2)
-        self.prob_mask = Prob_Mask()
 
     def forward(self, x, csms, masks):
 
