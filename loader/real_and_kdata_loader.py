@@ -15,8 +15,8 @@ class real_and_kdata_loader(data.Dataset):
     }
 
     dataRange = {
-        'train': ['0', '8800'],
-        'val': ['8800', '11000'],
+        'train': ['0', '200'],
+        'val': ['8800', '8850'],
         'test': ['11000', '11857']
     }
 

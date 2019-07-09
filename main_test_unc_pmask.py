@@ -21,7 +21,7 @@ if __name__ == '__main__':
     K = 3
     use_uncertainty = True
     slope_threshold = 12
-    lambda_Pmask = 1
+    lambda_Pmask = 10
     lambda_dll2 = 0.01
     batch_size = 12
     folderName = '{0}_rolls'.format(K)
@@ -44,9 +44,10 @@ if __name__ == '__main__':
                             '/weights_sigma=0.01_lambda_pmask={}.pt'.format(lambda_Pmask)))
     netG_dc.eval()
     print(netG_dc.lambda_dll2)
-    print(torch.mean(netG_dc.Pmask))
     metrices_test = Metrices()
 
+    Recons = []
+    Uncertainties = []
     for idx, (inputs, targets, csms) in enumerate(testLoader):
         print(idx)
         inputs = inputs.to(device)
@@ -54,8 +55,29 @@ if __name__ == '__main__':
         csms = csms.to(device)
         # calculating metrices
         Xs, Unc_maps = netG_dc(inputs, csms)
+        Recons.append(Xs[-1].cpu().detach())
+        Uncertainties.append(Unc_maps[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
+        if idx == 0:
+            print(torch.mean(netG_dc.Pmask))
+            adict = {}
+            adict['Mask'] = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
+            sio.savemat(rootName+'/'+folderName+
+                        '/Optimal_mask_{}.mat'.format(lambda_Pmask), adict)
+
     print(np.mean(np.asarray(metrices_test.PSNRs)))
+    Recons = np.concatenate(Recons, axis=0)
+    Uncertainties = np.concatenate(Uncertainties, axis=0)
+
+    adict = {}
+    adict['Recons'] = Recons
+    sio.savemat(rootName+'/'+folderName+
+                '/Recons_{}.mat'.format(lambda_Pmask), adict)
+
+    adict = {}
+    adict['Uncertainties'] = Uncertainties
+    sio.savemat(rootName+'/'+folderName+
+                '/Uncertainties_{}.mat'.format(lambda_Pmask), adict)
 
 
 

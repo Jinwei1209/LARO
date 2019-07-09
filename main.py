@@ -19,7 +19,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
     lrG = lrD = lrG_dc = 2e-4
     niter = 50
     batch_size = 6
@@ -28,6 +28,7 @@ if __name__ == '__main__':
     lambda_dll2 = 0.01
     lambda_dc = 1000
     K = 10
+    pre_dc_map = False
     use_uncertainty = False
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T2_slice_recon'
@@ -56,6 +57,7 @@ if __name__ == '__main__':
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
         K=K, 
+        pre_dc_map=pre_dc_map,
         unc_map=use_uncertainty
     )
     # netG_dc = Unet_with_DC(
@@ -195,7 +197,7 @@ if __name__ == '__main__':
         # save weights
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if PSNRs_val[-1] == max(PSNRs_val):
-            torch.save(netG_dc.state_dict(), logger.logPath+'/weights_sigma=0.01_new2.pt')
+            torch.save(netG_dc.state_dict(), logger.logPath+'/weights_sigma=0.01.pt')
 
         logger.close()
 

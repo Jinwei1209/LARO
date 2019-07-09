@@ -55,7 +55,7 @@ class DC_with_Prop_Mask(nn.Module):
         # self.lambda_dll2 = torch.tensor(lambda_dll2)
         self.slope = slope
         self.slope_threshold = slope_threshold
-        self.weight_parameters = nn.Parameter(torch.zeros(ncoil, nrow, ncol, 1), requires_grad=True)
+        self.weight_parameters = nn.Parameter((torch.rand(ncoil, nrow, ncol, 1)-0.5)*30, requires_grad=True)
         # self.prob_mask = Prob_Mask()
 
     def At(self, kdata, mask, csm):

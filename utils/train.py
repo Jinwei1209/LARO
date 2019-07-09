@@ -200,7 +200,7 @@ def netG_dc_train_pmask(
             temp = (Xs[i] - targets)**2
             lossl2_sum += torch.mean(torch.sum(temp, dim=1)/torch.exp(Unc_maps[i]))
             loss_unc_sum += torch.mean(Unc_maps[i])
-        loss_Pmask = lambda_Pmask*torch.sum(netG_dc.Pmask)
+        loss_Pmask = lambda_Pmask*torch.mean(netG_dc.Pmask)
         loss_total = lossl2_sum + loss_unc_sum + loss_Pmask
         loss_total.backward()
         optimizerG_dc.step()
@@ -208,7 +208,7 @@ def netG_dc_train_pmask(
     else:
         for i in range(len(Xs)):
             lossl2_sum += lossl2(Xs[i], targets)
-        loss_Pmask = lambda_Pmask*torch.sum(netG_dc.Pmask)
+        loss_Pmask = lambda_Pmask*torch.mean(netG_dc.Pmask)
         loss_total = lossl2_sum + loss_Pmask
         loss_total.backward()
         optimizerG_dc.step()

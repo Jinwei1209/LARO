@@ -29,7 +29,8 @@ class real_data_loader(data.Dataset):
         augmentations = [None],
         nrow = 256,
         ncol = 184,
-        ncoil = 1
+        ncoil = 1,
+        sigma=0.01
     ):
 
         self.rootDir = rootDir
@@ -49,6 +50,8 @@ class real_data_loader(data.Dataset):
         self.ncoil = ncoil  # just one coil for real-valued images
         self.nrow = nrow
         self.ncol = ncol
+
+        self.sigma = sigma
 
 
     def __len__(self):
@@ -81,7 +84,7 @@ class real_data_loader(data.Dataset):
         mask = np.tile(mask, (self.ncoil, 1, 1))
         mask = np.float32(mask)
 
-        atb = self.generateUndersampled(org, csm, mask, sigma=0.01)
+        atb = self.generateUndersampled(org, csm, mask, sigma=self.sigma)
 
         # for real-valued images
         org = np.float32(np.concatenate((org, np.zeros(org.shape)), axis=0))
