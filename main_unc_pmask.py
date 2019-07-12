@@ -19,16 +19,16 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
     lrG_dc = 1e-3
     niter = 8800
-    batch_size = 14
+    batch_size = 12
     display_iters = 10
     lambda_Pmask = 10
     lambda_dll2 = 0.01
     K = 3
     use_uncertainty = True
-    slope_threshold = 12
+    fixed_mask = True
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T2_slice_recon'
 
@@ -53,10 +53,20 @@ if __name__ == '__main__':
         lambda_dll2=lambda_dll2,
         K=K, 
         unc_map=use_uncertainty,
-        slope_threshold=slope_threshold
+        fixed_mask=fixed_mask
     )
     print(netG_dc)
     netG_dc.to(device)
+
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
+                            '/weights_sigma=0.01_lambda_pmask={}.pt'.format(lambda_Pmask)))
+    netG_dc.eval()
+
+    adict = {}
+    adict['Thresh'] = np.asarray(netG_dc.thresh_const.cpu().detach()) 
+    sio.savemat(rootName+'/'+folderName+
+                '/Thresh_{}.mat'.format(lambda_Pmask), adict)
+
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     logger = Logger(folderName, rootName)
     
@@ -146,7 +156,9 @@ if __name__ == '__main__':
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+
-                       '/weights_sigma=0.01_lambda_pmask={}.pt'.format(lambda_Pmask))
+                       '/weights_sigma=0.01_lambda_pmask={}_optimal_fixed.pt'.format(lambda_Pmask))
+        torch.save(netG_dc.state_dict(), logger.logPath+
+                   '/weights_sigma=0.01_lambda_pmask={}_last_fixed.pt'.format(lambda_Pmask))
 
         logger.close()
 

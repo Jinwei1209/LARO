@@ -6,27 +6,6 @@ from models.unet_blocks import *
 from models.initialization import *
 from models.resnet_with_dc import ResBlock
 
-
-# class Prob_Mask(nn.Module):
-
-#     def __init__(
-#         self,
-#         ncoil=1,
-#         nrow=256,
-#         ncol=184,
-#         slope=0.25
-#     ):
-#         super(Prob_Mask, self).__init__()
-#         self.slope = slope
-#         self.weight_parameters = nn.Parameter(torch.zeros(ncoil, nrow, ncol, 1), requires_grad=True)
-
-#     def forward(self, x):
-#         device = x.get_device()
-#         self.weight_parameters = self.weight_parameters.to(device)
-#         self.prob_mask = 1/(1+torch.exp(-self.slope*self.weight_parameters))
-        # return self.prob_mask
-
-
 class DC_with_Prop_Mask(nn.Module):
 
     def __init__(
@@ -40,7 +19,9 @@ class DC_with_Prop_Mask(nn.Module):
         K=1,
         unc_map=False,
         slope=0.25,
-        slope_threshold=12
+        slope_threshold=12,
+        fixed_mask=False,
+        testing=False
     ):
         super(DC_with_Prop_Mask, self).__init__()
         self.resnet_block = []
@@ -55,8 +36,16 @@ class DC_with_Prop_Mask(nn.Module):
         # self.lambda_dll2 = torch.tensor(lambda_dll2)
         self.slope = slope
         self.slope_threshold = slope_threshold
-        self.weight_parameters = nn.Parameter((torch.rand(ncoil, nrow, ncol, 1)-0.5)*30, requires_grad=True)
-        # self.prob_mask = Prob_Mask()
+        self.fixed_mask = fixed_mask
+        if self.fixed_mask:
+            self.weight_parameters = nn.Parameter((torch.rand(ncoil, nrow, ncol, 1)-0.5)*30, requires_grad=False)
+            if testing:
+                self.thresh_const = load_mat('/data/Jinwei/T2_slice_recon/3_rolls/Thresh_10.mat', 'Thresh')
+                self.thresh_const = torch.tensor(self.thresh_const)
+            else:
+                self.thresh_const = torch.rand(self.weight_parameters.shape)
+        else:
+            self.weight_parameters = nn.Parameter((torch.rand(ncoil, nrow, ncol, 1)-0.5)*30, requires_grad=True)
 
     def At(self, kdata, mask, csm):
         self.ncoil = csm.shape[1]
@@ -77,7 +66,10 @@ class DC_with_Prop_Mask(nn.Module):
 
     def ThresholdPmask(self):
         device = self.Pmask.get_device()
-        thresh = torch.rand(self.Pmask.shape).to(device)
+        if self.fixed_mask:
+            thresh = self.thresh_const.to(device)
+        else:
+            thresh = torch.rand(self.Pmask.shape).to(device)
         return 1/(1+torch.exp(-self.slope_threshold*(self.Pmask-thresh)))
 
     def forward(self, kdata, csms):

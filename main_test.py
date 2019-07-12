@@ -23,12 +23,12 @@ if __name__ == '__main__':
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T2_slice_recon'
 
-    dataLoader_test = real_data_loader(split='test', sigma=0.05)
+    dataLoader_test = real_data_loader(split='test', sigma=0.01)
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
     netG_dc = Resnet_with_DC(input_channels=2, filter_channels=32, lambda_dll2=lambda_dll2, K=K, pre_dc_map=True)
     netG_dc.to(device)
-    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights_sigma=0.01_new2.pt'))
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights_sigma=0.01.pt'))
     netG_dc.eval()
     print(netG_dc.lambda_dll2)
     metrices_test = Metrices()
