@@ -49,6 +49,7 @@ def load_mat(filename, varname='data'):
         f = sio.loadmat(filename)
         data = f[varname]        
     except:
+        print(filename)
         data = load_h5(filename, varname=varname)
         if data.ndim == 4:
             data = data.transpose(3,2,1,0)
@@ -95,11 +96,7 @@ def c2r(img):
     """
     for single image, no batch dim
     """
-    if img.dtype == 'complex64':
-        dtype = np.float32
-    else:
-        dtype = np.float64
-    
+    dtype = np.float32
     out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
     out[0, ...] = img.real
     out[1, ...] = img.imag
@@ -154,6 +151,10 @@ def cplx_conj(a):
     out[..., 0] = a[..., 0]
     out[..., 1] = -a[..., 1]
     return out
+
+
+def fft_shift_row(image, nrows):
+    return torch.cat((image[:, :, nrows//2:nrows, ...], image[:, :, 0:nrows//2, ...]), dim=2)
 
 
 def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):

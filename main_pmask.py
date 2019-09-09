@@ -19,22 +19,23 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG_dc = 1e-3
     niter = 8800
     batch_size = 4
     display_iters = 10
-    lambda_Pmask = 3*10**2
-    lambda_dll2 = 0.01
+    lambda_Pmask = 0.015
+    lambda_dll2 = 0.01 
     K = 2
-    use_uncertainty = True
-    fixed_mask = False
+    use_uncertainty = False
+    fixed_mask = True
+    testing = False
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T2_slice_recon_GE'
 
     epoch = 0
     gen_iterations = 1
-    errL2_dc_sum = errL2_unc_sum = Pmask_ratio = 0
+    errL2_dc_sum = Pmask_ratio = 0
     PSNRs_val = []
     Validation_loss = []
 
@@ -53,21 +54,22 @@ if __name__ == '__main__':
         lambda_dll2=lambda_dll2,
         K=K, 
         unc_map=use_uncertainty,
-        fixed_mask=fixed_mask
+        fixed_mask=fixed_mask,
+        testing=testing
     )
     print(netG_dc)
     netG_dc.to(device)
 
-    ## load pre-trained weights with pmask
-    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-    #                         '/weights_sigma=0.01_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
-    # netG_dc.eval()
+    # load pre-trained weights with pmask
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
+                            '/weights_lambda_pmask={}.pt'.format(lambda_Pmask)))
+    netG_dc.eval()
 
-    ## save thresh_const for network training with fixed optimal mask training 
-    # adict = {}
-    # adict['Thresh'] = np.asarray(netG_dc.thresh_const.cpu().detach()) 
-    # sio.savemat(rootName+'/'+folderName+
-    #             '/Thresh_{}.mat'.format(lambda_Pmask), adict)
+    # save thresh_const for network training with fixed optimal mask training 
+    adict = {}
+    adict['Thresh'] = np.asarray(netG_dc.thresh_const.cpu().detach()) 
+    sio.savemat(rootName+'/'+folderName+
+                '/Thresh_{}.mat'.format(lambda_Pmask), adict)
 
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     logger = Logger(folderName, rootName)
@@ -84,10 +86,10 @@ if __name__ == '__main__':
                 % (epoch, niter, idx, 414//batch_size+1, time.time()-t0))
 
                 print('Lambda_dll2: %f, Sampling ratio: %f, lambda_Pmask: %d' 
-                    % (netG_dc.lambda_dll2, torch.mean(netG_dc.Pmask), lambda_Pmask))
+                    % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), lambda_Pmask))
 
-                print('netG_dc --- loss_L2_dc: %f, loss_uncertainty: %f'
-                    % (errL2_dc_sum/display_iters, errL2_unc_sum/display_iters))
+                print('netG_dc --- loss_L2_dc: %f'
+                    % (errL2_dc_sum/display_iters))
 
                 print('Average PSNR in Training dataset is %.2f' 
                 % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
@@ -95,13 +97,13 @@ if __name__ == '__main__':
                     print('Average PSNR in Validation dataset is %.2f' 
                     % (np.mean(np.asarray(metrices_val.PSNRs))))
 
-                errL2_dc_sum = errL2_unc_sum = Pmask_ratio = 0
+                errL2_dc_sum = Pmask_ratio = 0
                 
             inputs = inputs.to(device)
             targets = targets.to(device)
             csms = csms.to(device)
 
-            errL2_dc, loss_unc, loss_Pmask = netG_dc_train_pmask(
+            errL2_dc, loss_Pmask = netG_dc_train_pmask(
                 inputs, 
                 targets, 
                 csms, 
@@ -111,11 +113,10 @@ if __name__ == '__main__':
                 lambda_Pmask
             )
             errL2_dc_sum += errL2_dc 
-            errL2_unc_sum += loss_unc
             Pmask_ratio += loss_Pmask
 
             # calculating metrices
-            Xs, Unc_maps = netG_dc(inputs, csms)
+            Xs = netG_dc(inputs, csms)
             metrices_train.get_metrices(Xs[-1], targets)
 
             gen_iterations += 1
@@ -130,20 +131,18 @@ if __name__ == '__main__':
             csms = csms.to(device)
 
             # calculating metrices
-            Xs, Unc_maps = netG_dc(inputs, csms)
+            Xs = netG_dc(inputs, csms)
             metrices_val.get_metrices(Xs[-1], targets)
 
             targets = np.asarray(targets.cpu().detach())
             lossl2_sum = loss_unc_sum = 0
             for i in range(len(Xs)):
                 Xs_i = np.asarray(Xs[i].cpu().detach())
-                Unc_maps_i = np.asarray(Unc_maps[i].cpu().detach())
-                temp = (Xs_i - targets)**2
-                lossl2_sum += np.mean(np.sum(temp, axis=1)/np.exp(Unc_maps_i))
-                loss_unc_sum += np.mean(Unc_maps_i)
+                temp = abs(Xs_i - targets)
+                lossl2_sum += np.mean(temp)
             temp = np.asarray(netG_dc.Pmask.cpu().detach())
             loss_Pmask = lambda_Pmask*np.mean(temp)
-            loss_total = lossl2_sum + loss_unc_sum + loss_Pmask
+            loss_total = lossl2_sum + loss_Pmask
             loss_total_list.append(loss_total)
         print('\n Validation loss: %f \n' 
             % (sum(loss_total_list) / float(len(loss_total_list))))
@@ -158,9 +157,9 @@ if __name__ == '__main__':
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+
-                       '/weights_sigma=0.01_lambda_pmask={}_optimal.pt'.format(lambda_Pmask))
+                       '/weights_lambda_pmask={}_fixed_optimal.pt'.format(lambda_Pmask))
         torch.save(netG_dc.state_dict(), logger.logPath+
-                   '/weights_sigma=0.01_lambda_pmask={}_last.pt'.format(lambda_Pmask))
+                   '/weights_lambda_pmask={}_fixed_last.pt'.format(lambda_Pmask))
 
         logger.close()
 

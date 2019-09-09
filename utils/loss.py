@@ -15,22 +15,31 @@ class Back_forward():
 
         self.ncoil = csm.shape[1]
         self.nrow = csm.shape[2] 
-        self.ncol = csm.shape[3]
-        self.npixels = torch.tensor(self.nrow*self.ncol)
-        self.npixels = self.npixels.type(torch.DoubleTensor) 
+        self.ncol = csm.shape[3] 
         self.csm = csm
         self.mask = mask
-        self.factor = torch.sqrt(self.npixels)
         self.lambda_dll2 = lambda_dll2
+
+        device = self.csm.get_device()
+        self.flip = torch.ones([self.nrow, self.ncol, 1]) 
+        self.flip = torch.cat((self.flip, torch.zeros(self.flip.shape)), -1).to(device)
+        self.flip[::2, ...] = - self.flip[::2, ...] 
+        self.flip[:, ::2, ...] = - self.flip[:, ::2, ...]
 
     def AtA(self, img, use_dll2=False):
 
+        # forward
         img_new = img.permute(0, 2, 3, 1)
         img_new = img_new[:, None, ...]
         coilImages = cplx_mlpy(self.csm, img_new)
-        kspace = torch.fft(coilImages, 2)/self.factor
+        coilImages = cplx_mlpy(coilImages, self.flip) # for GE kdata
+        coilImages = fft_shift_row(coilImages, self.nrow) # for GE kdata
+        kspace = torch.fft(coilImages, 2)  
         temp = cplx_mlpy(kspace, self.mask)
-        coilImgs = torch.ifft(temp, 2)*self.factor
+        # inverse
+        coilImgs = torch.ifft(temp, 2)
+        coilImgs = fft_shift_row(coilImgs, self.nrow) # for GE kdata
+        coilImgs = cplx_mlpy(coilImgs, self.flip) # for GE kdata
         coilComb = torch.sum(
             cplx_mlpy(coilImgs, cplx_conj(self.csm)),
             dim=1,

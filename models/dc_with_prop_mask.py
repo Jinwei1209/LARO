@@ -13,9 +13,9 @@ class DC_with_Prop_Mask(nn.Module):
         input_channels,
         filter_channels,
         lambda_dll2, # initializing lambda_dll2
-        ncoil=1,
+        ncoil=32,
         nrow=256,
-        ncol=184,
+        ncol=192,
         K=1,
         unc_map=False,
         slope=0.25,
@@ -38,24 +38,34 @@ class DC_with_Prop_Mask(nn.Module):
         self.slope_threshold = slope_threshold
         self.fixed_mask = fixed_mask
         if self.fixed_mask:
-            self.weight_parameters = nn.Parameter((torch.rand(ncoil, nrow, ncol, 1)-0.5)*30, requires_grad=False)
+            self.weight_parameters = nn.Parameter((torch.rand(1, nrow, ncol, 1)-0.5)*30, requires_grad=False)
             if testing:
-                self.thresh_const = load_mat('/data/Jinwei/T2_slice_recon/3_rolls/Thresh_10.mat', 'Thresh')
+                self.thresh_const = load_mat('/data/Jinwei/T2_slice_recon_GE/2_rolls/Thresh_0.015.mat', 'Thresh')
                 self.thresh_const = torch.tensor(self.thresh_const)
             else:
                 self.thresh_const = torch.rand(self.weight_parameters.shape)
         else:
-            self.weight_parameters = nn.Parameter((torch.rand(ncoil, nrow, ncol, 1)-0.5)*30, requires_grad=True)
+            temp = (torch.rand(1, nrow, ncol, 1)-0.5)*30
+            temp[:, nrow//2-10 : nrow//2+10, ncol//2-10 : ncol//2+10, :] = 15
+            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+            # self.weight_parameters = nn.Parameter(torch.ones(1, nrow, ncol, 1)*30, requires_grad=True)
+        self.ncoil = ncoil
+        self.nrow = nrow
+        self.ncol = ncol
 
     def At(self, kdata, mask, csm):
+        device = kdata.get_device()
         self.ncoil = csm.shape[1]
         self.nrow = csm.shape[2] 
         self.ncol = csm.shape[3]
-        self.npixels = torch.tensor(self.nrow*self.ncol)
-        self.npixels = self.npixels.type(torch.DoubleTensor) 
-        self.factor = torch.sqrt(self.npixels)
+        self.flip = torch.ones([self.nrow, self.ncol, 1]) 
+        self.flip = torch.cat((self.flip, torch.zeros(self.flip.shape)), -1).to(device)
+        self.flip[::2, ...] = - self.flip[::2, ...] 
+        self.flip[:, ::2, ...] = - self.flip[:, ::2, ...]
         temp = cplx_mlpy(kdata, mask)
-        coilImgs = torch.ifft(temp, 2)*self.factor
+        coilImgs = torch.ifft(temp, 2)
+        coilImgs = fft_shift_row(coilImgs, self.nrow) # for GE kdata
+        coilImgs = cplx_mlpy(coilImgs, self.flip) # for GE kdata
         coilComb = torch.sum(
             cplx_mlpy(coilImgs, cplx_conj(csm)),
             dim=1,
@@ -68,9 +78,13 @@ class DC_with_Prop_Mask(nn.Module):
         device = self.Pmask.get_device()
         if self.fixed_mask:
             thresh = self.thresh_const.to(device)
+            masks = (self.Pmask > thresh).to(device, dtype=torch.float32)
+            masks[:, self.nrow//2-10 : self.nrow//2+10, self.ncol//2-10 : self.ncol//2+10, :] = 1
         else:
             thresh = torch.rand(self.Pmask.shape).to(device)
-        return 1/(1+torch.exp(-self.slope_threshold*(self.Pmask-thresh)))
+            masks = 1/(1+torch.exp(-self.slope_threshold*(self.Pmask-thresh)))
+        self.masks = masks
+        return self.masks
 
     def forward(self, kdata, csms):
         device = kdata.get_device()
@@ -78,8 +92,13 @@ class DC_with_Prop_Mask(nn.Module):
         self.weight_parameters = self.weight_parameters.to(device)
         self.Pmask = 1/(1+torch.exp(-self.slope*self.weight_parameters))
         masks = self.ThresholdPmask()
+
+        # # keep the calibration region
+        # masks[:, masks.size()[1]//2-15:masks.size()[1]//2+15,  masks.size()[2]//2-15:masks.size()[2]//2+15, :] = 1
+        
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1)
-        x = self.At(kdata, masks, csms)
+        masks = torch.cat(self.ncoil*[masks])
+        x = self.At(kdata, masks, csms)    
         x_start = x
         self.lambda_dll2 = self.lambda_dll2.to(device)
         A = Back_forward(csms, masks, self.lambda_dll2)
