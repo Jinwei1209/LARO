@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
@@ -21,7 +22,8 @@ class DC_with_Prop_Mask(nn.Module):
         slope=0.25,
         slope_threshold=12,
         fixed_mask=False,
-        testing=False
+        testing=False,
+        samplingRatio = 0.1 # sparsity level of the sampling mask
     ):
         super(DC_with_Prop_Mask, self).__init__()
         self.resnet_block = []
@@ -52,6 +54,7 @@ class DC_with_Prop_Mask(nn.Module):
         self.ncoil = ncoil
         self.nrow = nrow
         self.ncol = ncol
+        self.samplingRatio = samplingRatio
 
     def At(self, kdata, mask, csm):
         device = kdata.get_device()
@@ -74,15 +77,23 @@ class DC_with_Prop_Mask(nn.Module):
         coilComb = coilComb.permute(0, 3, 1, 2)
         return coilComb
 
+    def rescalePmask(self):
+        device = self.Pmask.get_device()
+        xbar = torch.mean(self.Pmask)
+        r = self.samplingRatio/xbar
+        beta = (1-self.samplingRatio) / (1-xbar)
+        le = (r<=1).to(device, dtype=torch.float32)
+        self.Pmask_recaled = le * self.Pmask * r + (1-le) * (1 - (1-self.Pmask) * beta)
+
     def ThresholdPmask(self):
         device = self.Pmask.get_device()
         if self.fixed_mask:
             thresh = self.thresh_const.to(device)
-            masks = (self.Pmask > thresh).to(device, dtype=torch.float32)
+            masks = (self.Pmask_recaled > thresh).to(device, dtype=torch.float32)
             masks[:, self.nrow//2-10 : self.nrow//2+10, self.ncol//2-10 : self.ncol//2+10, :] = 1
         else:
-            thresh = torch.rand(self.Pmask.shape).to(device)
-            masks = 1/(1+torch.exp(-self.slope_threshold*(self.Pmask-thresh)))
+            thresh = torch.rand(self.Pmask_recaled.shape).to(device)
+            masks = 1/(1+torch.exp(-self.slope_threshold*(self.Pmask_recaled-thresh)))
         self.masks = masks
         return self.masks
 
@@ -91,6 +102,7 @@ class DC_with_Prop_Mask(nn.Module):
         self.lambda_dll2 = self.lambda_dll2.to(device)
         self.weight_parameters = self.weight_parameters.to(device)
         self.Pmask = 1/(1+torch.exp(-self.slope*self.weight_parameters))
+        self.rescalePmask()
         masks = self.ThresholdPmask()
 
         # # keep the calibration region

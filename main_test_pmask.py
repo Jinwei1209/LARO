@@ -16,13 +16,13 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 2
     use_uncertainty = False
-    fixed_mask = True
-    testing = True
-    lambda_Pmask = 0.015  
+    fixed_mask = False
+    testing = False
+    lambda_Pmask = 0  
     lambda_dll2 = 0.01
     batch_size = 2
     folderName = '{0}_rolls'.format(K)
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
     #     '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
     netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-        '/weights_lambda_pmask={}_fixed_optimal.pt'.format(lambda_Pmask)))
+        '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
     netG_dc.eval()
     print(netG_dc.lambda_dll2)
     metrices_test = Metrices()

@@ -24,11 +24,12 @@ if __name__ == '__main__':
     niter = 8800
     batch_size = 4
     display_iters = 10
-    lambda_Pmask = 0.015
+    lambda_Pmask = 0
     lambda_dll2 = 0.01 
     K = 2
+    samplingRatio = 0.1
     use_uncertainty = False
-    fixed_mask = True
+    fixed_mask = False
     testing = False
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T2_slice_recon_GE'
@@ -62,14 +63,14 @@ if __name__ == '__main__':
 
     # load pre-trained weights with pmask
     netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-                            '/weights_lambda_pmask={}.pt'.format(lambda_Pmask)))
+                            '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
     netG_dc.eval()
 
-    # save thresh_const for network training with fixed optimal mask training 
-    adict = {}
-    adict['Thresh'] = np.asarray(netG_dc.thresh_const.cpu().detach()) 
-    sio.savemat(rootName+'/'+folderName+
-                '/Thresh_{}.mat'.format(lambda_Pmask), adict)
+    # # save thresh_const for network training with fixed optimal mask training 
+    # adict = {}
+    # adict['Thresh'] = np.asarray(netG_dc.thresh_const.cpu().detach()) 
+    # sio.savemat(rootName+'/'+folderName+
+    #             '/Thresh_{}.mat'.format(lambda_Pmask), adict)
 
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     logger = Logger(folderName, rootName)
@@ -82,11 +83,12 @@ if __name__ == '__main__':
             
             if gen_iterations%display_iters == 0:
 
-                print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                % (epoch, niter, idx, 414//batch_size+1, time.time()-t0))
+                print('epochs: [%d/%d], batchs: [%d/%d], time: %ds, Lambda: %f'
+                % (epoch, niter, idx, 414//batch_size+1, time.time()-t0, lambda_Pmask))
 
-                print('Lambda_dll2: %f, Sampling ratio: %f, lambda_Pmask: %d' 
-                    % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), lambda_Pmask))
+                print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
+                    % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), \
+                        netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
 
                 print('netG_dc --- loss_L2_dc: %f'
                     % (errL2_dc_sum/display_iters))
@@ -157,9 +159,9 @@ if __name__ == '__main__':
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+
-                       '/weights_lambda_pmask={}_fixed_optimal.pt'.format(lambda_Pmask))
+                       '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask))
         torch.save(netG_dc.state_dict(), logger.logPath+
-                   '/weights_lambda_pmask={}_fixed_last.pt'.format(lambda_Pmask))
+                   '/weights_lambda_pmask={}_last.pt'.format(lambda_Pmask))
 
         logger.close()
 
