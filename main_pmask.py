@@ -14,15 +14,16 @@ from utils.loss import *
 from models.dc_blocks import *
 from models.unet_with_dc import *
 from models.dc_with_prop_mask import *
+from models.dc_with_straight_through_pmask import *
 from utils.test import *
 
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     lrG_dc = 1e-3
     niter = 8800
-    batch_size = 4
+    batch_size = 1
     display_iters = 10
     lambda_Pmask = 0
     lambda_dll2 = 0.01 
@@ -49,7 +50,17 @@ if __name__ == '__main__':
     dataLoader_val = kdata_loader_GE(split='val')
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
     
-    netG_dc = DC_with_Prop_Mask(
+    # netG_dc = DC_with_Prop_Mask(
+    #     input_channels=2, 
+    #     filter_channels=32, 
+    #     lambda_dll2=lambda_dll2,
+    #     K=K, 
+    #     unc_map=use_uncertainty,
+    #     fixed_mask=fixed_mask,
+    #     testing=testing
+    # )
+
+    netG_dc = DC_with_Straight_Through_Pmask(
         input_channels=2, 
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
@@ -61,10 +72,10 @@ if __name__ == '__main__':
     print(netG_dc)
     netG_dc.to(device)
 
-    # load pre-trained weights with pmask
-    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-                            '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
-    netG_dc.eval()
+    # # load pre-trained weights with pmask
+    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
+    #                         '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
+    # netG_dc.eval()
 
     # # save thresh_const for network training with fixed optimal mask training 
     # adict = {}
@@ -159,9 +170,9 @@ if __name__ == '__main__':
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+
-                       '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask))
+                       '/weights_lambda_pmask={}_optimal_ST.pt'.format(lambda_Pmask))
         torch.save(netG_dc.state_dict(), logger.logPath+
-                   '/weights_lambda_pmask={}_last.pt'.format(lambda_Pmask))
+                   '/weights_lambda_pmask={}_last_ST.pt'.format(lambda_Pmask))
 
         logger.close()
 

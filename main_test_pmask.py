@@ -9,14 +9,15 @@ from models.initialization import *
 from models.dc_blocks import *
 from models.unet_with_dc import *
 from models.resnet_with_dc import *
-from models.dc_with_prop_mask import *     
+from models.dc_with_prop_mask import *
+from models.dc_with_straight_through_pmask import *     
 from utils.test import *
 from utils.data import *
 from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 2
     use_uncertainty = False
@@ -24,28 +25,35 @@ if __name__ == '__main__':
     testing = False
     lambda_Pmask = 0  
     lambda_dll2 = 0.01
-    batch_size = 2
+    batch_size = 1
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T2_slice_recon_GE'
 
     dataLoader_test = kdata_loader_GE(split='val')
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
-    netG_dc = DC_with_Prop_Mask(
+    # netG_dc = DC_with_Prop_Mask(
+    #     input_channels=2, 
+    #     filter_channels=32, 
+    #     lambda_dll2=lambda_dll2, 
+    #     K=K,
+    #     unc_map=use_uncertainty,
+    #     fixed_mask=fixed_mask,
+    #     testing=testing
+    # )
+    netG_dc = DC_with_Straight_Through_Pmask(
         input_channels=2, 
         filter_channels=32, 
-        lambda_dll2=lambda_dll2, 
-        K=K,
+        lambda_dll2=lambda_dll2,
+        K=K, 
         unc_map=use_uncertainty,
         fixed_mask=fixed_mask,
         testing=testing
     )
     print(netG_dc)
     netG_dc.to(device)
-    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-    #     '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
     netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-        '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
+        '/weights_lambda_pmask={}_optimal_ST.pt'.format(lambda_Pmask)))
     netG_dc.eval()
     print(netG_dc.lambda_dll2)
     metrices_test = Metrices()
