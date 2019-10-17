@@ -20,20 +20,21 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
     lrG_dc = 1e-3
     niter = 8800
-    batch_size = 1
+    batch_size = 4
     display_iters = 10
-    lambda_Pmask = 0
+    lambda_Pmask = 0  # 0.01
     lambda_dll2 = 0.01 
     K = 2
     samplingRatio = 0.1
     use_uncertainty = False
     fixed_mask = False
     testing = False
+    rescale = True
     folderName = '{0}_rolls'.format(K)
-    rootName = '/data/Jinwei/T2_slice_recon_GE'
+    rootName = '/data/Jinwei/T1_slice_recon_GE'
 
     epoch = 0
     gen_iterations = 1
@@ -44,31 +45,42 @@ if __name__ == '__main__':
     t0 = time.time()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    dataLoader = kdata_loader_GE(split='train')
+    dataLoader = kdata_loader_GE(
+        rootDir=rootName,
+        contrast='T1', 
+        split='train'
+        )
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
-    dataLoader_val = kdata_loader_GE(split='val')
+    dataLoader_val = kdata_loader_GE(
+        rootDir=rootName,
+        contrast='T1', 
+        split='val'
+        )
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
     
-    # netG_dc = DC_with_Prop_Mask(
-    #     input_channels=2, 
-    #     filter_channels=32, 
-    #     lambda_dll2=lambda_dll2,
-    #     K=K, 
-    #     unc_map=use_uncertainty,
-    #     fixed_mask=fixed_mask,
-    #     testing=testing
-    # )
-
-    netG_dc = DC_with_Straight_Through_Pmask(
+    netG_dc = DC_with_Prop_Mask(
         input_channels=2, 
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
         K=K, 
         unc_map=use_uncertainty,
         fixed_mask=fixed_mask,
-        testing=testing
+        testing=testing,
+        rescale=rescale
     )
+
+    # netG_dc = DC_with_Straight_Through_Pmask(
+    #     input_channels=2, 
+    #     filter_channels=32, 
+    #     lambda_dll2=lambda_dll2,
+    #     K=K, 
+    #     unc_map=use_uncertainty,
+    #     fixed_mask=fixed_mask,
+    #     testing=testing,
+    #     rescale=rescale
+    # )
+
     print(netG_dc)
     netG_dc.to(device)
 
@@ -95,7 +107,7 @@ if __name__ == '__main__':
             if gen_iterations%display_iters == 0:
 
                 print('epochs: [%d/%d], batchs: [%d/%d], time: %ds, Lambda: %f'
-                % (epoch, niter, idx, 414//batch_size+1, time.time()-t0, lambda_Pmask))
+                % (epoch, niter, idx, 1050//batch_size+1, time.time()-t0, lambda_Pmask))
 
                 print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
                     % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), \
@@ -170,9 +182,9 @@ if __name__ == '__main__':
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+
-                       '/weights_lambda_pmask={}_optimal_ST.pt'.format(lambda_Pmask))
+                       '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask))
         torch.save(netG_dc.state_dict(), logger.logPath+
-                   '/weights_lambda_pmask={}_last_ST.pt'.format(lambda_Pmask))
+                   '/weights_lambda_pmask={}_last.pt'.format(lambda_Pmask))
 
         logger.close()
 

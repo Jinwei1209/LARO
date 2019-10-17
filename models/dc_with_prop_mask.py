@@ -23,6 +23,7 @@ class DC_with_Prop_Mask(nn.Module):
         slope_threshold=12,
         fixed_mask=False,
         testing=False,
+        rescale=False,
         samplingRatio = 0.1 # sparsity level of the sampling mask
     ):
         super(DC_with_Prop_Mask, self).__init__()
@@ -54,6 +55,7 @@ class DC_with_Prop_Mask(nn.Module):
         self.ncoil = ncoil
         self.nrow = nrow
         self.ncol = ncol
+        self.rescale = rescale
         self.samplingRatio = samplingRatio
 
     def At(self, kdata, mask, csm):
@@ -102,7 +104,10 @@ class DC_with_Prop_Mask(nn.Module):
         self.lambda_dll2 = self.lambda_dll2.to(device)
         self.weight_parameters = self.weight_parameters.to(device)
         self.Pmask = 1/(1+torch.exp(-self.slope*self.weight_parameters))
-        self.rescalePmask()
+        if self.rescale:
+            self.rescalePmask()
+        else:
+            self.Pmask_recaled = self.Pmask
         masks = self.ThresholdPmask()
 
         # # keep the calibration region

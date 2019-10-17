@@ -61,9 +61,9 @@ if __name__ == '__main__':
         Uncertainties.append(Unc_maps[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
         if idx == 0:
-            print(torch.mean(netG_dc.Pmask))
+            print(torch.mean(netG_dc.Pmask_recaled))
             adict = {}
-            adict['Mask'] = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
+            adict['Mask'] = np.squeeze(np.asarray(netG_dc.Pmask_recaled.cpu().detach()))
             sio.savemat(rootName+'/'+folderName+
                         '/Optimal_mask_{}.mat'.format(lambda_Pmask), adict)
 

@@ -61,6 +61,7 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         stochasticSampling=True,
         fixed_mask=False,
         testing=False,
+        rescale=False,
         samplingRatio = 0.1 # sparsity level of the sampling mask
     ):
         super(DC_with_Straight_Through_Pmask, self).__init__()
@@ -87,12 +88,13 @@ class DC_with_Straight_Through_Pmask(nn.Module):
                 self.thresh_const = torch.rand(self.weight_parameters.shape)
         else:
             temp = (torch.rand(1, nrow, ncol, 1)-0.5)*30
-            temp[:, nrow//2-10 : nrow//2+10, ncol//2-10 : ncol//2+10, :] = 15
+            temp[:, nrow//2-13 : nrow//2+12, ncol//2-13 : ncol//2+12, :] = 15
             self.weight_parameters = nn.Parameter(temp, requires_grad=True)
             # self.weight_parameters = nn.Parameter(torch.ones(1, nrow, ncol, 1)*30, requires_grad=True)
         self.ncoil = ncoil
         self.nrow = nrow
         self.ncol = ncol
+        self.rescale = rescale
         self.samplingRatio = samplingRatio
 
     def At(self, kdata, mask, csm):
@@ -129,7 +131,7 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         if self.fixed_mask:
             thresh = self.thresh_const.to(device)
             masks = (self.Pmask_recaled > thresh).to(device, dtype=torch.float32)
-            masks[:, self.nrow//2-10 : self.nrow//2+10, self.ncol//2-10 : self.ncol//2+10, :] = 1
+            masks[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12, :] = 1
         else:
             masks = bernoulliSample.apply(self.Pmask_recaled)
         self.masks = masks
@@ -143,7 +145,10 @@ class DC_with_Straight_Through_Pmask(nn.Module):
             self.Pmask = passThroughSigmoid.apply(self.slope * self.weight_parameters)
         else:
             self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters))
-        self.rescalePmask()
+        if self.rescale:
+            self.rescalePmask()
+        else:
+            self.Pmask_recaled = self.Pmask
         masks = self.ThresholdPmask()
 
         # # keep the calibration region
@@ -165,7 +170,7 @@ class DC_with_Straight_Through_Pmask(nn.Module):
             x = dc_layer.CG_iter()
             Xs.append(x)
             if self.unc_map:
-                Unc_maps.append(x_block[:, 2, ...])
+                Unc_maps.append(x_block[:, 2:4, ...])
         if self.unc_map:
             return Xs, Unc_maps
         else:

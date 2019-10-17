@@ -9,18 +9,25 @@ class kdata_loader_GE(data.Dataset):
 
 
     folderMatcher = {
-        'T2': 'Total_slices_T2/', 
-        'T2FLAIR': 'Total_slices_T2FLAIR/'
+        'T1': '/Total_slices_T1/',
+        'T2': '/Total_slices_T2/', 
+        'T2FLAIR': '/Total_slices_T2FLAIR/'
     }
 
-    dataRange = {
-        'train': ['0', '300'],
+    dataRangeT1 = {
+        'train': ['150', '1200'],   
+        'val': ['1200', '1350'],
+        'test': ['1350', '1650']
+    }
+
+    dataRangeT2 = {
+        'train': ['0', '300'],   
         'val': ['300', '400']
     }
 
 
     def __init__(self,
-        rootDir = '/data/Jinwei/T2_slice_recon_GE/',
+        rootDir = '/data/Jinwei/T2_slice_recon_GE',
         contrast = 'T2',
         split = 'train',
         batchSize = 1,
@@ -29,8 +36,12 @@ class kdata_loader_GE(data.Dataset):
 
         self.rootDir = rootDir
         self.dataFD = rootDir + self.folderMatcher[contrast]
-        self.startIdx = int(self.dataRange[split][0])
-        self.endIdx = int(self.dataRange[split][1])
+        if contrast == 'T1':
+            self.startIdx = int(self.dataRangeT1[split][0])
+            self.endIdx = int(self.dataRangeT1[split][1])
+        else:
+            self.startIdx = int(self.dataRangeT2[split][0])
+            self.endIdx = int(self.dataRangeT2[split][1])
         self.nsamples = self.endIdx - self.startIdx
 
         self.augmentations = augmentations

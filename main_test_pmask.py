@@ -17,19 +17,24 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 2
     use_uncertainty = False
     fixed_mask = False
     testing = False
+    rescale = True
     lambda_Pmask = 0  
     lambda_dll2 = 0.01
     batch_size = 1
     folderName = '{0}_rolls'.format(K)
-    rootName = '/data/Jinwei/T2_slice_recon_GE'
+    rootName = '/data/Jinwei/T1_slice_recon_GE'
 
-    dataLoader_test = kdata_loader_GE(split='val')
+    dataLoader_test = kdata_loader_GE(
+        rootDir=rootName,
+        contrast='T1', 
+        split='test'
+        )
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
     # netG_dc = DC_with_Prop_Mask(
@@ -48,7 +53,8 @@ if __name__ == '__main__':
         K=K, 
         unc_map=use_uncertainty,
         fixed_mask=fixed_mask,
-        testing=testing
+        testing=testing,
+        rescale=rescale
     )
     print(netG_dc)
     netG_dc.to(device)
@@ -69,9 +75,9 @@ if __name__ == '__main__':
         Recons.append(Xs[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
         if idx == 0:
-            print(torch.mean(netG_dc.masks))
+            print(torch.mean(netG_dc.Pmask_recaled))
             adict = {}
-            adict['Mask'] = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
+            adict['Mask'] = np.squeeze(np.asarray(netG_dc.Pmask_recaled.cpu().detach()))
             sio.savemat(rootName+'/'+folderName+
                         '/Optimal_mask_{}.mat'.format(lambda_Pmask), adict)
 

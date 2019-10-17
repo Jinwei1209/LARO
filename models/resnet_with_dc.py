@@ -29,7 +29,7 @@ def ResBlock(
             layers.append(nn.BatchNorm2d(filter_dim))
         layers.append(nn.ReLU(inplace=True))
     if unc_map:
-        layers.append(nn.Conv2d(filter_dim, input_dim+1, 1))
+        layers.append(nn.Conv2d(filter_dim, input_dim+2, 1))
     else:
         layers.append(nn.Conv2d(filter_dim, input_dim, 1))
 

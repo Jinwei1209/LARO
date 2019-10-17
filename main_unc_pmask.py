@@ -14,6 +14,7 @@ from utils.loss import *
 from models.dc_blocks import *
 from models.unet_with_dc import *
 from models.dc_with_prop_mask import *
+from models.dc_with_straight_through_pmask import *
 from utils.test import *
 
 
@@ -22,15 +23,17 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = '2'
     lrG_dc = 1e-3
     niter = 8800
-    batch_size = 4
+    batch_size = 3
     display_iters = 10
-    lambda_Pmask = 3*10**2
+    lambda_Pmask = 0
     lambda_dll2 = 0.01
     K = 2
     use_uncertainty = True
     fixed_mask = False
+    testing = False
+    rescale = True
     folderName = '{0}_rolls'.format(K)
-    rootName = '/data/Jinwei/T2_slice_recon_GE'
+    rootName = '/data/Jinwei/T1_slice_recon_GE'
 
     epoch = 0
     gen_iterations = 1
@@ -41,20 +44,40 @@ if __name__ == '__main__':
     t0 = time.time()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    dataLoader = kdata_loader_GE(split='train')
+    dataLoader = kdata_loader_GE(
+        rootDir=rootName,
+        contrast='T1', 
+        split='train'
+        )
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
-    dataLoader_val = kdata_loader_GE(split='val')
+    dataLoader_val = kdata_loader_GE(
+        rootDir=rootName,
+        contrast='T1', 
+        split='val'
+        )
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
     
-    netG_dc = DC_with_Prop_Mask(
+    # netG_dc = DC_with_Prop_Mask(
+    #     input_channels=2, 
+    #     filter_channels=32, 
+    #     lambda_dll2=lambda_dll2,
+    #     K=K, 
+    #     unc_map=use_uncertainty,
+    #     fixed_mask=fixed_mask
+    # )
+
+    netG_dc = DC_with_Straight_Through_Pmask(
         input_channels=2, 
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
         K=K, 
         unc_map=use_uncertainty,
-        fixed_mask=fixed_mask
+        fixed_mask=fixed_mask,
+        testing=testing,
+        rescale=rescale
     )
+
     print(netG_dc)
     netG_dc.to(device)
 
@@ -81,10 +104,11 @@ if __name__ == '__main__':
             if gen_iterations%display_iters == 0:
 
                 print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                % (epoch, niter, idx, 414//batch_size+1, time.time()-t0))
+                % (epoch, niter, idx, 1050//batch_size+1, time.time()-t0))
 
-                print('Lambda_dll2: %f, Sampling ratio: %f, lambda_Pmask: %d' 
-                    % (netG_dc.lambda_dll2, torch.mean(netG_dc.Pmask), lambda_Pmask))
+                print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
+                    % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), \
+                        netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
 
                 print('netG_dc --- loss_L2_dc: %f, loss_uncertainty: %f'
                     % (errL2_dc_sum/display_iters, errL2_unc_sum/display_iters))
@@ -139,7 +163,8 @@ if __name__ == '__main__':
                 Xs_i = np.asarray(Xs[i].cpu().detach())
                 Unc_maps_i = np.asarray(Unc_maps[i].cpu().detach())
                 temp = (Xs_i - targets)**2
-                lossl2_sum += np.mean(np.sum(temp, axis=1)/np.exp(Unc_maps_i))
+                # lossl2_sum += np.mean(np.sum(temp, axis=1)/np.exp(Unc_maps_i))
+                lossl2_sum += np.mean(temp/np.exp(Unc_maps_i))
                 loss_unc_sum += np.mean(Unc_maps_i)
             temp = np.asarray(netG_dc.Pmask.cpu().detach())
             loss_Pmask = lambda_Pmask*np.mean(temp)
@@ -158,9 +183,9 @@ if __name__ == '__main__':
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+
-                       '/weights_sigma=0.01_lambda_pmask={}_optimal.pt'.format(lambda_Pmask))
+                       '/weights_lambda_pmask={}_optimal_ST_unc.pt'.format(lambda_Pmask))
         torch.save(netG_dc.state_dict(), logger.logPath+
-                   '/weights_sigma=0.01_lambda_pmask={}_last.pt'.format(lambda_Pmask))
+                   '/weights_lambda_pmask={}_last_ST_unc.pt'.format(lambda_Pmask))
 
         logger.close()
 
