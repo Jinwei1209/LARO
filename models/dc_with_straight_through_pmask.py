@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 from models.dc_blocks import *
 from models.unet_blocks import *
@@ -60,9 +61,9 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         passSigmoid=False,
         stochasticSampling=True,
         fixed_mask=False,
-        testing=False,
         rescale=False,
-        samplingRatio = 0.1 # sparsity level of the sampling mask
+        samplingRatio = 0.1, # sparsity level of the sampling mask
+        contrast = 'T1'
     ):
         super(DC_with_Straight_Through_Pmask, self).__init__()
         self.resnet_block = []
@@ -79,18 +80,20 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
         self.fixed_mask = fixed_mask
+
+        temp = (torch.rand(1, nrow, ncol, 1)-0.5)*30
+        temp[:, nrow//2-13 : nrow//2+12, ncol//2-13 : ncol//2+12, :] = 15
+
         if self.fixed_mask:
-            self.weight_parameters = nn.Parameter((torch.rand(1, nrow, ncol, 1)-0.5)*30, requires_grad=False)
-            if testing:
-                self.thresh_const = load_mat('/data/Jinwei/T2_slice_recon_GE/2_rolls/Thresh_0.015.mat', 'Thresh')
-                self.thresh_const = torch.tensor(self.thresh_const)
-            else:
-                self.thresh_const = torch.rand(self.weight_parameters.shape)
+            self.masks = load_mat('/data/Jinwei/{}_slice_recon_GE/'.format(contrast) +  
+                         '2_rolls/Optimal_masks/{}/variable_density_mask.mat'.format(math.floor(samplingRatio*100)), 'Mask')
+            print('Loading variable_density_mask')  # or 'Loading variable density mask'
+            self.masks = torch.Tensor(self.masks[np.newaxis, ..., np.newaxis])
+            self.weight_parameters = nn.Parameter(temp, requires_grad=False)
         else:
-            temp = (torch.rand(1, nrow, ncol, 1)-0.5)*30
-            temp[:, nrow//2-13 : nrow//2+12, ncol//2-13 : ncol//2+12, :] = 15
             self.weight_parameters = nn.Parameter(temp, requires_grad=True)
             # self.weight_parameters = nn.Parameter(torch.ones(1, nrow, ncol, 1)*30, requires_grad=True)
+
         self.ncoil = ncoil
         self.nrow = nrow
         self.ncol = ncol
@@ -127,29 +130,26 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         self.Pmask_recaled = le * self.Pmask * r + (1-le) * (1 - (1-self.Pmask) * beta)
 
     def ThresholdPmask(self):
-        device = self.Pmask.get_device()
-        if self.fixed_mask:
-            thresh = self.thresh_const.to(device)
-            masks = (self.Pmask_recaled > thresh).to(device, dtype=torch.float32)
-            masks[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12, :] = 1
-        else:
-            masks = bernoulliSample.apply(self.Pmask_recaled)
-        self.masks = masks
-        return self.masks
+        return bernoulliSample.apply(self.Pmask_recaled)
 
     def forward(self, kdata, csms):
         device = kdata.get_device()
         self.lambda_dll2 = self.lambda_dll2.to(device)
-        self.weight_parameters = self.weight_parameters.to(device)
-        if self.passSigmoid:
-            self.Pmask = passThroughSigmoid.apply(self.slope * self.weight_parameters)
+        if not self.fixed_mask:
+            self.weight_parameters = self.weight_parameters.to(device)
+            if self.passSigmoid:
+                self.Pmask = passThroughSigmoid.apply(self.slope * self.weight_parameters)
+            else:
+                self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters))
+            if self.rescale:
+                self.rescalePmask()
+            else:
+                self.Pmask_recaled = self.Pmask
+            self.masks = self.ThresholdPmask()
+            masks = self.masks
         else:
             self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters))
-        if self.rescale:
-            self.rescalePmask()
-        else:
-            self.Pmask_recaled = self.Pmask
-        masks = self.ThresholdPmask()
+            masks = self.masks.to(device)
 
         # # keep the calibration region
         # masks[:, masks.size()[1]//2-15:masks.size()[1]//2+15,  masks.size()[2]//2-15:masks.size()[2]//2+15, :] = 1

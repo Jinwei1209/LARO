@@ -1,6 +1,7 @@
 import os
 import time
 import torch
+import math
 import numpy as np
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
@@ -20,7 +21,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     lrG_dc = 1e-3
     niter = 8800
     batch_size = 4
@@ -28,13 +29,13 @@ if __name__ == '__main__':
     lambda_Pmask = 0  # 0.01
     lambda_dll2 = 0.01 
     K = 2
-    samplingRatio = 0.1
+    samplingRatio = 0.2
     use_uncertainty = False
-    fixed_mask = False
-    testing = False
+    fixed_mask = True
     rescale = True
     folderName = '{0}_rolls'.format(K)
-    rootName = '/data/Jinwei/T1_slice_recon_GE'
+    contrast = 'T2'
+    rootName = '/data/Jinwei/{}_slice_recon_GE'.format(contrast)
 
     epoch = 0
     gen_iterations = 1
@@ -47,53 +48,47 @@ if __name__ == '__main__':
 
     dataLoader = kdata_loader_GE(
         rootDir=rootName,
-        contrast='T1', 
+        contrast=contrast, 
         split='train'
         )
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
     dataLoader_val = kdata_loader_GE(
         rootDir=rootName,
-        contrast='T1', 
+        contrast=contrast, 
         split='val'
         )
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
     
-    netG_dc = DC_with_Prop_Mask(
-        input_channels=2, 
-        filter_channels=32, 
-        lambda_dll2=lambda_dll2,
-        K=K, 
-        unc_map=use_uncertainty,
-        fixed_mask=fixed_mask,
-        testing=testing,
-        rescale=rescale
-    )
-
-    # netG_dc = DC_with_Straight_Through_Pmask(
+    # netG_dc = DC_with_Prop_Mask(
     #     input_channels=2, 
     #     filter_channels=32, 
     #     lambda_dll2=lambda_dll2,
     #     K=K, 
     #     unc_map=use_uncertainty,
     #     fixed_mask=fixed_mask,
-    #     testing=testing,
     #     rescale=rescale
     # )
+
+    netG_dc = DC_with_Straight_Through_Pmask(
+        input_channels=2, 
+        filter_channels=32, 
+        lambda_dll2=lambda_dll2,
+        K=K, 
+        unc_map=use_uncertainty,
+        fixed_mask=fixed_mask,
+        rescale=rescale,
+        samplingRatio=samplingRatio,
+        contrast=contrast
+    )
 
     print(netG_dc)
     netG_dc.to(device)
 
     # # load pre-trained weights with pmask
     # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-    #                         '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask)))
+    #                         '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
     # netG_dc.eval()
-
-    # # save thresh_const for network training with fixed optimal mask training 
-    # adict = {}
-    # adict['Thresh'] = np.asarray(netG_dc.thresh_const.cpu().detach()) 
-    # sio.savemat(rootName+'/'+folderName+
-    #             '/Thresh_{}.mat'.format(lambda_Pmask), adict)
 
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     logger = Logger(folderName, rootName)
@@ -180,11 +175,13 @@ if __name__ == '__main__':
 
         # save weights
         PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
+
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), logger.logPath+
-                       '/weights_lambda_pmask={}_optimal.pt'.format(lambda_Pmask))
-        torch.save(netG_dc.state_dict(), logger.logPath+
-                   '/weights_lambda_pmask={}_last.pt'.format(lambda_Pmask))
+            torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
+                       '/weights_ratio_pmask={}%_optimal_ST_vd.pt'.format(math.floor(samplingRatio*100)))
+
+        torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
+                   '/weights_ratio_pmask={}%_last_ST_vd.pt'.format(math.floor(samplingRatio*100)))
 
         logger.close()
 
