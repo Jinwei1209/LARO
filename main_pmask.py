@@ -21,7 +21,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG_dc = 1e-3
     niter = 8800
     batch_size = 4
@@ -29,12 +29,14 @@ if __name__ == '__main__':
     lambda_Pmask = 0  # 0.01
     lambda_dll2 = 0.01 
     K = 2
-    samplingRatio = 0.2
+    samplingRatio = 0.2  # 0.1/0.2
     use_uncertainty = False
-    fixed_mask = True
+    passSigmoid = False  # +/-
+    fixed_mask = True  # +/-
+    optimal_mask = True  # +/-
     rescale = True
     folderName = '{0}_rolls'.format(K)
-    contrast = 'T2'
+    contrast = 'T1'  # T1/T2
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(contrast)
 
     epoch = 0
@@ -76,7 +78,9 @@ if __name__ == '__main__':
         lambda_dll2=lambda_dll2,
         K=K, 
         unc_map=use_uncertainty,
+        passSigmoid=passSigmoid,
         fixed_mask=fixed_mask,
+        optimal_mask=optimal_mask,
         rescale=rescale,
         samplingRatio=samplingRatio,
         contrast=contrast
@@ -86,9 +90,9 @@ if __name__ == '__main__':
     netG_dc.to(device)
 
     # # load pre-trained weights with pmask
-    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+
-    #                         '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
-    # netG_dc.eval()
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
+                '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
+    netG_dc.eval()
 
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     logger = Logger(folderName, rootName)
@@ -178,10 +182,10 @@ if __name__ == '__main__':
 
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                       '/weights_ratio_pmask={}%_optimal_ST_vd.pt'.format(math.floor(samplingRatio*100)))
+                       '/weights_ratio_pmask={}%_optimal_ST_fixed2.pt'.format(math.floor(samplingRatio*100)))
 
         torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                   '/weights_ratio_pmask={}%_last_ST_vd.pt'.format(math.floor(samplingRatio*100)))
+                   '/weights_ratio_pmask={}%_last_ST_fixed2.pt'.format(math.floor(samplingRatio*100)))
 
         logger.close()
 

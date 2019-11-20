@@ -61,6 +61,7 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         passSigmoid=False,
         stochasticSampling=True,
         fixed_mask=False,
+        optimal_mask=True,
         rescale=False,
         samplingRatio = 0.1, # sparsity level of the sampling mask
         contrast = 'T1'
@@ -85,9 +86,14 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         temp[:, nrow//2-13 : nrow//2+12, ncol//2-13 : ncol//2+12, :] = 15
 
         if self.fixed_mask:
-            self.masks = load_mat('/data/Jinwei/{}_slice_recon_GE/'.format(contrast) +  
-                         '2_rolls/Optimal_masks/{}/variable_density_mask.mat'.format(math.floor(samplingRatio*100)), 'Mask')
-            print('Loading variable_density_mask')  # or 'Loading variable density mask'
+            if optimal_mask:
+                self.masks = load_mat('/data/Jinwei/{}_slice_recon_GE/'.format(contrast) +  
+                            '2_rolls/Optimal_masks/{}/optimal_mask(consistent with kdata).mat'.format(math.floor(samplingRatio*100)), 'Mask')
+                print('Loading optimal_mask of T1 consistent with kdata')
+            else:
+                self.masks = load_mat('/data/Jinwei/{}_slice_recon_GE/'.format(contrast) +  
+                            '2_rolls/Optimal_masks/{}/variable_density_mask.mat'.format(math.floor(samplingRatio*100)), 'Mask')
+                print('Loading variable_density_mask')
             self.masks = torch.Tensor(self.masks[np.newaxis, ..., np.newaxis])
             self.weight_parameters = nn.Parameter(temp, requires_grad=False)
         else:

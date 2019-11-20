@@ -19,25 +19,28 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 2
+    K_model = 2
     straight_through = True
     samplingRatio = 0.2
     use_uncertainty = False
-    fixed_mask = False
+    fixed_mask = True  # +/-
+    optimal_mask = False  # +/-
+    passSigmoid = False  # +/-
     rescale = True
     lambda_Pmask = 0  
     lambda_dll2 = 0.01
     batch_size = 1
     folderName = '{0}_rolls'.format(K)
-    contrast = 'T2'
+    contrast = 'T1'
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(contrast)
 
     dataLoader_test = kdata_loader_GE(
         rootDir=rootName,
         contrast=contrast, 
-        split='val'
+        split='test'
         )
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
@@ -52,27 +55,35 @@ if __name__ == '__main__':
             rescale=rescale
         )
         netG_dc.to(device)
-        netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-            '/weights_ratio_pmask={}%_optimal_ST_fixed.pt'.format(math.floor(samplingRatio*100))))
+        netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/L1_mask'+
+            '/weights_lambda_pmask=0.015_optimal.pt'))
         netG_dc.eval()
+        print('Loading LOUPE weights')
     else:
         netG_dc = DC_with_Straight_Through_Pmask(
             input_channels=2, 
             filter_channels=32, 
             lambda_dll2=lambda_dll2,
-            K=K, 
+            K=K_model, 
             unc_map=use_uncertainty,
             fixed_mask=fixed_mask,
+            optimal_mask=optimal_mask,
+            passSigmoid=passSigmoid,
             rescale=rescale,
             samplingRatio=samplingRatio,
             contrast=contrast
         )
         netG_dc.to(device)
-        netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-            '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
+        if optimal_mask:
+            netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
+                '/weights_ratio_pmask={}%_optimal_ST_fixed.pt'.format(math.floor(samplingRatio*100))))
+        else:
+            print('heihei \n')
+            netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
+                '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
         netG_dc.eval()
     
-    print(netG_dc)
+    # print(netG_dc)
     print(netG_dc.lambda_dll2)
     metrices_test = Metrices()
 
