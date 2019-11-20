@@ -29,7 +29,7 @@ class Metrices():
         targets = abs(r2c(targets))
 
         outputs = outputs / np.amax(outputs)
-        targetts = targets / np.amax(targets)
+        targets = targets / np.amax(targets)
         # weights = targets > 1e-1
         for i in range(len(targets)):
             self.PSNRs.append(psnr(outputs[i], targets[i]))
