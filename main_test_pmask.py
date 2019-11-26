@@ -19,16 +19,16 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 2
-    K_model = 2
+    K_model = 10
     straight_through = True
-    samplingRatio = 0.2
+    samplingRatio = 0.1
     use_uncertainty = False
-    fixed_mask = True  # +/-
-    optimal_mask = False  # +/-
     passSigmoid = False  # +/-
+    fixed_mask = True  # +/-
+    optimal_mask = True  # +/-
     rescale = True
     lambda_Pmask = 0  
     lambda_dll2 = 0.01
@@ -75,12 +75,13 @@ if __name__ == '__main__':
         )
         netG_dc.to(device)
         if optimal_mask:
+            print('K=10')
             netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                '/weights_ratio_pmask={}%_optimal_ST_fixed.pt'.format(math.floor(samplingRatio*100))))
+                '/weights_ratio_pmask={}%_optimal_ST_fixed_K=10.pt'.format(math.floor(samplingRatio*100))))
         else:
             print('heihei \n')
             netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
+                '/weights_ratio_pmask={}%_optimal_ST_vd_K=8.pt'.format(math.floor(samplingRatio*100))))
         netG_dc.eval()
     
     # print(netG_dc)

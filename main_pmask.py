@@ -24,16 +24,17 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG_dc = 1e-3
     niter = 8800
-    batch_size = 4
+    batch_size = 3
     display_iters = 10
     lambda_Pmask = 0  # 0.01
     lambda_dll2 = 0.01 
     K = 2
-    samplingRatio = 0.2  # 0.1/0.2
+    K_model = 2
+    samplingRatio = 0.1  # 0.1/0.2
     use_uncertainty = False
-    passSigmoid = False  # +/-
-    fixed_mask = True  # +/-
-    optimal_mask = True  # +/-
+    passSigmoid = False
+    fixed_mask = False  # +/-
+    optimal_mask = False  # +/-
     rescale = True
     folderName = '{0}_rolls'.format(K)
     contrast = 'T1'  # T1/T2
@@ -76,7 +77,7 @@ if __name__ == '__main__':
         input_channels=2, 
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
-        K=K, 
+        K=K_model, 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         fixed_mask=fixed_mask,
@@ -90,9 +91,9 @@ if __name__ == '__main__':
     netG_dc.to(device)
 
     # # load pre-trained weights with pmask
-    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
-    netG_dc.eval()
+    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
+    #             '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
+    # netG_dc.eval()
 
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     logger = Logger(folderName, rootName)
@@ -101,7 +102,7 @@ if __name__ == '__main__':
         epoch += 1 
         # training phase
         metrices_train = Metrices()
-        for idx, (inputs, targets, csms) in enumerate(trainLoader):
+        for idx, (inputs, targets, csms, brain_masks) in enumerate(trainLoader):
             
             if gen_iterations%display_iters == 0:
 
@@ -122,15 +123,17 @@ if __name__ == '__main__':
                     % (np.mean(np.asarray(metrices_val.PSNRs))))
 
                 errL2_dc_sum = Pmask_ratio = 0
-                
+            
             inputs = inputs.to(device)
             targets = targets.to(device)
             csms = csms.to(device)
+            brain_masks = brain_masks.to(device)
 
             errL2_dc, loss_Pmask = netG_dc_train_pmask(
                 inputs, 
                 targets, 
-                csms, 
+                csms,
+                brain_masks, 
                 netG_dc, 
                 optimizerG_dc, 
                 use_uncertainty,
@@ -141,28 +144,30 @@ if __name__ == '__main__':
 
             # calculating metrices
             Xs = netG_dc(inputs, csms)
-            metrices_train.get_metrices(Xs[-1], targets)
+            metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
 
             gen_iterations += 1
             
         # validation phase
         metrices_val = Metrices()
         loss_total_list = []
-        for idx, (inputs, targets, csms) in enumerate(valLoader):
+        for idx, (inputs, targets, csms, brain_masks) in enumerate(valLoader):
 
             inputs = inputs.to(device)
             targets = targets.to(device)
             csms = csms.to(device)
+            brain_masks = brain_masks.to(device)
 
             # calculating metrices
             Xs = netG_dc(inputs, csms)
-            metrices_val.get_metrices(Xs[-1], targets)
+            metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
 
             targets = np.asarray(targets.cpu().detach())
+            brain_masks = np.asarray(brain_masks.cpu().detach())
             lossl2_sum = loss_unc_sum = 0
             for i in range(len(Xs)):
                 Xs_i = np.asarray(Xs[i].cpu().detach())
-                temp = abs(Xs_i - targets)
+                temp = abs(Xs_i - targets) * brain_masks
                 lossl2_sum += np.mean(temp)
             temp = np.asarray(netG_dc.Pmask.cpu().detach())
             loss_Pmask = lambda_Pmask*np.mean(temp)
@@ -182,10 +187,10 @@ if __name__ == '__main__':
 
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                       '/weights_ratio_pmask={}%_optimal_ST_fixed2.pt'.format(math.floor(samplingRatio*100)))
+                       '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100)))
 
         torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                   '/weights_ratio_pmask={}%_last_ST_fixed2.pt'.format(math.floor(samplingRatio*100)))
+                   '/weights_ratio_pmask={}%_last_ST.pt'.format(math.floor(samplingRatio*100)))
 
         logger.close()
 

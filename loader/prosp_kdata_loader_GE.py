@@ -5,44 +5,20 @@ from utils.data import *
 from utils.loss import *
 
 
-class kdata_loader_GE(data.Dataset):
-
-
-    folderMatcher = {
-        'T1': '/Total_slices_T1/',
-        'T2': '/Total_slices_T2/', 
-        'T2FLAIR': '/Total_slices_T2FLAIR/'
-    }
-
-    dataRangeT1 = {
-        'train': ['150', '1200'],   
-        'val': ['1200', '1350'],  # 1200 1350
-        'test': ['1350', '1650']  # 1350 1650
-    }
-
-    dataRangeT2 = {
-        'train': ['0', '300'],   
-        'val': ['300', '400']  # 300. 400
-    }
+class prosp_kdata_loader_GE(data.Dataset):
 
 
     def __init__(self,
-        rootDir = '/data/Jinwei/T2_slice_recon_GE',
-        contrast = 'T2',
-        split = 'train',
+        rootDir = '/data/Jinwei/T1_slice_recon_GE',
+        subject = 'sub1',
+        mask = 'LOUPE_20',
         batchSize = 1,
         augmentations = [None]
     ):
 
-        self.rootDir = rootDir
-        self.dataFD = rootDir + self.folderMatcher[contrast]
-        self.contrast = contrast
-        if contrast == 'T1':
-            self.startIdx = int(self.dataRangeT1[split][0])
-            self.endIdx = int(self.dataRangeT1[split][1])
-        else:
-            self.startIdx = int(self.dataRangeT2[split][0])
-            self.endIdx = int(self.dataRangeT2[split][1])
+        self.dataFD = rootDir + '/' + subject + '_' + mask + '/'
+        self.startIdx = 0
+        self.endIdx = 206
         self.nsamples = self.endIdx - self.startIdx
 
         self.augmentations = augmentations
@@ -78,14 +54,11 @@ class kdata_loader_GE(data.Dataset):
         kdata = load_mat(self.dataFD + 'kdata_slice_%d.mat' %(idx), 'kdata_slice')
         kdata = np.transpose(kdata, (2, 0, 1))
         kdata = c2r_kdata(kdata)
-        if self.contrast == 'T1':
-            tmp = load_mat(self.dataFD + 'brain_mask_slice_%d.mat' %(idx), 'brain_mask_slice')
-            brain_mask = np.zeros(org.shape, dtype=np.float32)
-            brain_mask[0, ...] = tmp
-            brain_mask[1, ...] = tmp 
-        else:
-            brain_mask = np.ones(org.shape, dtype=np.float32)
-        return kdata, org, csm, brain_mask
+        
+        return kdata, org, csm
+
+
+
 
         
 

@@ -88,8 +88,8 @@ class DC_with_Straight_Through_Pmask(nn.Module):
         if self.fixed_mask:
             if optimal_mask:
                 self.masks = load_mat('/data/Jinwei/{}_slice_recon_GE/'.format(contrast) +  
-                            '2_rolls/Optimal_masks/{}/optimal_mask(consistent with kdata).mat'.format(math.floor(samplingRatio*100)), 'Mask')
-                print('Loading optimal_mask of T1 consistent with kdata')
+                            '2_rolls/Optimal_masks/{}/optimal_mask.mat'.format(math.floor(samplingRatio*100)), 'Mask')
+                print('Loading optimal_mask of T1')
             else:
                 self.masks = load_mat('/data/Jinwei/{}_slice_recon_GE/'.format(contrast) +  
                             '2_rolls/Optimal_masks/{}/variable_density_mask.mat'.format(math.floor(samplingRatio*100)), 'Mask')
