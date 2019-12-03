@@ -207,6 +207,8 @@ class Logger():
             if not os.path.exists(self.logPath):
                 os.mkdir(self.logPath)
             self.file = open(self.filePath, 'w')
+            self.file.write('Logs start:')
+            self.file.write('\n')
 
     def print_and_save(self, string, *args):
 
@@ -217,7 +219,7 @@ class Logger():
             print(string % (args))
 
         if self.flagSave:
-            self.file = open(self.filePath, 'w')
+            self.file = open(self.filePath, 'a+')
             self.file.write(string % (args))
             self.file.write('\n')
 

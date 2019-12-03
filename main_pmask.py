@@ -24,17 +24,17 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG_dc = 1e-3
     niter = 8800
-    batch_size = 3
+    batch_size = 1
     display_iters = 10
-    lambda_Pmask = 0  # 0.01
+    lambda_Pmask = 0
     lambda_dll2 = 0.01 
     K = 2
-    K_model = 2
+    K_model = 8
     samplingRatio = 0.1  # 0.1/0.2
     use_uncertainty = False
     passSigmoid = False
-    fixed_mask = False  # +/-
-    optimal_mask = False  # +/-
+    fixed_mask = True  # +/-
+    optimal_mask = True  # +/-
     rescale = True
     folderName = '{0}_rolls'.format(K)
     contrast = 'T1'  # T1/T2
@@ -90,10 +90,11 @@ if __name__ == '__main__':
     print(netG_dc)
     netG_dc.to(device)
 
-    # # load pre-trained weights with pmask
-    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-    #             '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
-    # netG_dc.eval()
+    # load pre-trained weights with pmask
+    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
+                '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
+    netG_dc.eval()
+    print('Load Pmask weights')
 
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     logger = Logger(folderName, rootName)
@@ -187,10 +188,10 @@ if __name__ == '__main__':
 
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                       '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100)))
+                       '/weights_ratio_pmask={}%_optimal_ST_fixed_K=8.pt'.format(math.floor(samplingRatio*100)))
 
         torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                   '/weights_ratio_pmask={}%_last_ST.pt'.format(math.floor(samplingRatio*100)))
+                   '/weights_ratio_pmask={}%_last_ST_fixed_K=8.pt'.format(math.floor(samplingRatio*100)))
 
         logger.close()
 
