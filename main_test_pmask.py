@@ -19,15 +19,15 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 2
-    K_model = 10
+    K_model = 2
     straight_through = True
     samplingRatio = 0.1
     use_uncertainty = False
     passSigmoid = False  # +/-
-    fixed_mask = True  # +/-
+    fixed_mask = False  # +/-
     optimal_mask = True  # +/-
     rescale = True
     lambda_Pmask = 0  
@@ -77,7 +77,7 @@ if __name__ == '__main__':
         if optimal_mask:
             print('K=10')
             netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                '/weights_ratio_pmask={}%_optimal_ST_fixed_K=10.pt'.format(math.floor(samplingRatio*100))))
+                '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
         else:
             print('heihei \n')
             netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     metrices_test = Metrices()
 
     Recons = []
-    for idx, (inputs, targets, csms) in enumerate(testLoader):
+    for idx, (inputs, targets, csms, brain_masks) in enumerate(testLoader):
         print(idx)
         inputs = inputs.to(device)
         targets = targets.to(device)
