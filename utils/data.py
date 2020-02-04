@@ -186,21 +186,31 @@ def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
 
 class Logger():
 
-    def __init__(self, folderName, rootName, flagFrint=True, flagSave=True):
+    def __init__(
+        self, 
+        logName, 
+        rootName,
+        K,
+        flag_ND,
+        Ratio, 
+        flagFrint=True, 
+        flagSave=True
+    ):
         
         self.flagFrint = flagFrint
         self.flagSave = flagSave
 
-        self.folderName = folderName
+        self.logName = logName
         self.rootName = rootName
 
         if(not os.path.exists(self.rootName)):
             os.mkdir(self.rootName)
-        self.logPath = os.path.join(self.rootName, self.folderName)
+        self.logPath = os.path.join(self.rootName, self.logName)
+        print(self.logPath)
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'logs_begining_at_' + self.t0 + '.log'
+        self.fileName = 'K={0}_flag_ND={1}_ratio={2}'.format(K, flag_ND, Ratio) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 
         if self.flagSave:

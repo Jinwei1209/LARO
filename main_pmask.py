@@ -2,7 +2,9 @@ import os
 import time
 import torch
 import math
+import argparse
 import numpy as np
+
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
 from utils.data import *
@@ -16,49 +18,54 @@ from models.dc_blocks import *
 from models.unet_with_dc import *
 from models.dc_with_prop_mask import *
 from models.dc_with_straight_through_pmask import *
+from models.dc_st_pmask import *
 from utils.test import *
 
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     lrG_dc = 1e-3
-    niter = 8800
+    niter = 1000
     batch_size = 1
     display_iters = 10
     lambda_Pmask = 0
-    lambda_dll2 = 0.01 
-    K = 2
-    K_model = 8
-    samplingRatio = 0.1  # 0.1/0.2
+    lambda_dll2 = 0.01
     use_uncertainty = False
     passSigmoid = False
-    fixed_mask = True  # +/-
-    optimal_mask = True  # +/-
+    fixed_mask = False  # +/-
+    optimal_mask = False  # +/-
     rescale = True
-    folderName = '{0}_rolls'.format(K)
-    contrast = 'T1'  # T1/T2
-    rootName = '/data/Jinwei/{}_slice_recon_GE'.format(contrast)
 
+    # typein parameters
+    parser = argparse.ArgumentParser(description='LOUPE-ST')
+    parser.add_argument('--gpu_id', type=str, default='0')
+    parser.add_argument('--flag_ND', type=int, default=3)
+    parser.add_argument('--contrast', type=str, default='T2')
+    parser.add_argument('--K', type=int, default=1)
+    parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
+    opt = {**vars(parser.parse_args())}
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
+    rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
+
+    t0 = time.time()
     epoch = 0
     gen_iterations = 1
     errL2_dc_sum = Pmask_ratio = 0
     PSNRs_val = []
     Validation_loss = []
-
-    t0 = time.time()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     dataLoader = kdata_loader_GE(
         rootDir=rootName,
-        contrast=contrast, 
+        contrast=opt['contrast'], 
         split='train'
         )
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
     dataLoader_val = kdata_loader_GE(
         rootDir=rootName,
-        contrast=contrast, 
+        contrast=opt['contrast'], 
         split='val'
         )
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
@@ -73,31 +80,46 @@ if __name__ == '__main__':
     #     rescale=rescale
     # )
 
-    netG_dc = DC_with_Straight_Through_Pmask(
+    # netG_dc = DC_with_Straight_Through_Pmask(
+    #     input_channels=2, 
+    #     filter_channels=32, 
+    #     lambda_dll2=lambda_dll2,
+    #     K=K_model, 
+    #     unc_map=use_uncertainty,
+    #     passSigmoid=passSigmoid,
+    #     fixed_mask=fixed_mask,
+    #     optimal_mask=optimal_mask,
+    #     rescale=rescale,
+    #     samplingRatio=samplingRatio,
+    #     contrast=contrast
+    # )
+
+    netG_dc = DC_ST_Pmask(
         input_channels=2, 
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
-        K=K_model, 
+        flag_ND=opt['flag_ND'],
+        K=opt['K'], 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
-        fixed_mask=fixed_mask,
-        optimal_mask=optimal_mask,
         rescale=rescale,
-        samplingRatio=samplingRatio,
-        contrast=contrast
+        samplingRatio=opt['samplingRatio']
     )
 
     print(netG_dc)
     netG_dc.to(device)
 
-    # load pre-trained weights with pmask
-    netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
-    netG_dc.eval()
-    print('Load Pmask weights')
+    # # load pre-trained weights with pmask
+    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
+    #             '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
+    # netG_dc.eval()
+    # print('Load Pmask weights')
 
+    # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
-    logger = Logger(folderName, rootName)
+
+    # logger
+    logger = Logger('logs', rootName, opt['K'], opt['flag_ND'], opt['samplingRatio'])
     
     while epoch < niter:
         epoch += 1 
@@ -177,21 +199,15 @@ if __name__ == '__main__':
         print('\n Validation loss: %f \n' 
             % (sum(loss_total_list) / float(len(loss_total_list))))
         Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
+
         # save log
-        logger.print_and_save('Epoch: [%d/%d], PSNR in Training: %.2f' 
+        logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f' 
         % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs))))
-        logger.print_and_save('Epoch: [%d/%d], PSNR in Validation: %.2f' 
-        % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs))))
+        logger.print_and_save('Epoch: [%d/%d], PSNR in validation: %.2f, loss in validation: %.5f' 
+        % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
 
         # save weights
-        PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
-
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                       '/weights_ratio_pmask={}%_optimal_ST_fixed_K=8.pt'.format(math.floor(samplingRatio*100)))
-
-        torch.save(netG_dc.state_dict(), logger.logPath+'/weights/{}'.format(math.floor(samplingRatio*100))+
-                   '/weights_ratio_pmask={}%_last_ST_fixed_K=8.pt'.format(math.floor(samplingRatio*100)))
-
-        logger.close()
+            torch.save(netG_dc.state_dict(), rootName+'/weights/ \
+            K={0}_flag_ND={1}_ratio={2}.pt'.format(opt['K'], opt['flag_ND'], opt['samplingRatio']))
 

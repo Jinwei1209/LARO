@@ -6,44 +6,9 @@ import math
 from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
-from models.resnet_with_dc import ResBlock
+from models.resBlocks import *
+from models.straight_through_layers import *
 
-class passThroughSigmoid(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, x):
-        device = x.get_device()
-        return (1 / (1 + torch.exp(-x))).to(device)
-
-    @staticmethod
-    def backward(ctx, g):
-        return g
-
-
-class binaryRound(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, x):
-        device = x.get_device()
-        return x.round().to(device)
-
-    @staticmethod
-    def backward(ctx, g):
-        return g
-
-
-class bernoulliSample(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, x):
-        device = x.get_device()
-        samples = torch.rand(x.shape).to(device)
-        return (torch.ceil(x - samples)).to(device)
-
-    @staticmethod
-    def backward(ctx, g):
-        return g
-        
 
 class DC_with_Straight_Through_Pmask(nn.Module):
 
@@ -68,7 +33,7 @@ class DC_with_Straight_Through_Pmask(nn.Module):
     ):
         super(DC_with_Straight_Through_Pmask, self).__init__()
         self.resnet_block = []
-        layers = ResBlock(input_channels, filter_channels, unc_map=unc_map)
+        layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
         for layer in layers:
             self.resnet_block.append(layer)
         self.resnet_block = nn.Sequential(*self.resnet_block)

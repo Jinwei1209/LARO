@@ -19,7 +19,7 @@ from utils.test import *
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     K = 2
     K_model = 8  # 2/8 or 10
@@ -34,9 +34,9 @@ if __name__ == '__main__':
     contrast = 'T1'
     folderName = '{0}_rolls'.format(K)
     rootName = '/data/Jinwei/T1_slice_recon_GE'
-    subject = 'sub1'
+    subject = 'sub2'
     samplingRatio = 0.1  # 0.1/0.2
-    optimal_mask = True  # +/-
+    optimal_mask = False  # +/-
 
     if samplingRatio == 0.1:
         if optimal_mask == True:

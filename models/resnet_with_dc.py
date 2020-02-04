@@ -1,39 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
-
-
-def ResBlock(
-    input_dim, 
-    filter_dim, 
-    kernel_size=3,
-    stride=1,
-    padding=1, 
-    use_bn=1,
-    N=5,
-    unc_map=False
-):  
-    layers = []
-
-    layers.append(nn.Conv2d(input_dim, filter_dim, kernel_size, stride, padding))
-    if use_bn:
-        layers.append(nn.BatchNorm2d(filter_dim))
-    layers.append(nn.ReLU(inplace=True))
-
-    for i in range(N-1):
-        layers.append(nn.Conv2d(filter_dim, filter_dim, kernel_size, stride, padding))
-        if use_bn:
-            layers.append(nn.BatchNorm2d(filter_dim))
-        layers.append(nn.ReLU(inplace=True))
-    if unc_map:
-        layers.append(nn.Conv2d(filter_dim, input_dim+2, 1))
-    else:
-        layers.append(nn.Conv2d(filter_dim, input_dim, 1))
-
-    return layers
+from models.resBlocks import *
 
 
 class Resnet_with_DC(nn.Module):
