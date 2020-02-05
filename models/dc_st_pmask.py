@@ -212,7 +212,7 @@ class DC_ST_Pmask(nn.Module):
                 x = dc_layer.CG_iter()
                 Xs.append(x)
                 # update auxiliary variable wk through threshold
-                ek = gradient(x) + etak/self.rho_penalty
+                ek = gradient(x) - etak/self.rho_penalty
                 wk = ek.sign() * torch.max(torch.abs(ek) - 
                         self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
                 # update dual variable etak

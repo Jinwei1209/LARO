@@ -53,17 +53,17 @@ if __name__ == '__main__':
         '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
             ).read().split('\n')[int(opt['gpu_id'])].split(',')
     
-    # total = int(total)
-    # used = int(used)
+    total = int(total)
+    used = int(used)
 
-    # print('Total memory is {0} MB'.format(total))
-    # print('Used memory is {0} MB'.format(used))
+    print('Total memory is {0} MB'.format(total))
+    print('Used memory is {0} MB'.format(used))
 
-    # max_mem = int(total*0.8)
-    # block_mem = max_mem - used
+    max_mem = int(total*0.8)
+    block_mem = max_mem - used
     
-    # x = torch.rand((256, 1024, block_mem)).cuda()
-    # x = torch.rand((2, 2)).cuda()
+    x = torch.rand((256, 1024, block_mem)).cuda()
+    x = torch.rand((2, 2)).cuda()
 
     t0 = time.time()
     epoch = 0
