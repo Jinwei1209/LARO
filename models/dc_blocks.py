@@ -6,6 +6,7 @@ import torch.nn as nn
 import numpy as np
 from utils.data import *
 from utils.loss import *
+from utils.operators import *
 
 
 def mlpy_in_cg(a, b):
@@ -33,8 +34,8 @@ def conj_in_cg(a):
 class DC_layer():
 
 
-    def __init__(self, A, rhs):
-        self.AtA = lambda z: A.AtA(z, use_dll2=True)
+    def __init__(self, A, rhs, use_dll2=1):
+        self.AtA = lambda z: A.AtA(z, use_dll2=use_dll2)
         self.rhs = rhs
         self.device = rhs.get_device()
 

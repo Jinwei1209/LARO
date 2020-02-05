@@ -28,8 +28,8 @@ if __name__ == '__main__':
     niter = 1000
     batch_size = 1
     display_iters = 10
-    lambda_Pmask = 0
     lambda_dll2 = 0.01
+    lambda_tv= 0.0001
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_ND', type=int, default=3)
+    parser.add_argument('--flag_solver', type=int, default=0)
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
@@ -47,6 +48,22 @@ if __name__ == '__main__':
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
+
+    total, used = os.popen(
+        '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
+            ).read().split('\n')[int(opt['gpu_id'])].split(',')
+    
+    # total = int(total)
+    # used = int(used)
+
+    # print('Total memory is {0} MB'.format(total))
+    # print('Used memory is {0} MB'.format(used))
+
+    # max_mem = int(total*0.8)
+    # block_mem = max_mem - used
+    
+    # x = torch.rand((256, 1024, block_mem)).cuda()
+    # x = torch.rand((2, 2)).cuda()
 
     t0 = time.time()
     epoch = 0
@@ -98,7 +115,9 @@ if __name__ == '__main__':
         input_channels=2, 
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
+        lambda_tv=lambda_tv,
         flag_ND=opt['flag_ND'],
+        flag_solver=opt['flag_solver'],
         K=opt['K'], 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
@@ -123,18 +142,25 @@ if __name__ == '__main__':
     
     while epoch < niter:
         epoch += 1 
+
         # training phase
+        netG_dc.train()
         metrices_train = Metrices()
         for idx, (inputs, targets, csms, brain_masks) in enumerate(trainLoader):
             
             if gen_iterations%display_iters == 0:
 
-                print('epochs: [%d/%d], batchs: [%d/%d], time: %ds, Lambda: %f'
-                % (epoch, niter, idx, 1050//batch_size+1, time.time()-t0, lambda_Pmask))
+                print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
+                % (epoch, niter, idx, 1050//batch_size+1, time.time()-t0))
 
-                print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
-                    % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), \
-                        netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
+                if opt['flag_solver'] == 0:
+                    print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
+                        % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), \
+                            netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
+                else:
+                    print('Lambda_tv: %f, Rho_penalty: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
+                        % (netG_dc.lambda_tv, netG_dc.rho_penalty, torch.mean(netG_dc.masks), \
+                            netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
 
                 print('netG_dc --- loss_L2_dc: %f'
                     % (errL2_dc_sum/display_iters))
@@ -160,7 +186,7 @@ if __name__ == '__main__':
                 netG_dc, 
                 optimizerG_dc, 
                 use_uncertainty,
-                lambda_Pmask
+                lambda_Pmask=0
             )
             errL2_dc_sum += errL2_dc 
             Pmask_ratio += loss_Pmask
@@ -172,6 +198,7 @@ if __name__ == '__main__':
             gen_iterations += 1
             
         # validation phase
+        netG_dc.eval()
         metrices_val = Metrices()
         loss_total_list = []
         for idx, (inputs, targets, csms, brain_masks) in enumerate(valLoader):
@@ -193,7 +220,7 @@ if __name__ == '__main__':
                 temp = abs(Xs_i - targets) * brain_masks
                 lossl2_sum += np.mean(temp)
             temp = np.asarray(netG_dc.Pmask.cpu().detach())
-            loss_Pmask = lambda_Pmask*np.mean(temp)
+            loss_Pmask = 0*np.mean(temp)
             loss_total = lossl2_sum + loss_Pmask
             loss_total_list.append(loss_total)
         print('\n Validation loss: %f \n' 
@@ -208,6 +235,6 @@ if __name__ == '__main__':
 
         # save weights
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/weights/ \
-            K={0}_flag_ND={1}_ratio={2}.pt'.format(opt['K'], opt['flag_ND'], opt['samplingRatio']))
+            torch.save(netG_dc.state_dict(), rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
+                                                        opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
 

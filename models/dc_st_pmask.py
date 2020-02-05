@@ -21,11 +21,15 @@ class DC_ST_Pmask(nn.Module):
         input_channels,
         filter_channels,
         lambda_dll2, # initializing lambda_dll2
+        lambda_tv=0.01,
+        rho_penalty=0.01,
         ncoil=32,
         nrow=256,
         ncol=192,
         flag_ND=2, # 0 for 1D Cartesian along row direciton, 1 for 1D Cartesian along column direction, 
                    # 2 for 2D Cartesian, 3 for variable density random
+        flag_solver=0,  # 0 for CG solver (MoDL), 1 for ADMM solver with learningable parameters,
+                        # 2 for ADMM solver without learningable parameters
         K=1,
         unc_map=False,
         slope=0.25,
@@ -35,15 +39,8 @@ class DC_ST_Pmask(nn.Module):
         samplingRatio = 0.1, # sparsity level of the sampling mask
     ):
         super(DC_ST_Pmask, self).__init__()
-        self.resnet_block = []
-        layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
-        for layer in layers:
-            self.resnet_block.append(layer)
-        self.resnet_block = nn.Sequential(*self.resnet_block)
-        self.resnet_block.apply(init_weights)
         self.K = K
         self.unc_map = unc_map
-        self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -51,6 +48,7 @@ class DC_ST_Pmask(nn.Module):
         self.nrow = nrow
         self.ncol = ncol
         self.flag_ND = flag_ND
+        self.flag_solver = flag_solver
         self.rescale = rescale
         self.samplingRatio = samplingRatio
         if flag_ND == 0:
@@ -72,6 +70,20 @@ class DC_ST_Pmask(nn.Module):
         else:
             self.weight_parameters1 = nn.Parameter(temp1, requires_grad=True)
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
+        if flag_solver == 0:
+            self.resnet_block = []
+            layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
+            for layer in layers:
+                self.resnet_block.append(layer)
+            self.resnet_block = nn.Sequential(*self.resnet_block)
+            self.resnet_block.apply(init_weights)
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+        elif flag_solver == 1:
+            self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=True)
+            self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=True)
+        elif flag_solver == 2:
+            self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=False)
+            self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=False)
 
     def rescalePmask(self, Pmask, samplingRatio):
         device = Pmask.get_device()
@@ -148,7 +160,6 @@ class DC_ST_Pmask(nn.Module):
 
     def forward(self, kdata, csms):
         device = kdata.get_device()
-        self.lambda_dll2 = self.lambda_dll2.to(device)
         if self.flag_ND != 2:
             self.weight_parameters = self.weight_parameters.to(device)
         else:
@@ -157,30 +168,54 @@ class DC_ST_Pmask(nn.Module):
         masks = self.generateMask()[None, :, :, None]
         self.Pmask = self.Pmask
         self.masks = self.Mask
-
         # keep the calibration region
         masks[:, masks.size()[1]//2-13:masks.size()[1]//2+12,  masks.size()[2]//2-13:masks.size()[2]//2+12, :] = 1
-        
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1)
         # add coil dimension
         masks = torch.cat(self.ncoil*[masks])
         x = self.At(kdata, masks, csms)    
+        # input
         x_start = x
-        self.lambda_dll2 = self.lambda_dll2.to(device)
-        A = Back_forward(csms, masks, self.lambda_dll2)
-        Xs = []
-        Unc_maps = []
-        for i in range(self.K):
-            x_block = self.resnet_block(x)
-            x_block1 = x - x_block[:, 0:2, ...]
-            rhs = x_start + self.lambda_dll2*x_block1
-            dc_layer = DC_layer(A, rhs)
-            x = dc_layer.CG_iter()
-            Xs.append(x)
+
+        if self.flag_solver == 0:
+            self.lambda_dll2 = self.lambda_dll2.to(device)
+            A = Back_forward(csms, masks, self.lambda_dll2)
+            Xs = []
+            Unc_maps = []
+            for i in range(self.K):
+                x_block = self.resnet_block(x)
+                x_block1 = x - x_block[:, 0:2, ...]
+                rhs = x_start + self.lambda_dll2*x_block1
+                dc_layer = DC_layer(A, rhs, use_dll2=1)
+                x = dc_layer.CG_iter()
+                Xs.append(x)
+                if self.unc_map:
+                    Unc_maps.append(x_block[:, 2:4, ...])
             if self.unc_map:
-                Unc_maps.append(x_block[:, 2:4, ...])
-        if self.unc_map:
-            return Xs, Unc_maps
-        else:
-            return Xs
+                return Xs, Unc_maps
+            else:
+                return Xs
+
+        elif self.flag_solver > 0:
+            self.lambda_tv = self.lambda_tv.to(device)
+            self.rho_penalty = self.rho_penalty.to(device)
+            A = Back_forward(csms, masks, self.rho_penalty)
+            Xs = []
+            Unc_maps = []
+            wk = torch.zeros(x_start.size()+(2,)).to(device)
+            etak = torch.zeros(x_start.size()+(2,)).to(device)
+            for i in range(self.K):
+                # update x using CG block
+                rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
+                dc_layer = DC_layer(A, rhs, use_dll2=2)
+                x = dc_layer.CG_iter()
+                Xs.append(x)
+                # update auxiliary variable wk through threshold
+                ek = gradient(x) + etak/self.rho_penalty
+                wk = ek.sign() * torch.max(torch.abs(ek) - 
+                        self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
+                # update dual variable etak
+                etak = etak + self.rho_penalty * (gradient(x) - wk)
+                return Xs
+

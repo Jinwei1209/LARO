@@ -3,6 +3,7 @@ import numpy as np
 from torch.utils import data
 from utils.data import *
 from utils.loss import *
+from utils.operators import *
 
 
 class kdata_loader_GE(data.Dataset):
@@ -22,7 +23,8 @@ class kdata_loader_GE(data.Dataset):
 
     dataRangeT2 = {
         'train': ['0', '300'],   
-        'val': ['300', '400']  # 300. 400
+        'val': ['300', '400'],
+        'test': ['300', '400']  # 300. 400
     }
 
 
