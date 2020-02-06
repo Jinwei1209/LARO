@@ -25,18 +25,20 @@ if __name__ == '__main__':
     niter = 1000
     batch_size = 1
     display_iters = 10
-    lambda_Pmask = 0
     lambda_dll2 = 0.01
+    lambda_tv = 0
+    rho_penalty = 0.0008
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True
-
+    
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_ND', type=int, default=3)
+    parser.add_argument('--flag_solver', type=int, default=0)
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
@@ -57,7 +59,10 @@ if __name__ == '__main__':
         input_channels=2, 
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
+        lambda_tv=lambda_tv,
+        rho_penalty=rho_penalty,
         flag_ND=opt['flag_ND'],
+        flag_solver=opt['flag_solver'],
         K=opt['K'], 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
@@ -65,12 +70,10 @@ if __name__ == '__main__':
         samplingRatio=opt['samplingRatio']
     )
     netG_dc.to(device)
-    netG_dc.load_state_dict(torch.load(rootName+'/weights/K={0}_flag_ND={1}_ratio={2}.pt'.format(
-                                                opt['K'], opt['flag_ND'], opt['samplingRatio'])))
+    netG_dc.load_state_dict(torch.load(rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
+                                                opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio'])))
     netG_dc.eval()
-    
-    # print(netG_dc)
-    print(netG_dc.lambda_dll2)
+    print('Lambda_tv={0}'.format(netG_dc.lambda_tv))
     metrices_test = Metrices()
 
     Recons = []

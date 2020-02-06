@@ -11,6 +11,7 @@ from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
 from models.resBlocks import *
+from models.unet import *
 from models.straight_through_layers import *
         
 
@@ -28,8 +29,8 @@ class DC_ST_Pmask(nn.Module):
         ncol=192,
         flag_ND=2, # 0 for 1D Cartesian along row direciton, 1 for 1D Cartesian along column direction, 
                    # 2 for 2D Cartesian, 3 for variable density random
-        flag_solver=0,  # 0 for CG solver (MoDL), 1 for ADMM solver with learningable parameters,
-                        # 2 for ADMM solver without learningable parameters
+        flag_solver=0,  # -2 for U-Net, -1 for CG solver (MoDL), 0 for deep ADMM with resnet denoiser, 
+                        # 1 for ADMM solver with learningable parameters, 2 for ADMM solver without learningable parameters
         K=1,
         unc_map=False,
         slope=0.25,
@@ -70,7 +71,10 @@ class DC_ST_Pmask(nn.Module):
         else:
             self.weight_parameters1 = nn.Parameter(temp1, requires_grad=True)
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
-        if flag_solver == 0:
+        if flag_solver == -2:
+            self.Unet_block = Unet(input_channels, input_channels, [2**i for i in range(4, 9)], skip_connect=True)
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
+        elif -2 < flag_solver < 1:
             self.resnet_block = []
             layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
             for layer in layers:
@@ -178,7 +182,15 @@ class DC_ST_Pmask(nn.Module):
         # input
         x_start = x
 
-        if self.flag_solver == 0:
+        # U-Net
+        if self.flag_solver == -2:
+            Xs = []
+            x = self.Unet_block(x_start)
+            Xs.append(x)
+            return Xs
+
+        # MoDL
+        elif self.flag_solver == -1:
             self.lambda_dll2 = self.lambda_dll2.to(device)
             A = Back_forward(csms, masks, self.lambda_dll2)
             Xs = []
@@ -197,6 +209,27 @@ class DC_ST_Pmask(nn.Module):
             else:
                 return Xs
 
+        # Deep ADMM
+        elif self.flag_solver == 0:
+            self.lambda_dll2 = self.lambda_dll2.to(device)
+            A = Back_forward(csms, masks, self.lambda_dll2)
+            Xs = []
+            uk = torch.zeros(x_start.size()).to(device)
+            for i in range(self.K):
+                # update auxiliary variable v
+                v_block = self.resnet_block(x+uk/self.lambda_dll2)
+                v_block1 = x + uk/self.lambda_dll2 - v_block[:, 0:2, ...]
+                # update x using CG block
+                x0 = v_block1 - uk/self.lambda_dll2
+                rhs = x_start + self.lambda_dll2*x0
+                dc_layer = DC_layer(A, rhs, use_dll2=1)
+                x = dc_layer.CG_iter()
+                Xs.append(x)
+                # update dual variable uk
+                uk = uk + self.lambda_dll2*(x - v_block1)
+            return Xs
+
+        # ADMM
         elif self.flag_solver > 0:
             self.lambda_tv = self.lambda_tv.to(device)
             self.rho_penalty = self.rho_penalty.to(device)
@@ -211,11 +244,15 @@ class DC_ST_Pmask(nn.Module):
                 dc_layer = DC_layer(A, rhs, use_dll2=2)
                 x = dc_layer.CG_iter()
                 Xs.append(x)
+
                 # update auxiliary variable wk through threshold
+                # L1-gradient
                 ek = gradient(x) - etak/self.rho_penalty
-                wk = ek.sign() * torch.max(torch.abs(ek) - 
-                        self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
+                wk = ek.sign() * torch.max(torch.abs(ek) - self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
+                # # L2-gradient
+                # wk = (self.rho_penalty*gradient(x) + etak) / (2*self.lambda_tv + self.rho_penalty)
+                
                 # update dual variable etak
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
-                return Xs
+            return Xs
 

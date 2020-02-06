@@ -29,7 +29,8 @@ if __name__ == '__main__':
     batch_size = 1
     display_iters = 10
     lambda_dll2 = 0.01
-    lambda_tv= 0.0001
+    lambda_tv = 1e-4
+    rho_penalty = 0.0008
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
@@ -116,6 +117,7 @@ if __name__ == '__main__':
         filter_channels=32, 
         lambda_dll2=lambda_dll2,
         lambda_tv=lambda_tv,
+        rho_penalty=rho_penalty,
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
         K=opt['K'], 
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
 
     # logger
-    logger = Logger('logs', rootName, opt['K'], opt['flag_ND'], opt['samplingRatio'])
+    logger = Logger('logs', rootName, opt)
     
     while epoch < niter:
         epoch += 1 
@@ -150,10 +152,10 @@ if __name__ == '__main__':
             
             if gen_iterations%display_iters == 0:
 
-                print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                % (epoch, niter, idx, 1050//batch_size+1, time.time()-t0))
+                print('epochs: [%d/%d], batchs: [%d/%d], time: %ds, K=%d, Solver=%d'
+                % (epoch, niter, idx, 1050//batch_size+1, time.time()-t0, netG_dc.K, netG_dc.flag_solver))
 
-                if opt['flag_solver'] == 0:
+                if opt['flag_solver'] < 1:
                     print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
                         % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), \
                             netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))

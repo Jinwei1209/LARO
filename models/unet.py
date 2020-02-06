@@ -9,7 +9,8 @@ class Unet(nn.Module):
         self,
         input_channels,
         output_channels,
-        num_filters
+        num_filters,
+        skip_connect=False
     ):
 
         super(Unet, self).__init__()
@@ -18,7 +19,8 @@ class Unet(nn.Module):
         self.num_filters = num_filters
         self.downsampling_path = nn.ModuleList()
         self.upsampling_path = nn.ModuleList()
-        
+        self.skip_connect = skip_connect
+
         for i in range(len(self.num_filters)):
 
             input_dim = self.input_channels if i == 0 else output_dim
@@ -44,7 +46,7 @@ class Unet(nn.Module):
     def forward(self, x):
 
         blocks = []
-
+        x_start = x
         for idx, down in enumerate(self.downsampling_path):
             x = down(x)
 
@@ -57,5 +59,8 @@ class Unet(nn.Module):
         del blocks
 
         x = self.last_layer(x)
+
+        if self.skip_connect:
+            x = x + x_start
 
         return x
