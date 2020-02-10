@@ -76,12 +76,13 @@ class real_and_kdata_loader(data.Dataset):
         # csm = abs(org) > 1e-1
         csm = np.float32(csm)
 
-        kdata = self.generateKdata(org, csm, sigma=0.01)
+        kdata = self.generateKdata(org, csm, sigma=0.00)
         # for real-valued images
         org = np.float32(np.concatenate((org, np.zeros(org.shape)), axis=0))
         csm = np.float32(np.concatenate((csm[..., np.newaxis], np.zeros(csm.shape+(1,))), axis=-1))
-        
-        return kdata, org, csm
+        brain_mask = np.ones(org.shape, dtype=np.float32)
+
+        return kdata, org, csm, brain_mask
 
 
     def generateKdata(self, org, csm, sigma=0.01):
