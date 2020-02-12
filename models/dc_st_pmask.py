@@ -29,8 +29,12 @@ class DC_ST_Pmask(nn.Module):
         ncol=192,
         flag_ND=2, # 0 for 1D Cartesian along row direciton, 1 for 1D Cartesian along column direction, 
                    # 2 for 2D Cartesian, 3 for variable density random
-        flag_solver=0,  # -2 for U-Net, -1 for CG solver (MoDL), 0 for deep ADMM with resnet denoiser, 
-                        # 1 for ADMM solver with learningable parameters, 2 for ADMM solver without learningable parameters
+        flag_solver=0,  # -3 for Quasi-Newton without learnable parameters,
+                        # -2 for Quasi-Newton with learnable parameters,
+                        # -1 for deep Quasi-Newton with resnet denoiser (MoDL),
+                        #  0 for deep ADMM with resnet denoiser, 
+                        #  1 for ADMM solver with learnable parameters, 
+                        #  2 for ADMM solver without learnable parameters.
         K=1,
         unc_map=False,
         slope=0.25,
@@ -52,6 +56,7 @@ class DC_ST_Pmask(nn.Module):
         self.flag_solver = flag_solver
         self.rescale = rescale
         self.samplingRatio = samplingRatio
+        # flag for sampling pattern designs
         if flag_ND == 0:
             temp = (torch.rand(nrow)-0.5)*30
             temp[nrow//2-13 : nrow//2+12] = 15
@@ -71,9 +76,11 @@ class DC_ST_Pmask(nn.Module):
         else:
             self.weight_parameters1 = nn.Parameter(temp1, requires_grad=True)
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
-        if flag_solver == -2:
-            self.Unet_block = Unet(input_channels, input_channels, [2**i for i in range(5, 10)], skip_connect=False)
+        # flag for all the solvers
+        if flag_solver == -3:
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
+        elif flag_solver == -2:
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         elif -2 < flag_solver < 1:
             self.resnet_block = []
             layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
@@ -177,11 +184,11 @@ class DC_ST_Pmask(nn.Module):
         # # fftshift for simulated kspace data
         # masks = torch.cat((masks[:, self.nrow//2:self.nrow, ...], masks[:, 0:self.nrow//2, ...]), dim=1)
         # masks = torch.cat((masks[:, :, self.ncol//2:self.ncol, :], masks[:, :, 0:self.ncol//2, :]), dim=2)
-        # # load fixed mask
-        # masks = load_mat('/data/Jinwei/T2_slice_recon_GE/random_30.mat', 'mask')
+        # load fixed mask
+        masks = load_mat('/data/Jinwei/T2_slice_recon_GE/random_10.mat', 'mask')
         # masks = np.fft.fftshift(masks)
-        # masks = masks[np.newaxis, ..., np.newaxis]
-        # masks = torch.tensor(masks, device=device).float()
+        masks = masks[np.newaxis, ..., np.newaxis]
+        masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1)
         # add coil dimension
@@ -190,14 +197,24 @@ class DC_ST_Pmask(nn.Module):
         # input
         x_start = x
 
-        # U-Net
-        if self.flag_solver == -2:
+        # Quasi_newton
+        if self.flag_solver < -1:
+            epsilon = (torch.ones(1)*1e-7).to(device)
+            self.lambda_dll2 = self.lambda_dll2.to(device)
+            A = Back_forward(csms, masks, self.lambda_dll2)
             Xs = []
-            x = self.Unet_block(x_start)
-            Xs.append(x)
+            for i in range(self.K):
+                x_old = x
+                rhs = x_start - A.AtA(x, use_dll2=2)
+                dc_layer = DC_layer(A, rhs, use_dll2=2)
+                delta_x = dc_layer.CG_iter()
+                x = x + delta_x
+                Xs.append(x)
+                # if i % 10 == 0:
+                print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
             return Xs
 
-        # MoDL
+        # Deep Quasi_newton (MoDL)
         elif self.flag_solver == -1:
             self.lambda_dll2 = self.lambda_dll2.to(device)
             A = Back_forward(csms, masks, self.lambda_dll2)
@@ -266,6 +283,6 @@ class DC_ST_Pmask(nn.Module):
                 # update dual variable etak
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
                 # if i % 10 == 0:
-                # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
+                print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
             return Xs
 
