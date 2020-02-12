@@ -211,7 +211,7 @@ class DC_ST_Pmask(nn.Module):
                 x = x + delta_x
                 Xs.append(x)
                 # if i % 10 == 0:
-                print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
+                # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
             return Xs
 
         # Deep Quasi_newton (MoDL)
@@ -283,6 +283,6 @@ class DC_ST_Pmask(nn.Module):
                 # update dual variable etak
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
                 # if i % 10 == 0:
-                print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
+                # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
             return Xs
 
