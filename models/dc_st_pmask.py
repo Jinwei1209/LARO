@@ -185,10 +185,10 @@ class DC_ST_Pmask(nn.Module):
         # masks = torch.cat((masks[:, self.nrow//2:self.nrow, ...], masks[:, 0:self.nrow//2, ...]), dim=1)
         # masks = torch.cat((masks[:, :, self.ncol//2:self.ncol, :], masks[:, :, 0:self.ncol//2, :]), dim=2)
         # load fixed mask
-        masks = load_mat('/data/Jinwei/T2_slice_recon_GE/random_10.mat', 'mask')
+        # masks = load_mat('/data/Jinwei/T2_slice_recon_GE/random_10.mat', 'mask')
         # masks = np.fft.fftshift(masks)
-        masks = masks[np.newaxis, ..., np.newaxis]
-        masks = torch.tensor(masks, device=device).float()
+        # masks = masks[np.newaxis, ..., np.newaxis]
+        # masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1)
         # add coil dimension
