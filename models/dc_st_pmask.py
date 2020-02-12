@@ -72,7 +72,7 @@ class DC_ST_Pmask(nn.Module):
             self.weight_parameters1 = nn.Parameter(temp1, requires_grad=True)
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
         if flag_solver == -2:
-            self.Unet_block = Unet(input_channels, input_channels, [2**i for i in range(4, 9)], skip_connect=True)
+            self.Unet_block = Unet(input_channels, input_channels, [2**i for i in range(5, 10)], skip_connect=False)
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
         elif -2 < flag_solver < 1:
             self.resnet_block = []
@@ -152,8 +152,8 @@ class DC_ST_Pmask(nn.Module):
         self.flip[:, ::2, ...] = - self.flip[:, ::2, ...]
         temp = cplx_mlpy(kdata, mask)
         coilImgs = torch.ifft(temp, 2)
-        coilImgs = fft_shift_row(coilImgs, self.nrow) # for GE kdata
-        coilImgs = cplx_mlpy(coilImgs, self.flip) # for GE kdata
+        coilImgs = fft_shift_row(coilImgs, self.nrow) # for GE kdata 
+        coilImgs = cplx_mlpy(coilImgs, self.flip) # for GE kdata 
         coilComb = torch.sum(
             cplx_mlpy(coilImgs, cplx_conj(csm)),
             dim=1,
@@ -174,6 +174,14 @@ class DC_ST_Pmask(nn.Module):
         self.masks = self.Mask
         # keep the calibration region
         masks[:, masks.size()[1]//2-13:masks.size()[1]//2+12,  masks.size()[2]//2-13:masks.size()[2]//2+12, :] = 1
+        # # fftshift for simulated kspace data
+        # masks = torch.cat((masks[:, self.nrow//2:self.nrow, ...], masks[:, 0:self.nrow//2, ...]), dim=1)
+        # masks = torch.cat((masks[:, :, self.ncol//2:self.ncol, :], masks[:, :, 0:self.ncol//2, :]), dim=2)
+        # # load fixed mask
+        # masks = load_mat('/data/Jinwei/T2_slice_recon_GE/random_30.mat', 'mask')
+        # masks = np.fft.fftshift(masks)
+        # masks = masks[np.newaxis, ..., np.newaxis]
+        # masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1)
         # add coil dimension
@@ -231,6 +239,7 @@ class DC_ST_Pmask(nn.Module):
 
         # ADMM
         elif self.flag_solver > 0:
+            epsilon = (torch.ones(1)*1e-7).to(device)
             self.lambda_tv = self.lambda_tv.to(device)
             self.rho_penalty = self.rho_penalty.to(device)
             A = Back_forward(csms, masks, self.rho_penalty)
@@ -238,21 +247,25 @@ class DC_ST_Pmask(nn.Module):
             Unc_maps = []
             wk = torch.zeros(x_start.size()+(2,)).to(device)
             etak = torch.zeros(x_start.size()+(2,)).to(device)
+            # etak = gradient(x_start).to(device)
             for i in range(self.K):
+                # update auxiliary variable wk through threshold
+                # # L1-gradient
+                # ek = gradient(x) - etak/self.rho_penalty
+                # wk = ek.sign() * torch.max(torch.abs(ek) - self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
+                # L2-gradient
+                wk = (self.rho_penalty*gradient(x) + etak) / (2*self.lambda_tv + self.rho_penalty)
+
+                x_old = x
                 # update x using CG block
                 rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
                 dc_layer = DC_layer(A, rhs, use_dll2=2)
                 x = dc_layer.CG_iter()
                 Xs.append(x)
-
-                # update auxiliary variable wk through threshold
-                # L1-gradient
-                ek = gradient(x) - etak/self.rho_penalty
-                wk = ek.sign() * torch.max(torch.abs(ek) - self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
-                # # L2-gradient
-                # wk = (self.rho_penalty*gradient(x) + etak) / (2*self.lambda_tv + self.rho_penalty)
                 
                 # update dual variable etak
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
+                # if i % 10 == 0:
+                # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
             return Xs
 

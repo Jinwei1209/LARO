@@ -49,7 +49,7 @@ class Unet(nn.Module):
         x_start = x
         for idx, down in enumerate(self.downsampling_path):
             x = down(x)
-
+            
             if idx != len(self.downsampling_path)-1:
                 blocks.append(x)
 

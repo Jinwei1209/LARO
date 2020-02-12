@@ -7,6 +7,7 @@ import numpy as np
 
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
+from loader.real_and_kdata_loader import real_and_kdata_loader
 from utils.data import *
 from models.unet import Unet
 from models.initialization import *
@@ -25,12 +26,12 @@ from utils.test import *
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 1000
+    niter = 500
     batch_size = 1
     display_iters = 10
     lambda_dll2 = 0.01
     lambda_tv = 1e-4
-    rho_penalty = 0.0008
+    rho_penalty = lambda_tv*2
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
@@ -79,6 +80,11 @@ if __name__ == '__main__':
         contrast=opt['contrast'], 
         split='train'
         )
+    # dataLoader = real_and_kdata_loader(
+    #     rootDir='/data/Jinwei/T2_slice_recon_GE/',
+    #     contrast=opt['contrast'], 
+    #     split='train'
+    #     )
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
     dataLoader_val = kdata_loader_GE(
@@ -86,6 +92,11 @@ if __name__ == '__main__':
         contrast=opt['contrast'], 
         split='val'
         )
+    # dataLoader_val = real_and_kdata_loader(
+    #     rootDir='/data/Jinwei/T2_slice_recon_GE/',
+    #     contrast=opt['contrast'], 
+    #     split='val'
+    #     )
     valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
     
     # netG_dc = DC_with_Prop_Mask(
@@ -124,7 +135,10 @@ if __name__ == '__main__':
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
-        samplingRatio=opt['samplingRatio']
+        samplingRatio=opt['samplingRatio'],
+        nrow=256,
+        ncol=192,
+        ncoil=32
     )
 
     print(netG_dc)
@@ -140,7 +154,7 @@ if __name__ == '__main__':
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
 
     # logger
-    logger = Logger('logs', rootName, opt)
+    logger = Logger('logs2', rootName, opt)
     
     while epoch < niter:
         epoch += 1 
@@ -203,31 +217,32 @@ if __name__ == '__main__':
         netG_dc.eval()
         metrices_val = Metrices()
         loss_total_list = []
-        for idx, (inputs, targets, csms, brain_masks) in enumerate(valLoader):
+        with torch.no_grad():  # to solve memory exploration issue
+            for idx, (inputs, targets, csms, brain_masks) in enumerate(valLoader):
 
-            inputs = inputs.to(device)
-            targets = targets.to(device)
-            csms = csms.to(device)
-            brain_masks = brain_masks.to(device)
+                inputs = inputs.to(device)
+                targets = targets.to(device)
+                csms = csms.to(device)
+                brain_masks = brain_masks.to(device)
 
-            # calculating metrices
-            Xs = netG_dc(inputs, csms)
-            metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
+                # calculating metrices
+                Xs = netG_dc(inputs, csms)
+                metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
 
-            targets = np.asarray(targets.cpu().detach())
-            brain_masks = np.asarray(brain_masks.cpu().detach())
-            lossl2_sum = loss_unc_sum = 0
-            for i in range(len(Xs)):
-                Xs_i = np.asarray(Xs[i].cpu().detach())
-                temp = abs(Xs_i - targets) * brain_masks
-                lossl2_sum += np.mean(temp)
-            temp = np.asarray(netG_dc.Pmask.cpu().detach())
-            loss_Pmask = 0*np.mean(temp)
-            loss_total = lossl2_sum + loss_Pmask
-            loss_total_list.append(loss_total)
-        print('\n Validation loss: %f \n' 
-            % (sum(loss_total_list) / float(len(loss_total_list))))
-        Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
+                targets = np.asarray(targets.cpu().detach())
+                brain_masks = np.asarray(brain_masks.cpu().detach())
+                lossl2_sum = loss_unc_sum = 0
+                for i in range(len(Xs)):
+                    Xs_i = np.asarray(Xs[i].cpu().detach())
+                    temp = abs(Xs_i - targets) * brain_masks
+                    lossl2_sum += np.mean(temp)
+                temp = np.asarray(netG_dc.Pmask.cpu().detach())
+                loss_Pmask = 0*np.mean(temp)
+                loss_total = lossl2_sum + loss_Pmask
+                loss_total_list.append(loss_total)
+            print('\n Validation loss: %f \n' 
+                % (sum(loss_total_list) / float(len(loss_total_list))))
+            Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
 
         # save log
         logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f' 
@@ -237,6 +252,6 @@ if __name__ == '__main__':
 
         # save weights
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
+            torch.save(netG_dc.state_dict(), rootName+'/weights3/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
                                                         opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
 

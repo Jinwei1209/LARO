@@ -7,6 +7,7 @@ import argparse
 
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
+from loader.real_and_kdata_loader import real_and_kdata_loader
 from models.unet import Unet
 from models.initialization import *
 from models.dc_blocks import *
@@ -18,6 +19,7 @@ from models.dc_st_pmask import *
 from utils.test import *
 from utils.data import *
 from utils.test import *
+from utils.operators import *
 
 if __name__ == '__main__':
 
@@ -26,8 +28,8 @@ if __name__ == '__main__':
     batch_size = 1
     display_iters = 10
     lambda_dll2 = 0.01
-    lambda_tv = 0
-    rho_penalty = 0.0008
+    lambda_tv = 1e-4
+    rho_penalty = lambda_tv*2
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
@@ -53,6 +55,11 @@ if __name__ == '__main__':
         contrast=opt['contrast'], 
         split='test'
         )
+    # dataLoader_test = real_and_kdata_loader(
+    #     rootDir='/data/Jinwei/T2_slice_recon_GE/',
+    #     contrast=opt['contrast'], 
+    #     split='test'
+    #     )
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
     netG_dc = DC_ST_Pmask(
@@ -63,17 +70,24 @@ if __name__ == '__main__':
         rho_penalty=rho_penalty,
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
-        K=opt['K'], 
+        K=opt['K']+19, 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
-        samplingRatio=opt['samplingRatio']
+        samplingRatio=opt['samplingRatio'],
+        nrow=256,
+        ncol=192,
+        ncoil=32
     )
     netG_dc.to(device)
-    netG_dc.load_state_dict(torch.load(rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
-                                                opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio'])))
+    weights_dict = torch.load(rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
+                              opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+    weights_dict['lambda_tv'] = (torch.ones(1)*lambda_tv).to(device)
+    weights_dict['rho_penalty'] = (torch.ones(1)*rho_penalty).to(device)
+    netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
-    print('Lambda_tv={0}'.format(netG_dc.lambda_tv))
+    print('Lambda_tv={0}'.format(netG_dc.lambda_tv)) 
+    print('Rho_penalty={0}'.format(netG_dc.rho_penalty))
     metrices_test = Metrices()
 
     Recons = []

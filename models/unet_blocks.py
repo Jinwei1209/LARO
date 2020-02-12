@@ -73,7 +73,7 @@ class UpConvBlock(nn.Module):
         stride=1,
         padding=1, 
         use_bn=1,
-        use_deconv=0
+        use_deconv=1
     ):
         
         super(UpConvBlock, self).__init__()

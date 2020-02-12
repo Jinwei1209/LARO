@@ -85,7 +85,9 @@ def divergence(d):
     device = d.get_device()
     dx = d[..., 0]
     dy = d[..., 1]
-    dxx = dx - torch.cat((torch.zeros(dx.size()[:3] + (1,)).to(device), dx[:, :, :, :-1]), dim=3)
-    dyy = dy - torch.cat((torch.zeros(dy.size()[:2] + (1,) + dy.size()[-1:]).to(device), dy[:, :, :-1, :]), dim=2)
-    return dxx + dyy
+    zerox = torch.zeros(dx.size()[:3] + (1,)).to(device)
+    zeroy = torch.zeros(dy.size()[:2] + (1,) + dy.size()[-1:]).to(device)
+    dxx = torch.cat((dx[:, :, :, :-1], zerox), dim=3) - torch.cat((zerox, dx[:, :, :, :-1]), dim=3) 
+    dyy = torch.cat((dy[:, :, :-1, :], zeroy), dim=2) - torch.cat((zeroy, dy[:, :, :-1, :]), dim=2)
+    return  - dxx - dyy
 
