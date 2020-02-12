@@ -78,9 +78,9 @@ class DC_ST_Pmask(nn.Module):
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
         # flag for all the solvers
         if flag_solver == -3:
-            self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=False)
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
         elif flag_solver == -2:
-            self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=True)
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         elif -2 < flag_solver < 1:
             self.resnet_block = []
             layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
@@ -200,8 +200,8 @@ class DC_ST_Pmask(nn.Module):
         # Quasi_newton
         if self.flag_solver < -1:
             epsilon = (torch.ones(1)*1e-7).to(device)
-            self.lambda_tv = self.lambda_tv.to(device)
-            A = Back_forward(csms, masks, self.lambda_tv)
+            self.lambda_dll2 = self.lambda_dll2.to(device)
+            A = Back_forward(csms, masks, self.lambda_dll2)
             Xs = []
             for i in range(self.K):
                 x_old = x
@@ -211,7 +211,7 @@ class DC_ST_Pmask(nn.Module):
                 x = x + delta_x
                 Xs.append(x)
                 # if i % 10 == 0:
-                # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
+                print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
             return Xs
 
         # Deep Quasi_newton (MoDL)
@@ -283,6 +283,6 @@ class DC_ST_Pmask(nn.Module):
                 # update dual variable etak
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
                 # if i % 10 == 0:
-                # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
+                print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
             return Xs
 
