@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
     Recons = []
     for idx, (inputs, targets, csms, brain_masks) in enumerate(testLoader):
-        if id%10 == 0:
+        if idx % 10 == 0:
             print(idx)
         inputs = inputs.to(device)
         targets = targets.to(device)
