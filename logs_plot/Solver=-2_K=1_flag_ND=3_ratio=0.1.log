@@ -1,0 +1,582 @@
+Logs start:
+Epoch: [1/500], PSNR in training: 31.39
+Epoch: [1/500], PSNR in validation: 33.75, loss in validation: 0.00749
+Epoch: [2/500], PSNR in training: 31.51
+Epoch: [2/500], PSNR in validation: 33.84, loss in validation: 0.00740
+Epoch: [3/500], PSNR in training: 31.57
+Epoch: [3/500], PSNR in validation: 34.55, loss in validation: 0.00737
+Epoch: [4/500], PSNR in training: 31.69
+Epoch: [4/500], PSNR in validation: 34.37, loss in validation: 0.00726
+Epoch: [5/500], PSNR in training: 31.87
+Epoch: [5/500], PSNR in validation: 34.47, loss in validation: 0.00724
+Epoch: [6/500], PSNR in training: 31.98
+Epoch: [6/500], PSNR in validation: 34.88, loss in validation: 0.00722
+Epoch: [7/500], PSNR in training: 32.07
+Epoch: [7/500], PSNR in validation: 34.57, loss in validation: 0.00711
+Epoch: [8/500], PSNR in training: 32.17
+Epoch: [8/500], PSNR in validation: 34.79, loss in validation: 0.00701
+Epoch: [9/500], PSNR in training: 32.34
+Epoch: [9/500], PSNR in validation: 35.17, loss in validation: 0.00701
+Epoch: [10/500], PSNR in training: 32.40
+Epoch: [10/500], PSNR in validation: 35.03, loss in validation: 0.00693
+Epoch: [11/500], PSNR in training: 32.60
+Epoch: [11/500], PSNR in validation: 35.03, loss in validation: 0.00684
+Epoch: [12/500], PSNR in training: 32.69
+Epoch: [12/500], PSNR in validation: 35.17, loss in validation: 0.00679
+Epoch: [13/500], PSNR in training: 32.79
+Epoch: [13/500], PSNR in validation: 35.56, loss in validation: 0.00676
+Epoch: [14/500], PSNR in training: 32.88
+Epoch: [14/500], PSNR in validation: 35.41, loss in validation: 0.00665
+Epoch: [15/500], PSNR in training: 32.91
+Epoch: [15/500], PSNR in validation: 35.94, loss in validation: 0.00675
+Epoch: [16/500], PSNR in training: 33.09
+Epoch: [16/500], PSNR in validation: 35.71, loss in validation: 0.00657
+Epoch: [17/500], PSNR in training: 33.28
+Epoch: [17/500], PSNR in validation: 35.57, loss in validation: 0.00651
+Epoch: [18/500], PSNR in training: 33.32
+Epoch: [18/500], PSNR in validation: 35.75, loss in validation: 0.00641
+Epoch: [19/500], PSNR in training: 33.53
+Epoch: [19/500], PSNR in validation: 36.09, loss in validation: 0.00644
+Epoch: [20/500], PSNR in training: 33.56
+Epoch: [20/500], PSNR in validation: 35.99, loss in validation: 0.00637
+Epoch: [21/500], PSNR in training: 33.68
+Epoch: [21/500], PSNR in validation: 35.66, loss in validation: 0.00627
+Epoch: [22/500], PSNR in training: 33.82
+Epoch: [22/500], PSNR in validation: 36.22, loss in validation: 0.00627
+Epoch: [23/500], PSNR in training: 33.94
+Epoch: [23/500], PSNR in validation: 36.44, loss in validation: 0.00625
+Epoch: [24/500], PSNR in training: 33.98
+Epoch: [24/500], PSNR in validation: 36.45, loss in validation: 0.00616
+Epoch: [25/500], PSNR in training: 34.14
+Epoch: [25/500], PSNR in validation: 36.51, loss in validation: 0.00619
+Epoch: [26/500], PSNR in training: 34.23
+Epoch: [26/500], PSNR in validation: 36.51, loss in validation: 0.00610
+Epoch: [27/500], PSNR in training: 34.29
+Epoch: [27/500], PSNR in validation: 36.44, loss in validation: 0.00607
+Epoch: [28/500], PSNR in training: 34.43
+Epoch: [28/500], PSNR in validation: 36.28, loss in validation: 0.00602
+Epoch: [29/500], PSNR in training: 34.49
+Epoch: [29/500], PSNR in validation: 36.83, loss in validation: 0.00597
+Epoch: [30/500], PSNR in training: 34.61
+Epoch: [30/500], PSNR in validation: 36.92, loss in validation: 0.00594
+Epoch: [31/500], PSNR in training: 34.69
+Epoch: [31/500], PSNR in validation: 36.93, loss in validation: 0.00593
+Epoch: [32/500], PSNR in training: 34.79
+Epoch: [32/500], PSNR in validation: 37.15, loss in validation: 0.00585
+Epoch: [33/500], PSNR in training: 34.85
+Epoch: [33/500], PSNR in validation: 36.80, loss in validation: 0.00583
+Epoch: [34/500], PSNR in training: 34.87
+Epoch: [34/500], PSNR in validation: 37.17, loss in validation: 0.00582
+Epoch: [35/500], PSNR in training: 34.96
+Epoch: [35/500], PSNR in validation: 37.02, loss in validation: 0.00574
+Epoch: [36/500], PSNR in training: 35.05
+Epoch: [36/500], PSNR in validation: 37.29, loss in validation: 0.00575
+Epoch: [37/500], PSNR in training: 35.13
+Epoch: [37/500], PSNR in validation: 37.17, loss in validation: 0.00570
+Epoch: [38/500], PSNR in training: 35.16
+Epoch: [38/500], PSNR in validation: 37.54, loss in validation: 0.00575
+Epoch: [39/500], PSNR in training: 35.30
+Epoch: [39/500], PSNR in validation: 37.60, loss in validation: 0.00580
+Epoch: [40/500], PSNR in training: 35.28
+Epoch: [40/500], PSNR in validation: 37.03, loss in validation: 0.00564
+Epoch: [41/500], PSNR in training: 35.39
+Epoch: [41/500], PSNR in validation: 37.52, loss in validation: 0.00563
+Epoch: [42/500], PSNR in training: 35.44
+Epoch: [42/500], PSNR in validation: 37.42, loss in validation: 0.00559
+Epoch: [43/500], PSNR in training: 35.50
+Epoch: [43/500], PSNR in validation: 37.58, loss in validation: 0.00556
+Epoch: [44/500], PSNR in training: 35.51
+Epoch: [44/500], PSNR in validation: 37.43, loss in validation: 0.00554
+Epoch: [45/500], PSNR in training: 35.60
+Epoch: [45/500], PSNR in validation: 37.37, loss in validation: 0.00552
+Epoch: [46/500], PSNR in training: 35.61
+Epoch: [46/500], PSNR in validation: 37.77, loss in validation: 0.00551
+Epoch: [47/500], PSNR in training: 35.68
+Epoch: [47/500], PSNR in validation: 37.72, loss in validation: 0.00547
+Epoch: [48/500], PSNR in training: 35.77
+Epoch: [48/500], PSNR in validation: 37.78, loss in validation: 0.00549
+Epoch: [49/500], PSNR in training: 35.71
+Epoch: [49/500], PSNR in validation: 37.50, loss in validation: 0.00546
+Epoch: [50/500], PSNR in training: 35.78
+Epoch: [50/500], PSNR in validation: 37.44, loss in validation: 0.00542
+Epoch: [51/500], PSNR in training: 35.85
+Epoch: [51/500], PSNR in validation: 37.75, loss in validation: 0.00542
+Epoch: [52/500], PSNR in training: 35.93
+Epoch: [52/500], PSNR in validation: 37.76, loss in validation: 0.00539
+Epoch: [53/500], PSNR in training: 35.98
+Epoch: [53/500], PSNR in validation: 37.86, loss in validation: 0.00540
+Epoch: [54/500], PSNR in training: 35.97
+Epoch: [54/500], PSNR in validation: 37.66, loss in validation: 0.00535
+Epoch: [55/500], PSNR in training: 35.95
+Epoch: [55/500], PSNR in validation: 38.21, loss in validation: 0.00552
+Epoch: [56/500], PSNR in training: 36.02
+Epoch: [56/500], PSNR in validation: 37.66, loss in validation: 0.00533
+Epoch: [57/500], PSNR in training: 36.06
+Epoch: [57/500], PSNR in validation: 37.84, loss in validation: 0.00533
+Epoch: [58/500], PSNR in training: 36.14
+Epoch: [58/500], PSNR in validation: 37.75, loss in validation: 0.00532
+Epoch: [59/500], PSNR in training: 36.13
+Epoch: [59/500], PSNR in validation: 37.65, loss in validation: 0.00532
+Epoch: [60/500], PSNR in training: 36.09
+Epoch: [60/500], PSNR in validation: 38.06, loss in validation: 0.00534
+Epoch: [61/500], PSNR in training: 36.15
+Epoch: [61/500], PSNR in validation: 38.08, loss in validation: 0.00533
+Epoch: [62/500], PSNR in training: 36.20
+Epoch: [62/500], PSNR in validation: 38.03, loss in validation: 0.00532
+Epoch: [63/500], PSNR in training: 36.19
+Epoch: [63/500], PSNR in validation: 38.01, loss in validation: 0.00529
+Epoch: [64/500], PSNR in training: 36.22
+Epoch: [64/500], PSNR in validation: 38.08, loss in validation: 0.00528
+Epoch: [65/500], PSNR in training: 36.22
+Epoch: [65/500], PSNR in validation: 38.01, loss in validation: 0.00527
+Epoch: [66/500], PSNR in training: 36.24
+Epoch: [66/500], PSNR in validation: 37.82, loss in validation: 0.00524
+Epoch: [67/500], PSNR in training: 36.23
+Epoch: [67/500], PSNR in validation: 37.91, loss in validation: 0.00524
+Epoch: [68/500], PSNR in training: 36.22
+Epoch: [68/500], PSNR in validation: 38.13, loss in validation: 0.00525
+Epoch: [69/500], PSNR in training: 36.22
+Epoch: [69/500], PSNR in validation: 38.21, loss in validation: 0.00528
+Epoch: [70/500], PSNR in training: 36.25
+Epoch: [70/500], PSNR in validation: 38.30, loss in validation: 0.00530
+Epoch: [71/500], PSNR in training: 36.33
+Epoch: [71/500], PSNR in validation: 37.93, loss in validation: 0.00521
+Epoch: [72/500], PSNR in training: 36.35
+Epoch: [72/500], PSNR in validation: 38.16, loss in validation: 0.00521
+Epoch: [73/500], PSNR in training: 36.38
+Epoch: [73/500], PSNR in validation: 38.08, loss in validation: 0.00520
+Epoch: [74/500], PSNR in training: 36.39
+Epoch: [74/500], PSNR in validation: 38.16, loss in validation: 0.00521
+Epoch: [75/500], PSNR in training: 36.33
+Epoch: [75/500], PSNR in validation: 38.09, loss in validation: 0.00520
+Epoch: [76/500], PSNR in training: 36.38
+Epoch: [76/500], PSNR in validation: 38.18, loss in validation: 0.00521
+Epoch: [77/500], PSNR in training: 36.38
+Epoch: [77/500], PSNR in validation: 38.06, loss in validation: 0.00518
+Epoch: [78/500], PSNR in training: 36.37
+Epoch: [78/500], PSNR in validation: 38.05, loss in validation: 0.00517
+Epoch: [79/500], PSNR in training: 36.42
+Epoch: [79/500], PSNR in validation: 37.83, loss in validation: 0.00518
+Epoch: [80/500], PSNR in training: 36.42
+Epoch: [80/500], PSNR in validation: 38.19, loss in validation: 0.00520
+Epoch: [81/500], PSNR in training: 36.45
+Epoch: [81/500], PSNR in validation: 38.09, loss in validation: 0.00518
+Epoch: [82/500], PSNR in training: 36.43
+Epoch: [82/500], PSNR in validation: 38.15, loss in validation: 0.00518
+Epoch: [83/500], PSNR in training: 36.44
+Epoch: [83/500], PSNR in validation: 38.34, loss in validation: 0.00522
+Epoch: [84/500], PSNR in training: 36.42
+Epoch: [84/500], PSNR in validation: 38.09, loss in validation: 0.00517
+Epoch: [85/500], PSNR in training: 36.44
+Epoch: [85/500], PSNR in validation: 37.97, loss in validation: 0.00516
+Epoch: [86/500], PSNR in training: 36.46
+Epoch: [86/500], PSNR in validation: 37.90, loss in validation: 0.00515
+Epoch: [87/500], PSNR in training: 36.51
+Epoch: [87/500], PSNR in validation: 38.29, loss in validation: 0.00518
+Epoch: [88/500], PSNR in training: 36.42
+Epoch: [88/500], PSNR in validation: 38.31, loss in validation: 0.00518
+Epoch: [89/500], PSNR in training: 36.50
+Epoch: [89/500], PSNR in validation: 38.38, loss in validation: 0.00522
+Epoch: [90/500], PSNR in training: 36.50
+Epoch: [90/500], PSNR in validation: 38.26, loss in validation: 0.00518
+Epoch: [91/500], PSNR in training: 36.46
+Epoch: [91/500], PSNR in validation: 37.84, loss in validation: 0.00514
+Epoch: [92/500], PSNR in training: 36.47
+Epoch: [92/500], PSNR in validation: 38.40, loss in validation: 0.00521
+Epoch: [93/500], PSNR in training: 36.46
+Epoch: [93/500], PSNR in validation: 38.04, loss in validation: 0.00512
+Epoch: [94/500], PSNR in training: 36.42
+Epoch: [94/500], PSNR in validation: 37.90, loss in validation: 0.00513
+Epoch: [95/500], PSNR in training: 36.52
+Epoch: [95/500], PSNR in validation: 38.08, loss in validation: 0.00513
+Epoch: [96/500], PSNR in training: 36.49
+Epoch: [96/500], PSNR in validation: 38.25, loss in validation: 0.00516
+Epoch: [97/500], PSNR in training: 36.51
+Epoch: [97/500], PSNR in validation: 38.34, loss in validation: 0.00518
+Epoch: [98/500], PSNR in training: 36.47
+Epoch: [98/500], PSNR in validation: 38.21, loss in validation: 0.00514
+Epoch: [99/500], PSNR in training: 36.53
+Epoch: [99/500], PSNR in validation: 38.35, loss in validation: 0.00515
+Epoch: [100/500], PSNR in training: 36.58
+Epoch: [100/500], PSNR in validation: 38.36, loss in validation: 0.00514
+Epoch: [101/500], PSNR in training: 36.57
+Epoch: [101/500], PSNR in validation: 38.33, loss in validation: 0.00513
+Epoch: [102/500], PSNR in training: 36.55
+Epoch: [102/500], PSNR in validation: 38.13, loss in validation: 0.00512
+Epoch: [103/500], PSNR in training: 36.46
+Epoch: [103/500], PSNR in validation: 38.24, loss in validation: 0.00513
+Epoch: [104/500], PSNR in training: 36.52
+Epoch: [104/500], PSNR in validation: 38.33, loss in validation: 0.00513
+Epoch: [105/500], PSNR in training: 36.56
+Epoch: [105/500], PSNR in validation: 38.14, loss in validation: 0.00511
+Epoch: [106/500], PSNR in training: 36.54
+Epoch: [106/500], PSNR in validation: 37.95, loss in validation: 0.00510
+Epoch: [107/500], PSNR in training: 36.52
+Epoch: [107/500], PSNR in validation: 38.15, loss in validation: 0.00511
+Epoch: [108/500], PSNR in training: 36.58
+Epoch: [108/500], PSNR in validation: 38.03, loss in validation: 0.00512
+Epoch: [109/500], PSNR in training: 36.54
+Epoch: [109/500], PSNR in validation: 38.27, loss in validation: 0.00514
+Epoch: [110/500], PSNR in training: 36.53
+Epoch: [110/500], PSNR in validation: 38.23, loss in validation: 0.00512
+Epoch: [111/500], PSNR in training: 36.51
+Epoch: [111/500], PSNR in validation: 38.07, loss in validation: 0.00509
+Epoch: [112/500], PSNR in training: 36.53
+Epoch: [112/500], PSNR in validation: 38.26, loss in validation: 0.00512
+Epoch: [113/500], PSNR in training: 36.53
+Epoch: [113/500], PSNR in validation: 38.27, loss in validation: 0.00511
+Epoch: [114/500], PSNR in training: 36.52
+Epoch: [114/500], PSNR in validation: 38.19, loss in validation: 0.00511
+Epoch: [115/500], PSNR in training: 36.56
+Epoch: [115/500], PSNR in validation: 38.29, loss in validation: 0.00514
+Epoch: [116/500], PSNR in training: 36.56
+Epoch: [116/500], PSNR in validation: 38.48, loss in validation: 0.00516
+Epoch: [117/500], PSNR in training: 36.57
+Epoch: [117/500], PSNR in validation: 38.36, loss in validation: 0.00513
+Epoch: [118/500], PSNR in training: 36.55
+Epoch: [118/500], PSNR in validation: 38.32, loss in validation: 0.00512
+Epoch: [119/500], PSNR in training: 36.59
+Epoch: [119/500], PSNR in validation: 38.32, loss in validation: 0.00513
+Epoch: [120/500], PSNR in training: 36.58
+Epoch: [120/500], PSNR in validation: 38.24, loss in validation: 0.00511
+Epoch: [121/500], PSNR in training: 36.54
+Epoch: [121/500], PSNR in validation: 38.10, loss in validation: 0.00510
+Epoch: [122/500], PSNR in training: 36.57
+Epoch: [122/500], PSNR in validation: 37.94, loss in validation: 0.00510
+Epoch: [123/500], PSNR in training: 36.51
+Epoch: [123/500], PSNR in validation: 38.40, loss in validation: 0.00514
+Epoch: [124/500], PSNR in training: 36.56
+Epoch: [124/500], PSNR in validation: 38.05, loss in validation: 0.00509
+Epoch: [125/500], PSNR in training: 36.54
+Epoch: [125/500], PSNR in validation: 38.21, loss in validation: 0.00511
+Epoch: [126/500], PSNR in training: 36.58
+Epoch: [126/500], PSNR in validation: 38.37, loss in validation: 0.00514
+Epoch: [127/500], PSNR in training: 36.55
+Epoch: [127/500], PSNR in validation: 38.14, loss in validation: 0.00511
+Epoch: [128/500], PSNR in training: 36.58
+Epoch: [128/500], PSNR in validation: 38.05, loss in validation: 0.00509
+Epoch: [129/500], PSNR in training: 36.49
+Epoch: [129/500], PSNR in validation: 38.24, loss in validation: 0.00512
+Epoch: [130/500], PSNR in training: 36.60
+Epoch: [130/500], PSNR in validation: 38.18, loss in validation: 0.00510
+Epoch: [131/500], PSNR in training: 36.55
+Epoch: [131/500], PSNR in validation: 38.11, loss in validation: 0.00510
+Epoch: [132/500], PSNR in training: 36.59
+Epoch: [132/500], PSNR in validation: 38.35, loss in validation: 0.00514
+Epoch: [133/500], PSNR in training: 36.56
+Epoch: [133/500], PSNR in validation: 38.25, loss in validation: 0.00510
+Epoch: [134/500], PSNR in training: 36.55
+Epoch: [134/500], PSNR in validation: 38.40, loss in validation: 0.00512
+Epoch: [135/500], PSNR in training: 36.53
+Epoch: [135/500], PSNR in validation: 38.43, loss in validation: 0.00516
+Epoch: [136/500], PSNR in training: 36.55
+Epoch: [136/500], PSNR in validation: 38.17, loss in validation: 0.00509
+Epoch: [137/500], PSNR in training: 36.58
+Epoch: [137/500], PSNR in validation: 38.37, loss in validation: 0.00512
+Epoch: [138/500], PSNR in training: 36.59
+Epoch: [138/500], PSNR in validation: 38.14, loss in validation: 0.00509
+Epoch: [139/500], PSNR in training: 36.57
+Epoch: [139/500], PSNR in validation: 38.36, loss in validation: 0.00511
+Epoch: [140/500], PSNR in training: 36.59
+Epoch: [140/500], PSNR in validation: 38.39, loss in validation: 0.00513
+Epoch: [141/500], PSNR in training: 36.57
+Epoch: [141/500], PSNR in validation: 38.42, loss in validation: 0.00514
+Epoch: [142/500], PSNR in training: 36.56
+Epoch: [142/500], PSNR in validation: 38.39, loss in validation: 0.00512
+Epoch: [143/500], PSNR in training: 36.58
+Epoch: [143/500], PSNR in validation: 38.26, loss in validation: 0.00512
+Epoch: [144/500], PSNR in training: 36.56
+Epoch: [144/500], PSNR in validation: 38.16, loss in validation: 0.00510
+Epoch: [145/500], PSNR in training: 36.62
+Epoch: [145/500], PSNR in validation: 38.20, loss in validation: 0.00510
+Epoch: [146/500], PSNR in training: 36.56
+Epoch: [146/500], PSNR in validation: 38.29, loss in validation: 0.00514
+Epoch: [147/500], PSNR in training: 36.53
+Epoch: [147/500], PSNR in validation: 38.24, loss in validation: 0.00509
+Epoch: [148/500], PSNR in training: 36.58
+Epoch: [148/500], PSNR in validation: 38.30, loss in validation: 0.00510
+Epoch: [149/500], PSNR in training: 36.51
+Epoch: [149/500], PSNR in validation: 38.26, loss in validation: 0.00509
+Epoch: [150/500], PSNR in training: 36.55
+Epoch: [150/500], PSNR in validation: 38.19, loss in validation: 0.00508
+Epoch: [151/500], PSNR in training: 36.60
+Epoch: [151/500], PSNR in validation: 38.20, loss in validation: 0.00509
+Epoch: [152/500], PSNR in training: 36.60
+Epoch: [152/500], PSNR in validation: 38.30, loss in validation: 0.00511
+Epoch: [153/500], PSNR in training: 36.60
+Epoch: [153/500], PSNR in validation: 38.43, loss in validation: 0.00512
+Epoch: [154/500], PSNR in training: 36.59
+Epoch: [154/500], PSNR in validation: 38.29, loss in validation: 0.00512
+Epoch: [155/500], PSNR in training: 36.60
+Epoch: [155/500], PSNR in validation: 38.06, loss in validation: 0.00509
+Epoch: [156/500], PSNR in training: 36.61
+Epoch: [156/500], PSNR in validation: 38.29, loss in validation: 0.00509
+Epoch: [157/500], PSNR in training: 36.56
+Epoch: [157/500], PSNR in validation: 38.39, loss in validation: 0.00515
+Epoch: [158/500], PSNR in training: 36.55
+Epoch: [158/500], PSNR in validation: 38.58, loss in validation: 0.00522
+Epoch: [159/500], PSNR in training: 36.56
+Epoch: [159/500], PSNR in validation: 38.12, loss in validation: 0.00509
+Epoch: [160/500], PSNR in training: 36.50
+Epoch: [160/500], PSNR in validation: 38.01, loss in validation: 0.00508
+Epoch: [161/500], PSNR in training: 36.55
+Epoch: [161/500], PSNR in validation: 38.42, loss in validation: 0.00513
+Epoch: [162/500], PSNR in training: 36.60
+Epoch: [162/500], PSNR in validation: 38.14, loss in validation: 0.00510
+Epoch: [163/500], PSNR in training: 36.56
+Epoch: [163/500], PSNR in validation: 38.03, loss in validation: 0.00508
+Epoch: [164/500], PSNR in training: 36.60
+Epoch: [164/500], PSNR in validation: 38.39, loss in validation: 0.00509
+Epoch: [165/500], PSNR in training: 36.61
+Epoch: [165/500], PSNR in validation: 38.16, loss in validation: 0.00508
+Epoch: [166/500], PSNR in training: 36.61
+Epoch: [166/500], PSNR in validation: 38.25, loss in validation: 0.00512
+Epoch: [167/500], PSNR in training: 36.56
+Epoch: [167/500], PSNR in validation: 38.12, loss in validation: 0.00508
+Epoch: [168/500], PSNR in training: 36.50
+Epoch: [168/500], PSNR in validation: 37.83, loss in validation: 0.00510
+Epoch: [169/500], PSNR in training: 36.59
+Epoch: [169/500], PSNR in validation: 38.40, loss in validation: 0.00511
+Epoch: [170/500], PSNR in training: 36.61
+Epoch: [170/500], PSNR in validation: 38.35, loss in validation: 0.00510
+Epoch: [171/500], PSNR in training: 36.59
+Epoch: [171/500], PSNR in validation: 38.20, loss in validation: 0.00508
+Epoch: [172/500], PSNR in training: 36.57
+Epoch: [172/500], PSNR in validation: 38.01, loss in validation: 0.00509
+Epoch: [173/500], PSNR in training: 36.60
+Epoch: [173/500], PSNR in validation: 38.11, loss in validation: 0.00509
+Epoch: [174/500], PSNR in training: 36.55
+Epoch: [174/500], PSNR in validation: 38.31, loss in validation: 0.00509
+Epoch: [175/500], PSNR in training: 36.62
+Epoch: [175/500], PSNR in validation: 38.44, loss in validation: 0.00513
+Epoch: [176/500], PSNR in training: 36.59
+Epoch: [176/500], PSNR in validation: 38.10, loss in validation: 0.00508
+Epoch: [177/500], PSNR in training: 36.57
+Epoch: [177/500], PSNR in validation: 38.27, loss in validation: 0.00510
+Epoch: [178/500], PSNR in training: 36.57
+Epoch: [178/500], PSNR in validation: 38.04, loss in validation: 0.00508
+Epoch: [179/500], PSNR in training: 36.60
+Epoch: [179/500], PSNR in validation: 37.92, loss in validation: 0.00508
+Epoch: [180/500], PSNR in training: 36.58
+Epoch: [180/500], PSNR in validation: 38.17, loss in validation: 0.00508
+Epoch: [181/500], PSNR in training: 36.65
+Epoch: [181/500], PSNR in validation: 38.24, loss in validation: 0.00511
+Epoch: [182/500], PSNR in training: 36.58
+Epoch: [182/500], PSNR in validation: 38.39, loss in validation: 0.00515
+Epoch: [183/500], PSNR in training: 36.58
+Epoch: [183/500], PSNR in validation: 38.04, loss in validation: 0.00508
+Epoch: [184/500], PSNR in training: 36.50
+Epoch: [184/500], PSNR in validation: 38.32, loss in validation: 0.00509
+Epoch: [185/500], PSNR in training: 36.55
+Epoch: [185/500], PSNR in validation: 38.26, loss in validation: 0.00508
+Epoch: [186/500], PSNR in training: 36.65
+Epoch: [186/500], PSNR in validation: 38.34, loss in validation: 0.00510
+Epoch: [187/500], PSNR in training: 36.59
+Epoch: [187/500], PSNR in validation: 38.25, loss in validation: 0.00511
+Epoch: [188/500], PSNR in training: 36.58
+Epoch: [188/500], PSNR in validation: 38.33, loss in validation: 0.00511
+Epoch: [189/500], PSNR in training: 36.59
+Epoch: [189/500], PSNR in validation: 38.25, loss in validation: 0.00510
+Epoch: [190/500], PSNR in training: 36.61
+Epoch: [190/500], PSNR in validation: 38.08, loss in validation: 0.00508
+Epoch: [191/500], PSNR in training: 36.56
+Epoch: [191/500], PSNR in validation: 38.34, loss in validation: 0.00510
+Epoch: [192/500], PSNR in training: 36.56
+Epoch: [192/500], PSNR in validation: 38.24, loss in validation: 0.00509
+Epoch: [193/500], PSNR in training: 36.61
+Epoch: [193/500], PSNR in validation: 38.27, loss in validation: 0.00508
+Epoch: [194/500], PSNR in training: 36.60
+Epoch: [194/500], PSNR in validation: 38.42, loss in validation: 0.00512
+Epoch: [195/500], PSNR in training: 36.61
+Epoch: [195/500], PSNR in validation: 38.17, loss in validation: 0.00508
+Epoch: [196/500], PSNR in training: 36.59
+Epoch: [196/500], PSNR in validation: 37.95, loss in validation: 0.00507
+Epoch: [197/500], PSNR in training: 36.59
+Epoch: [197/500], PSNR in validation: 38.33, loss in validation: 0.00510
+Epoch: [198/500], PSNR in training: 36.63
+Epoch: [198/500], PSNR in validation: 38.26, loss in validation: 0.00510
+Epoch: [199/500], PSNR in training: 36.59
+Epoch: [199/500], PSNR in validation: 38.15, loss in validation: 0.00509
+Epoch: [200/500], PSNR in training: 36.62
+Epoch: [200/500], PSNR in validation: 38.49, loss in validation: 0.00517
+Epoch: [201/500], PSNR in training: 36.59
+Epoch: [201/500], PSNR in validation: 38.24, loss in validation: 0.00510
+Epoch: [202/500], PSNR in training: 36.63
+Epoch: [202/500], PSNR in validation: 38.01, loss in validation: 0.00507
+Epoch: [203/500], PSNR in training: 36.57
+Epoch: [203/500], PSNR in validation: 38.26, loss in validation: 0.00509
+Epoch: [204/500], PSNR in training: 36.62
+Epoch: [204/500], PSNR in validation: 38.19, loss in validation: 0.00508
+Epoch: [205/500], PSNR in training: 36.55
+Epoch: [205/500], PSNR in validation: 38.24, loss in validation: 0.00509
+Epoch: [206/500], PSNR in training: 36.55
+Epoch: [206/500], PSNR in validation: 38.25, loss in validation: 0.00509
+Epoch: [207/500], PSNR in training: 36.56
+Epoch: [207/500], PSNR in validation: 38.21, loss in validation: 0.00508
+Epoch: [208/500], PSNR in training: 36.62
+Epoch: [208/500], PSNR in validation: 38.10, loss in validation: 0.00507
+Epoch: [209/500], PSNR in training: 36.62
+Epoch: [209/500], PSNR in validation: 38.18, loss in validation: 0.00509
+Epoch: [210/500], PSNR in training: 36.59
+Epoch: [210/500], PSNR in validation: 38.12, loss in validation: 0.00507
+Epoch: [211/500], PSNR in training: 36.63
+Epoch: [211/500], PSNR in validation: 38.14, loss in validation: 0.00509
+Epoch: [212/500], PSNR in training: 36.60
+Epoch: [212/500], PSNR in validation: 38.25, loss in validation: 0.00510
+Epoch: [213/500], PSNR in training: 36.61
+Epoch: [213/500], PSNR in validation: 38.38, loss in validation: 0.00512
+Epoch: [214/500], PSNR in training: 36.59
+Epoch: [214/500], PSNR in validation: 38.47, loss in validation: 0.00511
+Epoch: [215/500], PSNR in training: 36.59
+Epoch: [215/500], PSNR in validation: 38.05, loss in validation: 0.00509
+Epoch: [216/500], PSNR in training: 36.59
+Epoch: [216/500], PSNR in validation: 38.39, loss in validation: 0.00512
+Epoch: [217/500], PSNR in training: 36.61
+Epoch: [217/500], PSNR in validation: 38.12, loss in validation: 0.00509
+Epoch: [218/500], PSNR in training: 36.60
+Epoch: [218/500], PSNR in validation: 38.24, loss in validation: 0.00509
+Epoch: [219/500], PSNR in training: 36.54
+Epoch: [219/500], PSNR in validation: 38.40, loss in validation: 0.00511
+Epoch: [220/500], PSNR in training: 36.60
+Epoch: [220/500], PSNR in validation: 38.28, loss in validation: 0.00510
+Epoch: [221/500], PSNR in training: 36.61
+Epoch: [221/500], PSNR in validation: 38.26, loss in validation: 0.00510
+Epoch: [222/500], PSNR in training: 36.56
+Epoch: [222/500], PSNR in validation: 38.49, loss in validation: 0.00513
+Epoch: [223/500], PSNR in training: 36.55
+Epoch: [223/500], PSNR in validation: 38.22, loss in validation: 0.00508
+Epoch: [224/500], PSNR in training: 36.62
+Epoch: [224/500], PSNR in validation: 38.34, loss in validation: 0.00509
+Epoch: [225/500], PSNR in training: 36.62
+Epoch: [225/500], PSNR in validation: 38.24, loss in validation: 0.00509
+Epoch: [226/500], PSNR in training: 36.62
+Epoch: [226/500], PSNR in validation: 38.31, loss in validation: 0.00510
+Epoch: [227/500], PSNR in training: 36.58
+Epoch: [227/500], PSNR in validation: 38.33, loss in validation: 0.00513
+Epoch: [228/500], PSNR in training: 36.61
+Epoch: [228/500], PSNR in validation: 38.21, loss in validation: 0.00511
+Epoch: [229/500], PSNR in training: 36.58
+Epoch: [229/500], PSNR in validation: 38.35, loss in validation: 0.00512
+Epoch: [230/500], PSNR in training: 36.58
+Epoch: [230/500], PSNR in validation: 38.15, loss in validation: 0.00508
+Epoch: [231/500], PSNR in training: 36.54
+Epoch: [231/500], PSNR in validation: 38.27, loss in validation: 0.00511
+Epoch: [232/500], PSNR in training: 36.58
+Epoch: [232/500], PSNR in validation: 37.82, loss in validation: 0.00508
+Epoch: [233/500], PSNR in training: 36.61
+Epoch: [233/500], PSNR in validation: 38.05, loss in validation: 0.00507
+Epoch: [234/500], PSNR in training: 36.55
+Epoch: [234/500], PSNR in validation: 38.31, loss in validation: 0.00510
+Epoch: [235/500], PSNR in training: 36.67
+Epoch: [235/500], PSNR in validation: 38.05, loss in validation: 0.00507
+Epoch: [236/500], PSNR in training: 36.56
+Epoch: [236/500], PSNR in validation: 38.39, loss in validation: 0.00512
+Epoch: [237/500], PSNR in training: 36.59
+Epoch: [237/500], PSNR in validation: 38.42, loss in validation: 0.00511
+Epoch: [238/500], PSNR in training: 36.57
+Epoch: [238/500], PSNR in validation: 38.33, loss in validation: 0.00509
+Epoch: [239/500], PSNR in training: 36.58
+Epoch: [239/500], PSNR in validation: 38.13, loss in validation: 0.00509
+Epoch: [240/500], PSNR in training: 36.56
+Epoch: [240/500], PSNR in validation: 38.22, loss in validation: 0.00509
+Epoch: [241/500], PSNR in training: 36.63
+Epoch: [241/500], PSNR in validation: 37.98, loss in validation: 0.00508
+Epoch: [242/500], PSNR in training: 36.61
+Epoch: [242/500], PSNR in validation: 38.29, loss in validation: 0.00508
+Epoch: [243/500], PSNR in training: 36.62
+Epoch: [243/500], PSNR in validation: 38.31, loss in validation: 0.00510
+Epoch: [244/500], PSNR in training: 36.56
+Epoch: [244/500], PSNR in validation: 38.27, loss in validation: 0.00509
+Epoch: [245/500], PSNR in training: 36.58
+Epoch: [245/500], PSNR in validation: 38.13, loss in validation: 0.00508
+Epoch: [246/500], PSNR in training: 36.62
+Epoch: [246/500], PSNR in validation: 38.55, loss in validation: 0.00520
+Epoch: [247/500], PSNR in training: 36.59
+Epoch: [247/500], PSNR in validation: 38.03, loss in validation: 0.00508
+Epoch: [248/500], PSNR in training: 36.60
+Epoch: [248/500], PSNR in validation: 38.31, loss in validation: 0.00509
+Epoch: [249/500], PSNR in training: 36.57
+Epoch: [249/500], PSNR in validation: 38.32, loss in validation: 0.00508
+Epoch: [250/500], PSNR in training: 36.57
+Epoch: [250/500], PSNR in validation: 38.27, loss in validation: 0.00507
+Epoch: [251/500], PSNR in training: 36.57
+Epoch: [251/500], PSNR in validation: 38.31, loss in validation: 0.00513
+Epoch: [252/500], PSNR in training: 36.55
+Epoch: [252/500], PSNR in validation: 38.15, loss in validation: 0.00506
+Epoch: [253/500], PSNR in training: 36.63
+Epoch: [253/500], PSNR in validation: 38.19, loss in validation: 0.00509
+Epoch: [254/500], PSNR in training: 36.65
+Epoch: [254/500], PSNR in validation: 38.26, loss in validation: 0.00509
+Epoch: [255/500], PSNR in training: 36.55
+Epoch: [255/500], PSNR in validation: 38.25, loss in validation: 0.00508
+Epoch: [256/500], PSNR in training: 36.62
+Epoch: [256/500], PSNR in validation: 38.23, loss in validation: 0.00511
+Epoch: [257/500], PSNR in training: 36.64
+Epoch: [257/500], PSNR in validation: 38.17, loss in validation: 0.00509
+Epoch: [258/500], PSNR in training: 36.54
+Epoch: [258/500], PSNR in validation: 38.21, loss in validation: 0.00509
+Epoch: [259/500], PSNR in training: 36.56
+Epoch: [259/500], PSNR in validation: 38.43, loss in validation: 0.00513
+Epoch: [260/500], PSNR in training: 36.65
+Epoch: [260/500], PSNR in validation: 38.33, loss in validation: 0.00512
+Epoch: [261/500], PSNR in training: 36.55
+Epoch: [261/500], PSNR in validation: 38.11, loss in validation: 0.00508
+Epoch: [262/500], PSNR in training: 36.60
+Epoch: [262/500], PSNR in validation: 38.44, loss in validation: 0.00514
+Epoch: [263/500], PSNR in training: 36.60
+Epoch: [263/500], PSNR in validation: 38.35, loss in validation: 0.00511
+Epoch: [264/500], PSNR in training: 36.56
+Epoch: [264/500], PSNR in validation: 38.04, loss in validation: 0.00507
+Epoch: [265/500], PSNR in training: 36.56
+Epoch: [265/500], PSNR in validation: 38.29, loss in validation: 0.00509
+Epoch: [266/500], PSNR in training: 36.61
+Epoch: [266/500], PSNR in validation: 38.09, loss in validation: 0.00508
+Epoch: [267/500], PSNR in training: 36.62
+Epoch: [267/500], PSNR in validation: 38.28, loss in validation: 0.00509
+Epoch: [268/500], PSNR in training: 36.64
+Epoch: [268/500], PSNR in validation: 38.14, loss in validation: 0.00509
+Epoch: [269/500], PSNR in training: 36.59
+Epoch: [269/500], PSNR in validation: 38.35, loss in validation: 0.00511
+Epoch: [270/500], PSNR in training: 36.58
+Epoch: [270/500], PSNR in validation: 38.38, loss in validation: 0.00511
+Epoch: [271/500], PSNR in training: 36.55
+Epoch: [271/500], PSNR in validation: 38.16, loss in validation: 0.00508
+Epoch: [272/500], PSNR in training: 36.56
+Epoch: [272/500], PSNR in validation: 38.12, loss in validation: 0.00508
+Epoch: [273/500], PSNR in training: 36.63
+Epoch: [273/500], PSNR in validation: 38.16, loss in validation: 0.00507
+Epoch: [274/500], PSNR in training: 36.60
+Epoch: [274/500], PSNR in validation: 38.31, loss in validation: 0.00509
+Epoch: [275/500], PSNR in training: 36.60
+Epoch: [275/500], PSNR in validation: 38.16, loss in validation: 0.00509
+Epoch: [276/500], PSNR in training: 36.63
+Epoch: [276/500], PSNR in validation: 38.37, loss in validation: 0.00511
+Epoch: [277/500], PSNR in training: 36.56
+Epoch: [277/500], PSNR in validation: 38.28, loss in validation: 0.00508
+Epoch: [278/500], PSNR in training: 36.61
+Epoch: [278/500], PSNR in validation: 38.30, loss in validation: 0.00510
+Epoch: [279/500], PSNR in training: 36.58
+Epoch: [279/500], PSNR in validation: 37.99, loss in validation: 0.00507
+Epoch: [280/500], PSNR in training: 36.63
+Epoch: [280/500], PSNR in validation: 38.37, loss in validation: 0.00511
+Epoch: [281/500], PSNR in training: 36.59
+Epoch: [281/500], PSNR in validation: 38.29, loss in validation: 0.00508
+Epoch: [282/500], PSNR in training: 36.62
+Epoch: [282/500], PSNR in validation: 38.45, loss in validation: 0.00513
+Epoch: [283/500], PSNR in training: 36.62
+Epoch: [283/500], PSNR in validation: 38.02, loss in validation: 0.00507
+Epoch: [284/500], PSNR in training: 36.60
+Epoch: [284/500], PSNR in validation: 38.29, loss in validation: 0.00507
+Epoch: [285/500], PSNR in training: 36.59
+Epoch: [285/500], PSNR in validation: 38.31, loss in validation: 0.00509
+Epoch: [286/500], PSNR in training: 36.53
+Epoch: [286/500], PSNR in validation: 38.30, loss in validation: 0.00510
+Epoch: [287/500], PSNR in training: 36.64
+Epoch: [287/500], PSNR in validation: 38.05, loss in validation: 0.00507
+Epoch: [288/500], PSNR in training: 36.60
+Epoch: [288/500], PSNR in validation: 38.29, loss in validation: 0.00510
+Epoch: [289/500], PSNR in training: 36.62
+Epoch: [289/500], PSNR in validation: 38.33, loss in validation: 0.00511
+Epoch: [290/500], PSNR in training: 36.62
+Epoch: [290/500], PSNR in validation: 38.03, loss in validation: 0.00509
+Epoch: [291/500], PSNR in training: 36.56

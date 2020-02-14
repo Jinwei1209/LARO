@@ -71,7 +71,7 @@ if __name__ == '__main__':
         rho_penalty=rho_penalty,
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
-        K=opt['K']+19, 
+        K=opt['K'], 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
@@ -81,12 +81,12 @@ if __name__ == '__main__':
         ncoil=32
     )
     netG_dc.to(device)
-    # weights_dict = torch.load(rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
-    #                           opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+    weights_dict = torch.load(rootName+'/weights3/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
+                              opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
     # weights_dict['lambda_tv'] = (torch.ones(1)*lambda_tv).to(device)
     # weights_dict['rho_penalty'] = (torch.ones(1)*rho_penalty).to(device)
-    # netG_dc.load_state_dict(weights_dict)
-    # netG_dc.eval()
+    netG_dc.load_state_dict(weights_dict)
+    netG_dc.eval()
     # print('Lambda_tv={0}'.format(netG_dc.lambda_tv)) 
     # print('Rho_penalty={0}'.format(netG_dc.rho_penalty))
     # print('Lambda_dll2={0}'.format(netG_dc.lambda_dll2))
@@ -94,7 +94,8 @@ if __name__ == '__main__':
 
     Recons = []
     for idx, (inputs, targets, csms, brain_masks) in enumerate(testLoader):
-        print(idx)
+        if id%10 == 0:
+            print(idx)
         inputs = inputs.to(device)
         targets = targets.to(device)
         csms = csms.to(device)
@@ -105,14 +106,18 @@ if __name__ == '__main__':
         if idx == 0:
             print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
             adict = {}
-            adict['Mask'] = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
-            sio.savemat(rootName+'/results/Mask_K={0}_flag_ND={1}_ratio={2}.mat'.format(
-                        opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+            Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
+            Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
+            adict['Mask'] = Mask
+            sio.savemat(rootName+'/results/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
+                        opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
             adict = {}
-            adict['Pmask'] = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
-            sio.savemat(rootName+'/results/Pmask_K={0}_flag_ND={1}_ratio={2}.mat'.format(
-                        opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+            Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
+            Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
+            adict['Pmask'] = Pmask
+            sio.savemat(rootName+'/results/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
+                        opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
     print(np.mean(np.asarray(metrices_test.PSNRs)))
     Recons = np.concatenate(Recons, axis=0)
@@ -121,8 +126,8 @@ if __name__ == '__main__':
 
     adict = {}
     adict['Recons'] = Recons
-    sio.savemat(rootName+'/results/Recons_K={0}_flag_ND={1}_ratio={2}.mat'.format(
-                opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+    sio.savemat(rootName+'/results/Recons_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
+                opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
 
 
