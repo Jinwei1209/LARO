@@ -29,7 +29,8 @@ if __name__ == '__main__':
     niter = 500
     batch_size = 1
     display_iters = 10
-    lambda_dll2 = 1e-4
+    # lambda_dll2 = 1e-4
+    lambda_dll2 = 0
     lambda_tv = 1e-4
     rho_penalty = lambda_tv*2
     use_uncertainty = False
@@ -154,7 +155,7 @@ if __name__ == '__main__':
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
 
     # logger
-    logger = Logger('logs2', rootName, opt)
+    logger = Logger('logs', rootName, opt)
     
     while epoch < niter:
         epoch += 1 
@@ -173,10 +174,12 @@ if __name__ == '__main__':
                     print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
                         % (netG_dc.lambda_dll2, torch.mean(netG_dc.masks), \
                             netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
-                else:
+                elif 0 < opt['flag_solver'] < 3:
                     print('Lambda_tv: %f, Rho_penalty: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
                         % (netG_dc.lambda_tv, netG_dc.rho_penalty, torch.mean(netG_dc.masks), \
                             netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
+                else:
+                    print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' % (torch.mean(netG_dc.masks), netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
 
                 print('netG_dc --- loss_L2_dc: %f'
                     % (errL2_dc_sum/display_iters))
@@ -252,6 +255,6 @@ if __name__ == '__main__':
 
         # save weights
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/weights3/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
+            torch.save(netG_dc.state_dict(), rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
                                                         opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
 

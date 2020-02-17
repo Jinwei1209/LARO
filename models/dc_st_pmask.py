@@ -35,6 +35,7 @@ class DC_ST_Pmask(nn.Module):
                         #  0 for deep ADMM with resnet denoiser, 
                         #  1 for ADMM solver with learnable parameters, 
                         #  2 for ADMM solver without learnable parameters.
+                        #  3 for adjoint operator recon
         K=1,
         unc_map=False,
         slope=0.25,
@@ -255,7 +256,7 @@ class DC_ST_Pmask(nn.Module):
             return Xs
 
         # ADMM
-        elif self.flag_solver > 0:
+        elif 0 < self.flag_solver < 3:
             epsilon = (torch.ones(1)*1e-7).to(device)
             self.lambda_tv = self.lambda_tv.to(device)
             self.rho_penalty = self.rho_penalty.to(device)
@@ -284,5 +285,10 @@ class DC_ST_Pmask(nn.Module):
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
                 # if i % 10 == 0:
                 # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
+            return Xs
+
+        elif self.flag_solver == 3:
+            Xs = []
+            Xs.append(x_start)
             return Xs
 
