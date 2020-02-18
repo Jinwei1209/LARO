@@ -29,8 +29,7 @@ if __name__ == '__main__':
     niter = 500
     batch_size = 1
     display_iters = 10
-    # lambda_dll2 = 1e-4
-    lambda_dll2 = 0
+    lambda_dll2 = 1e-4
     lambda_tv = 1e-4
     rho_penalty = lambda_tv*2
     use_uncertainty = False
