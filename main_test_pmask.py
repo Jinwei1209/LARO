@@ -29,8 +29,8 @@ if __name__ == '__main__':
     display_iters = 10
     lambda_dll2 = 1e-4
     lambda_tv = 1e-4
-    rho_penalty = lambda_tv*2  # 2 as default
-    # rho_penalty = lambda_tv*10
+    # rho_penalty = lambda_tv*2  # 2 as default
+    rho_penalty = lambda_tv*2
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         rho_penalty=rho_penalty,
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
-        K=opt['K']+4, 
+        K=opt['K']+2, 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
@@ -88,9 +88,9 @@ if __name__ == '__main__':
     weights_dict['rho_penalty'] = (torch.ones(1)*rho_penalty).to(device)
     netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
+    # print('Lambda_dll2={0}'.format(netG_dc.lambda_dll2))
     print('Lambda_tv={0}'.format(netG_dc.lambda_tv)) 
     print('Rho_penalty={0}'.format(netG_dc.rho_penalty))
-    # print('Lambda_dll2={0}'.format(netG_dc.lambda_dll2))
     metrices_test = Metrices()
 
     Recons = []

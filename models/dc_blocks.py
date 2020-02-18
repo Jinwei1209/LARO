@@ -60,18 +60,19 @@ class DC_layer():
         return i+1, rTrNew, x, r, p
 
 
-    def while_cond(self, i, rTr):
-        return (i<10) and (rTr>1e-10)
+    def while_cond(self, i, rTr, max_iter=10):
+        return (i<max_iter) and (rTr>1e-10)
 
 
-    def CG_iter(self):
+    def CG_iter(self, max_iter=10):
       
         x = torch.zeros(self.rhs.shape).to(self.device)
         i, r, p = 0, self.rhs, self.rhs
         rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
 
-        while self.while_cond(i, rTr):
+        while self.while_cond(i, rTr, max_iter):
             i, rTr, x, r, p = self.CG_body(i, rTr, x, r, p)
+            # print('i = {0}, rTr = {1}'.format(i, rTr))
 
         return x
         

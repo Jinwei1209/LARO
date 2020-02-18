@@ -278,7 +278,7 @@ class DC_ST_Pmask(nn.Module):
                 # update x using CG block
                 rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
                 dc_layer = DC_layer(A, rhs, use_dll2=2)
-                x = dc_layer.CG_iter()
+                x = dc_layer.CG_iter(max_iter=i*10+10)
                 Xs.append(x)
                 
                 # update dual variable etak
