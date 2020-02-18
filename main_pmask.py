@@ -248,8 +248,8 @@ if __name__ == '__main__':
             Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
 
         # save log
-        logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f' 
-        % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs))))
+        logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f, Pmask: %f' 
+        % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs)), torch.mean(netG_dc.Pmask)))
         logger.print_and_save('Epoch: [%d/%d], PSNR in validation: %.2f, loss in validation: %.5f' 
         % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
 
