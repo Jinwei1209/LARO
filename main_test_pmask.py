@@ -71,7 +71,7 @@ if __name__ == '__main__':
         rho_penalty=rho_penalty,
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
-        K=opt['K'], 
+        K=opt['K']+4, 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
@@ -81,7 +81,7 @@ if __name__ == '__main__':
         ncoil=32
     )
     netG_dc.to(device)
-    weights_dict = torch.load(rootName+'/weights3/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
+    weights_dict = torch.load(rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
                               opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
     weights_dict['lambda_dll2'] = (torch.ones(1)*lambda_dll2).to(device)
     # weights_dict['lambda_tv'] = (torch.ones(1)*lambda_tv).to(device)

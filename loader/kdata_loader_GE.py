@@ -25,9 +25,15 @@ class kdata_loader_GE(data.Dataset):
     dataRangeT2 = {
         'train': ['0', '300'],   
         'val': ['300', '400'],
-        # 'test': ['400', '500']
-        'test': ['450', '451']
+        'test': ['400', '500']
+        # 'test': ['450', '451']
     }
+
+    # dataRangeT2 = {
+    #     'train': ['1000', '1099'],   
+    #     'val': ['1000', '1099'],
+    #     'test': ['1000', '1099']
+    # }
 
 
     def __init__(self,

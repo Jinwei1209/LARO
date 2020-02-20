@@ -87,7 +87,7 @@ if __name__ == '__main__':
     #     contrast=opt['contrast'], 
     #     split='train'
     #     )
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
+    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, pin_memory=False)
 
     dataLoader_val = kdata_loader_GE(
         rootDir=rootName,
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     #     contrast=opt['contrast'], 
     #     split='val'
     #     )
-    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True)
+    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, pin_memory=False)
     
     # netG_dc = DC_with_Prop_Mask(
     #     input_channels=2, 
