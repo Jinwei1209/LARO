@@ -11,7 +11,7 @@ class kdata_loader_GE(data.Dataset):
 
     folderMatcher = {
         'T1': '/Total_slices_T1/',
-        'T2': '/Total_slices_T2/', 
+        'T2': '/Total_slices_T2_/', 
         'T2FLAIR': '/Total_slices_T2FLAIR/'
     }
 

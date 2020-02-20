@@ -33,7 +33,7 @@ if __name__ == '__main__':
     lambda_tv = 1e-4
     rho_penalty = lambda_tv*2
     use_uncertainty = False
-    passSigmoid = False
+    passSigmoid = True
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True
@@ -51,22 +51,24 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
 
-    total, used = os.popen(
-        '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
-            ).read().split('\n')[int(opt['gpu_id'])].split(',')
+    # # pre-occupy the memory
+    # total, used = os.popen(
+    #     '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
+    #         ).read().split('\n')[int(opt['gpu_id'])].split(',')
     
-    total = int(total)
-    used = int(used)
+    # total = int(total)
+    # used = int(used)
 
-    print('Total memory is {0} MB'.format(total))
-    print('Used memory is {0} MB'.format(used))
+    # print('Total memory is {0} MB'.format(total))
+    # print('Used memory is {0} MB'.format(used))
 
-    max_mem = int(total*0.8)
-    block_mem = max_mem - used
+    # max_mem = int(total*0.8)
+    # block_mem = max_mem - used
     
-    x = torch.rand((256, 1024, block_mem)).cuda()
-    x = torch.rand((2, 2)).cuda()
+    # x = torch.rand((256, 1024, block_mem)).cuda()
+    # x = torch.rand((2, 2)).cuda()
 
+    # start here
     t0 = time.time()
     epoch = 0
     gen_iterations = 1
@@ -167,7 +169,7 @@ if __name__ == '__main__':
             if gen_iterations%display_iters == 0:
 
                 print('epochs: [%d/%d], batchs: [%d/%d], time: %ds, K=%d, Solver=%d'
-                % (epoch, niter, idx, 1050//batch_size+1, time.time()-t0, netG_dc.K, netG_dc.flag_solver))
+                % (epoch, niter, idx, 300//batch_size+1, time.time()-t0, netG_dc.K, netG_dc.flag_solver))
 
                 if opt['flag_solver'] < 1:
                     print('Lambda_dll2: %f, Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
@@ -234,10 +236,15 @@ if __name__ == '__main__':
                 targets = np.asarray(targets.cpu().detach())
                 brain_masks = np.asarray(brain_masks.cpu().detach())
                 lossl2_sum = loss_unc_sum = 0
-                for i in range(len(Xs)):
-                    Xs_i = np.asarray(Xs[i].cpu().detach())
-                    temp = abs(Xs_i - targets) * brain_masks
-                    lossl2_sum += np.mean(temp)
+
+                # for i in range(len(Xs)):
+                #     Xs_i = np.asarray(Xs[i].cpu().detach())
+                #     temp = abs(Xs_i - targets) * brain_masks
+                #     lossl2_sum += np.mean(temp)
+                Xs_i = np.asarray(Xs[-1].cpu().detach())
+                temp = abs(Xs_i - targets) * brain_masks
+                lossl2_sum += np.mean(temp)
+
                 temp = np.asarray(netG_dc.Pmask.cpu().detach())
                 loss_Pmask = 0*np.mean(temp)
                 loss_total = lossl2_sum + loss_Pmask
