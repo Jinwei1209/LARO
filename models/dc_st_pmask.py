@@ -185,10 +185,10 @@ class DC_ST_Pmask(nn.Module):
         # # fftshift for simulated kspace data
         # masks = torch.cat((masks[:, self.nrow//2:self.nrow, ...], masks[:, 0:self.nrow//2, ...]), dim=1)
         # masks = torch.cat((masks[:, :, self.ncol//2:self.ncol, :], masks[:, :, 0:self.ncol//2, :]), dim=2)
-        # load fixed mask
-        masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Adjoint
-        masks = masks[np.newaxis, ..., np.newaxis]
-        masks = torch.tensor(masks, device=device).float()
+        # # load fixed mask
+        # masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Adjoint
+        # masks = masks[np.newaxis, ..., np.newaxis]
+        # masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1)
         # add coil dimension
