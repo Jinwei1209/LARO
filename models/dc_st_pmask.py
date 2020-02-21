@@ -205,8 +205,8 @@ class DC_ST_Pmask(nn.Module):
             Xs = []
             for i in range(self.K):
                 x_old = x
-                rhs = x_start - A.AtA(x, use_dll2=2)
-                dc_layer = DC_layer(A, rhs, use_dll2=2)
+                rhs = x_start - A.AtA(x, use_dll2=3)
+                dc_layer = DC_layer(A, rhs, use_dll2=3)
                 delta_x = dc_layer.CG_iter()
                 x = x + delta_x
                 Xs.append(x)

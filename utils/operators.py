@@ -30,7 +30,7 @@ class Back_forward():
     def AtA(
         self, 
         img, 
-        use_dll2=1
+        use_dll2=1  # 1 for l2-x0 reg, 2 for l2-TV reg, 3 for l1-TV reg
     ):
         # forward
         img_new = img.permute(0, 2, 3, 1)
@@ -54,6 +54,8 @@ class Back_forward():
             coilComb = coilComb + self.lambda_dll2*img
         elif use_dll2 == 2:
             coilComb = coilComb + self.lambda_dll2*divergence(gradient(img))
+        elif use_dll2 == 3:
+            coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+1e-6))
         return coilComb
 
 def forward_operator(img, csm, mask, ncoil, nrow, ncol):
