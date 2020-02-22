@@ -1,9 +1,10 @@
 import os
 import time
 import torch
-import numpy as np
 import math
 import argparse
+import numpy as np
+import matplotlib.pyplot as plt
 
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
@@ -29,8 +30,8 @@ if __name__ == '__main__':
     display_iters = 10
     lambda_dll2 = 1e-4
     lambda_tv = 1e-4
-    # rho_penalty = lambda_tv*2  # 2 as default
-    rho_penalty = lambda_tv*2
+    # rho_penalty = lambda_tv*2  # 2 as default, 100 best
+    rho_penalty = lambda_tv*100
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
@@ -42,6 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_ND', type=int, default=3)
     parser.add_argument('--flag_solver', type=int, default=0)
+    parser.add_argument('--flag_TV', type=int, default=0)
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
@@ -71,7 +73,8 @@ if __name__ == '__main__':
         rho_penalty=rho_penalty,
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
-        K=opt['K']+4, 
+        flag_TV=opt['flag_TV'],
+        K=opt['K']+2, 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
@@ -83,14 +86,17 @@ if __name__ == '__main__':
     netG_dc.to(device)
     weights_dict = torch.load(rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
                               opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-    weights_dict['lambda_dll2'] = (torch.ones(1)*lambda_dll2).to(device)
-    # weights_dict['lambda_tv'] = (torch.ones(1)*lambda_tv).to(device)
-    # weights_dict['rho_penalty'] = (torch.ones(1)*rho_penalty).to(device)
+    if opt['flag_solver'] == -3:
+        weights_dict['lambda_dll2'] = (torch.ones(1)*lambda_dll2).to(device)
+        print('Lambda_dll2={0}'.format(netG_dc.lambda_dll2))
+    elif opt['flag_solver'] == 2:
+        weights_dict['lambda_tv'] = (torch.ones(1)*lambda_tv).to(device)
+        weights_dict['rho_penalty'] = (torch.ones(1)*rho_penalty).to(device)
+        print('Lambda_tv={0}'.format(netG_dc.lambda_tv))
+        print('Rho_penalty={0}'.format(netG_dc.rho_penalty)) 
     netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
-    print('Lambda_dll2={0}'.format(netG_dc.lambda_dll2))
-    # print('Lambda_tv={0}'.format(netG_dc.lambda_tv)) 
-    # print('Rho_penalty={0}'.format(netG_dc.rho_penalty))
+
     metrices_test = Metrices()
 
     Recons = []
@@ -129,6 +135,14 @@ if __name__ == '__main__':
     adict['Recons'] = Recons
     sio.savemat(rootName+'/results/Recons_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+
+    # Display the output images
+    plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, .6))
+    plt.clf()
+    plot(Recons)
+    plt.axis('off')
+    plt.title('Solver = {0}, TV = {1}'.format(opt['flag_solver'], opt['flag_TV']))
+    plt.show()
 
 
 

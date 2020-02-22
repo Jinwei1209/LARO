@@ -55,7 +55,8 @@ class Back_forward():
         elif use_dll2 == 2:
             coilComb = coilComb + self.lambda_dll2*divergence(gradient(img))
         elif use_dll2 == 3:
-            coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+1e-6))
+            coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+3e-5))  #1e-4 best, 5e-5 to have consistent result to ADMM
+            # print(torch.mean(gradient(img)**2))
         return coilComb
 
 def forward_operator(img, csm, mask, ncoil, nrow, ncol):

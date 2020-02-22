@@ -36,6 +36,7 @@ class DC_ST_Pmask(nn.Module):
                         #  1 for ADMM solver with learnable parameters, 
                         #  2 for ADMM solver without learnable parameters.
                         #  3 for adjoint operator recon
+        flag_TV=0,  # 0 for l2 gradient reg, 1 for l1 gradient reg
         K=1,
         unc_map=False,
         slope=0.25,
@@ -55,6 +56,7 @@ class DC_ST_Pmask(nn.Module):
         self.ncol = ncol
         self.flag_ND = flag_ND
         self.flag_solver = flag_solver
+        self.flag_TV = flag_TV 
         self.rescale = rescale
         self.samplingRatio = samplingRatio
         # flag for sampling pattern designs
@@ -205,8 +207,12 @@ class DC_ST_Pmask(nn.Module):
             Xs = []
             for i in range(self.K):
                 x_old = x
-                rhs = x_start - A.AtA(x, use_dll2=3)
-                dc_layer = DC_layer(A, rhs, use_dll2=3)
+                if self.flag_TV == 0:
+                    rhs = x_start - A.AtA(x, use_dll2=2)
+                    dc_layer = DC_layer(A, rhs, use_dll2=2)
+                elif self.flag_TV == 1:
+                    rhs = x_start - A.AtA(x, use_dll2=3)
+                    dc_layer = DC_layer(A, rhs, use_dll2=3)
                 delta_x = dc_layer.CG_iter()
                 x = x + delta_x
                 Xs.append(x)
@@ -267,17 +273,18 @@ class DC_ST_Pmask(nn.Module):
             # etak = gradient(x_start).to(device)
             for i in range(self.K):
                 # update auxiliary variable wk through threshold
-                # # L1-gradient
-                # ek = gradient(x) - etak/self.rho_penalty
-                # wk = ek.sign() * torch.max(torch.abs(ek) - self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
-                # L2-gradient
-                wk = (self.rho_penalty*gradient(x) + etak) / (2*self.lambda_tv + self.rho_penalty)
+                if self.flag_TV == 0:  # recon not change so much with large lambda in this case
+                    wk = (self.rho_penalty*gradient(x) + etak) / (2*self.lambda_tv + self.rho_penalty)
+                elif self.flag_TV == 1:
+                    ek = gradient(x) + etak/self.rho_penalty
+                    wk = ek.sign() * torch.max(torch.abs(ek) - self.lambda_tv/self.rho_penalty, torch.zeros(ek.size()).to(device))
 
                 x_old = x
                 # update x using CG block
                 rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
                 dc_layer = DC_layer(A, rhs, use_dll2=2)
-                x = dc_layer.CG_iter(max_iter=i*10+10)
+                # x = dc_layer.CG_iter(max_iter=i*10+10)
+                x = dc_layer.CG_iter(max_iter=10)
                 Xs.append(x)
                 
                 # update dual variable etak
