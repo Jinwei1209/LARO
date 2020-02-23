@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_ND', type=int, default=3)
     parser.add_argument('--flag_solver', type=int, default=0)
-    parser.add_argument('--flag_TV', type=int, default=0)
+    parser.add_argument('--flag_TV', type=int, default=1)
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
