@@ -31,7 +31,7 @@ if __name__ == '__main__':
     display_iters = 10
     lambda_dll2 = 1e-4
     lambda_tv = 1e-4
-    rho_penalty = lambda_tv*2
+    rho_penalty = lambda_tv*100
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
