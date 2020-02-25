@@ -33,7 +33,7 @@ if __name__ == '__main__':
     lambda_tv = 1e-4
     rho_penalty = lambda_tv*100
     use_uncertainty = False
-    passSigmoid = False
+    passSigmoid = True
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True

@@ -157,6 +157,10 @@ def fft_shift_row(image, nrows):
     return torch.cat((image[:, :, nrows//2:nrows, ...], image[:, :, 0:nrows//2, ...]), dim=2)
 
 
+def fft_shift_col(image, ncols):
+    return torch.cat((image[:, :, :, ncols//2:ncols, ...], image[:, :, :, 0:ncols//2, ...]), dim=3)
+
+
 def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
 
     img = np.asarray(img)

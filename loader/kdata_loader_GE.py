@@ -12,7 +12,8 @@ class kdata_loader_GE(data.Dataset):
     folderMatcher = {
         'T1': '/Total_slices_T1/',
         'T2': '/Total_slices_T2/', 
-        'T2FLAIR': '/Total_slices_T2FLAIR/'
+        'T2FLAIR': '/Total_slices_T2FLAIR/',
+        'CardiacQSM': '/Total_slices_CardiacQSM/'
     }
 
     dataRangeT1 = {
@@ -34,6 +35,13 @@ class kdata_loader_GE(data.Dataset):
    #      'val': ['1000', '1100'],
    #      'test': ['1000', '1100']
    #  }
+    
+    dataRangeCardiac = {
+        'train': ['0', '90'],   
+        'val': ['90', '108'],
+        # 'test': ['108', '126']
+        'test': ['120', '121']
+    }
 
 
     def __init__(self,
@@ -50,11 +58,14 @@ class kdata_loader_GE(data.Dataset):
         if contrast == 'T1':
             self.startIdx = int(self.dataRangeT1[split][0])
             self.endIdx = int(self.dataRangeT1[split][1])
-        else:
+        elif contrast == 'T2':
             self.startIdx = int(self.dataRangeT2[split][0])
             self.endIdx = int(self.dataRangeT2[split][1])
-        self.nsamples = self.endIdx - self.startIdx
+        elif contrast == 'CardiacQSM':
+            self.startIdx = int(self.dataRangeCardiac[split][0])
+            self.endIdx = int(self.dataRangeCardiac[split][1])
 
+        self.nsamples = self.endIdx - self.startIdx
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
         self.augSize = len(self.augmentations)
