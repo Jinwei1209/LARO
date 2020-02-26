@@ -79,11 +79,12 @@ class ResBlock2(nn.Module):
             self.stride, 
             self.padding)
         )
-        if self.use_norm == 1:
-            layers.append(nn.BatchNorm2d(output_dim))
-        elif self.use_norm == 2:
-            layers.append(nn.GroupNorm(output_dim, output_dim))
-        layers.append(nn.ReLU(inplace=True))
+        if input_dim <= output_dim:
+            if self.use_norm == 1:
+                layers.append(nn.BatchNorm2d(output_dim))
+            elif self.use_norm == 2:
+                layers.append(nn.GroupNorm(output_dim, output_dim))
+            layers.append(nn.ReLU(inplace=True))
         basicBlock = nn.Sequential(*layers)
         basicBlock.apply(init_weights)
         return basicBlock
@@ -98,6 +99,7 @@ class ResBlock2(nn.Module):
 
     def forward(self, x):
         # identity = self.img2latent(x.contiguous())
+        x_start = x
         x = self.basicBlock1(x)
         # x = out + identity
 
@@ -116,5 +118,5 @@ class ResBlock2(nn.Module):
         # identity = self.latent2img(x.contiguous())
         x = self.basicBlock5(x)
         # x = out + identity
-        return x
+        return x_start - x
 
