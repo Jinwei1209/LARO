@@ -13,7 +13,8 @@ class kdata_loader_GE(data.Dataset):
         'T1': '/Total_slices_T1/',
         'T2': '/Total_slices_T2/', 
         'T2FLAIR': '/Total_slices_T2FLAIR/',
-        'CardiacQSM': '/Total_slices_CardiacQSM/'
+        'CardiacQSM': '/Total_slices_CardiacQSM/',
+        'CardiacSub6': '/Total_slices_multi_echo_sub6/'
     }
 
     dataRangeT1 = {
@@ -30,17 +31,23 @@ class kdata_loader_GE(data.Dataset):
         'test': ['450', '451']
     }
 
-   #  dataRangeT2 = {
-   #      'train': ['1000', '1100'],   
-   #      'val': ['1000', '1100'],
-   #      'test': ['1000', '1100']
-   #  }
+    # # for the phantom study
+    # dataRangeT2 = {
+    #     'train': ['1000', '1100'],   
+    #     'val': ['1000', '1100'],
+    #     'test': ['1000', '1100']
+    # }
     
     dataRangeCardiac = {
         'train': ['0', '90'],   
         'val': ['90', '108'],
         # 'test': ['108', '126']
-        'test': ['120', '121']
+        'test': ['98', '99']
+    }
+
+    # for cardiac sub6 with multi-echo data
+    dataRangeCardiacSub6 = {
+        'test': ['0', '90']
     }
 
 
@@ -64,6 +71,9 @@ class kdata_loader_GE(data.Dataset):
         elif contrast == 'CardiacQSM':
             self.startIdx = int(self.dataRangeCardiac[split][0])
             self.endIdx = int(self.dataRangeCardiac[split][1])
+        elif contrast == 'CardiacSub6':
+            self.startIdx = int(self.dataRangeCardiacSub6[split][0])
+            self.endIdx = int(self.dataRangeCardiacSub6[split][1])
 
         self.nsamples = self.endIdx - self.startIdx
         self.augmentations = augmentations

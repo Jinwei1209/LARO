@@ -85,12 +85,13 @@ class DC_ST_Pmask(nn.Module):
         elif flag_solver == -2:
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         elif -2 < flag_solver < 1:
-            self.resnet_block = []
-            layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
-            for layer in layers:
-                self.resnet_block.append(layer)
-            self.resnet_block = nn.Sequential(*self.resnet_block)
-            self.resnet_block.apply(init_weights)
+            # self.resnet_block = []
+            # layers = ResBlock(input_channels, filter_channels, use_norm=2, unc_map=unc_map)
+            # for layer in layers:
+            #     self.resnet_block.append(layer)
+            # self.resnet_block = nn.Sequential(*self.resnet_block)
+            # self.resnet_block.apply(init_weights)
+            self.resnet_block = ResBlock2(input_channels, filter_channels, use_norm=2)
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         elif flag_solver == 1:
             self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=True)

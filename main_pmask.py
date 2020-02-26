@@ -33,7 +33,7 @@ if __name__ == '__main__':
     lambda_tv = 1e-4
     rho_penalty = lambda_tv*100
     use_uncertainty = False
-    passSigmoid = True
+    passSigmoid = False
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True
@@ -52,22 +52,22 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
 
-    # pre-occupy the memory
-    total, used = os.popen(
-        '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
-            ).read().split('\n')[int(opt['gpu_id'])].split(',')
+    # # pre-occupy the memory
+    # total, used = os.popen(
+    #     '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
+    #         ).read().split('\n')[int(opt['gpu_id'])].split(',')
     
-    total = int(total)
-    used = int(used)
+    # total = int(total)
+    # used = int(used)
 
-    print('Total memory is {0} MB'.format(total))
-    print('Used memory is {0} MB'.format(used))
+    # print('Total memory is {0} MB'.format(total))
+    # print('Used memory is {0} MB'.format(used))
 
-    max_mem = int(total*0.8)
-    block_mem = max_mem - used
+    # max_mem = int(total*0.8)
+    # block_mem = max_mem - used
     
-    x = torch.rand((256, 1024, block_mem)).cuda()
-    x = torch.rand((2, 2)).cuda()
+    # x = torch.rand((256, 1024, block_mem)).cuda()
+    # x = torch.rand((2, 2)).cuda()
 
     # start here
     t0 = time.time()

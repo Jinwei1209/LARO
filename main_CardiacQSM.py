@@ -22,6 +22,7 @@ from models.dc_with_straight_through_pmask import *
 from models.dc_st_pmask import *
 from models.resnet_with_dc import *
 from utils.test import *
+from utils.operators import *
 
 if __name__ == '__main__':
 
@@ -44,6 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=0)  # 0 for training, 1 for testing, 2 for FINE.
     parser.add_argument('--flag_model', type=int, default=0)  # 0 for Unet, 1 for MoDL.
+    parser.add_argument('--lambda_tv', type=int, default=1)  # 0 for Unet, 1 for MoDL.
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -197,7 +199,7 @@ if __name__ == '__main__':
                     torch.save(netG_dc.state_dict(), rootName+'/weights/weight_CardiacQSM_MoDL.pt')
     
 
-    # for Unet test
+    # for test
     if opt['flag_train'] == 1:
         if opt['flag_model'] == 0:
             netG_dc = Unet(
@@ -205,6 +207,7 @@ if __name__ == '__main__':
                 output_channels=2, 
                 num_filters=[2**i for i in range(5, 10)]
             )
+            weights_dict = torch.load(rootName+'/weights/weight_CardiacQSM.pt')
         elif opt['flag_model'] == 1:
             netG_dc = Resnet_with_DC(
                 input_channels=2,
@@ -212,8 +215,8 @@ if __name__ == '__main__':
                 lambda_dll2=0.001,
                 K=5
             )
+            weights_dict = torch.load(rootName+'/weights/weight_CardiacQSM_MoDL.pt')
         netG_dc.to(device)
-        weights_dict = torch.load(rootName+'/weights/weight_CardiacQSM.pt')
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
 
@@ -223,7 +226,7 @@ if __name__ == '__main__':
 
         dataLoader_test = kdata_loader_GE(
         rootDir=rootName,
-        contrast='CardiacQSM', 
+        contrast='CardiacSub6', 
         split='test'
         )
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
@@ -255,20 +258,31 @@ if __name__ == '__main__':
         Recons = np.transpose(Recons, [1,2,0])
 
         adict = {}
+        Inputs = np.concatenate((Inputs[:, :, 0:18, np.newaxis], Inputs[:, :, 18:36, np.newaxis], 
+                                Inputs[:, :, 36:54, np.newaxis], Inputs[:, :, 54:72, np.newaxis],
+                                Inputs[:, :, 72:90, np.newaxis]), axis=-1)
         adict['Inputs'] = Inputs
         sio.savemat(rootName+'/results/Inputs_CardiacQSM.mat', adict)
 
         adict = {}
+        Targets = np.concatenate((Targets[:, :, 0:18, np.newaxis], Targets[:, :, 18:36, np.newaxis], 
+                                Targets[:, :, 36:54, np.newaxis], Targets[:, :, 54:72, np.newaxis],
+                                Targets[:, :, 72:90, np.newaxis]), axis=-1)
         adict['Targets'] = Targets
         sio.savemat(rootName+'/results/Targets_CardiacQSM.mat', adict)
 
         adict = {}
+        Recons = np.concatenate((Recons[:, :, 0:18, np.newaxis], Recons[:, :, 18:36, np.newaxis], 
+                                Recons[:, :, 36:54, np.newaxis], Recons[:, :, 54:72, np.newaxis],
+                                Recons[:, :, 72:90, np.newaxis]), axis=-1)
         adict['Recons'] = Recons
         sio.savemat(rootName+'/results/Recons_CardiacQSM.mat', adict)
+
 
     # for Unet FINE
     if opt['flag_train'] == 2:
         lossl2 = lossL2()
+        lambda_tv = opt['lambda_tv']
 
         netG_dc = Unet(
             input_channels=2, 
@@ -281,18 +295,18 @@ if __name__ == '__main__':
         netG_dc.eval()
 
         Kunders = []
-        FINEs = []
 
         dataLoader_test = kdata_loader_GE(
             rootDir=rootName,
-            contrast='CardiacQSM', 
+            contrast='CardiacSub6', 
             split='test'
         )
-        testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
+        testLoader = data.DataLoader(dataLoader_test, batch_size=1, shuffle=False)
 
         # optimizer
         optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
 
+        FINEs_all = []
         for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
 
             kdatas = kdatas.to(device)
@@ -300,7 +314,8 @@ if __name__ == '__main__':
             csms = csms.to(device)
             brain_masks = brain_masks.to(device)
 
-            for i in range(1000):
+            FINEs = []
+            for i in range(200):
 
                 optimizerG_dc.zero_grad()
 
@@ -309,22 +324,40 @@ if __name__ == '__main__':
                 K_measured = cplx_mlpy(kdatas, masks)
                 kunder = forward_CardiacQSM(X, csms, masks, flip)
                 kspace_loss = lossl2(K_measured, kunder)
+                tv_loss = lambda_tv * torch.mean(abs(gradient(X)))
+                total_loss = kspace_loss + tv_loss
 
-                kspace_loss.backward()
+                total_loss.backward()
 
                 optimizerG_dc.step()
                 
-                if i % 10 == 0:
-                    print('Fidelity loss: {0}'.format(kspace_loss.item()))
+                if i % 5 == 0:
+                    print('Fidelity loss: {0}, TV loss: {1}, Idx: {2}'.format(
+                           kspace_loss.item(), tv_loss.item(), idx))
                     FINEs.append(X.cpu().detach())
 
             FINEs = r2c(np.concatenate(FINEs, axis=0))
-            print(FINEs.shape)
-            FINEs = np.transpose(FINEs, [1,2,0])
+            FINEs = np.transpose(FINEs, [1, 2, 0])
 
-            adict = {}
-            adict['FINEs'] = FINEs
-            sio.savemat(rootName+'/results/FINEs_CardiacQSM.mat', adict)
+            # adict = {}
+            # adict['FINEs'] = FINEs
+            # sio.savemat(rootName+'/results/FINEs_CardiacQSM.mat', adict)
+
+            FINEs_all.append(FINEs[np.newaxis, ...])
+
+        FINEs_all = np.concatenate(FINEs_all, axis=0)
+        FINEs_all = np.transpose(FINEs_all, [1, 2, 3, 0])
+        print(FINEs_all.shape)
+        FINEs_all = np.concatenate((FINEs_all[:, :, :, 0:18, np.newaxis],  FINEs_all[:, :, :, 18:36, np.newaxis], 
+                                    FINEs_all[:, :, :, 36:54, np.newaxis], FINEs_all[:, :, :, 54:72, np.newaxis],
+                                    FINEs_all[:, :, :, 72:90, np.newaxis]), axis=-1)
+        FINEs_all = np.transpose(FINEs_all, [0, 1, 3, 4, 2])
+
+        adict = {}
+        adict['FINEs_all'] = FINEs_all
+        sio.savemat(rootName+'/results/FINEs_all_CardiacQSM_tv={0}.mat'.format(lambda_tv), adict)
+
+
 
 
 
