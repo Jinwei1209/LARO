@@ -60,14 +60,14 @@ class ResBlock2(nn.Module):
         self.use_norm = use_norm
 
         self.basicBlock1 = self._basicBlock(self.input_dim, self.filter_dim)
-        self.img2latent = self._conv2d(self.input_dim, self.filter_dim)
+        # self.img2latent = self._conv2d(self.input_dim, self.filter_dim)
 
         self.basicBlock2 = self._basicBlock(self.filter_dim, self.filter_dim)
         self.basicBlock3 = self._basicBlock(self.filter_dim, self.filter_dim)
         self.basicBlock4 = self._basicBlock(self.filter_dim, self.filter_dim)
 
         self.basicBlock5 = self._basicBlock(self.filter_dim, self.input_dim)
-        self.latent2img = self._conv2d(self.filter_dim, self.input_dim)
+        # self.latent2img = self._conv2d(self.filter_dim, self.input_dim)
 
 
     def _basicBlock(self, input_dim, output_dim):
@@ -86,7 +86,7 @@ class ResBlock2(nn.Module):
                 layers.append(nn.GroupNorm(output_dim, output_dim))
             layers.append(nn.ReLU(inplace=True))
         else:
-            layers.append(nn.Conv2d(input_dim, output_dim, 1))
+            layers.append(nn.Conv2d(input_dim, output_dim, 5, 1, 2))
         basicBlock = nn.Sequential(*layers)
         basicBlock.apply(init_weights)
         return basicBlock
@@ -100,9 +100,9 @@ class ResBlock2(nn.Module):
 
 
     def forward(self, x):
-        identity = self.img2latent(x)
-        out = self.basicBlock1(x)
-        x = out + identity
+        # identity = self.img2latent(x)
+        x = self.basicBlock1(x)
+        # x = out + identity
 
         identity = x
         out = self.basicBlock2(x)
@@ -116,8 +116,8 @@ class ResBlock2(nn.Module):
         out = self.basicBlock4(x)
         x = out + identity
 
-        identity = self.latent2img(x)
-        out = self.basicBlock5(x)
-        x = out + identity
+        # identity = self.latent2img(x)
+        x = self.basicBlock5(x)
+        # x = out + identity
         return x
 
