@@ -128,7 +128,7 @@ if __name__ == '__main__':
 
     netG_dc = DC_ST_Pmask(
         input_channels=2, 
-        filter_channels=32, 
+        filter_channels=8, 
         lambda_dll2=lambda_dll2,
         lambda_tv=lambda_tv,
         rho_penalty=rho_penalty,
