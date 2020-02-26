@@ -99,7 +99,6 @@ class ResBlock2(nn.Module):
 
     def forward(self, x):
         # identity = self.img2latent(x.contiguous())
-        x_start = x
         x = self.basicBlock1(x)
         # x = out + identity
 
@@ -118,5 +117,5 @@ class ResBlock2(nn.Module):
         # identity = self.latent2img(x.contiguous())
         x = self.basicBlock5(x)
         # x = out + identity
-        return x_start - x
+        return x
 
