@@ -45,13 +45,13 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=0)  # 0 for training, 1 for testing, 2 for FINE.
     parser.add_argument('--flag_model', type=int, default=0)  # 0 for Unet, 1 for MoDL.
-    parser.add_argument('--lambda_tv', type=int, default=1)  # 0 for Unet, 1 for MoDL.
+    parser.add_argument('--lambda_tv', type=float, default=1)  # 0 for Unet, 1 for MoDL.
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/T2_slice_recon_GE'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+ 
     # load mask
     masks = load_mat(rootName+'/Total_slices_CardiacQSM/Mask_CardiacQSM.mat', 'Mask')  # LOUPE/VD/Adjoint
     masks = masks[np.newaxis, ..., np.newaxis]
@@ -289,8 +289,8 @@ if __name__ == '__main__':
             output_channels=2, 
             num_filters=[2**i for i in range(5, 10)]
         )
-        netG_dc.to(device)
         weights_dict = torch.load(rootName+'/weights/weight_CardiacQSM.pt')
+        netG_dc.to(device)
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
 
@@ -301,10 +301,10 @@ if __name__ == '__main__':
             contrast='CardiacSub6', 
             split='test'
         )
-        testLoader = data.DataLoader(dataLoader_test, batch_size=1, shuffle=False)
+        testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
         # optimizer
-        optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
+        optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=1e-4, betas=(0.9, 0.999))
 
         FINEs_all = []
         for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
@@ -315,7 +315,7 @@ if __name__ == '__main__':
             brain_masks = brain_masks.to(device)
 
             FINEs = []
-            for i in range(200):
+            for i in range(200):  # 200
 
                 optimizerG_dc.zero_grad()
 
@@ -331,19 +331,21 @@ if __name__ == '__main__':
 
                 optimizerG_dc.step()
                 
-                if i % 5 == 0:
+                if i % 5 == 0:  # 5
                     print('Fidelity loss: {0}, TV loss: {1}, Idx: {2}'.format(
                            kspace_loss.item(), tv_loss.item(), idx))
-                    FINEs.append(X.cpu().detach())
+                    FINEs.append(X.cpu().detach()[np.newaxis, ...])
 
-            FINEs = r2c(np.concatenate(FINEs, axis=0))
-            FINEs = np.transpose(FINEs, [1, 2, 0])
+            FINEs = np.concatenate(FINEs, axis=0)
+            FINEs = np.transpose(FINEs, [1, 2, 3, 4, 0])
+            FINEs = r2c(FINEs)
+            print(FINEs.shape)
 
             # adict = {}
             # adict['FINEs'] = FINEs
             # sio.savemat(rootName+'/results/FINEs_CardiacQSM.mat', adict)
 
-            FINEs_all.append(FINEs[np.newaxis, ...])
+            FINEs_all.append(FINEs)
 
         FINEs_all = np.concatenate(FINEs_all, axis=0)
         FINEs_all = np.transpose(FINEs_all, [1, 2, 3, 0])

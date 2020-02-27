@@ -108,6 +108,14 @@ class DC_ST_Pmask(nn.Module):
         le = (r<=1).to(device, dtype=torch.float32)
         return le * Pmask * r + (1-le) * (1 - (1-Pmask) * beta)
 
+    # def rescalePmask2(self, Pmask, samplingRatio):
+    #     idx = 0
+    #     while torch.mean(Pmask) > samplingRatio:
+    #         Pmask = Pmask**1.1
+    #         idx += 1
+    #         # print(idx)
+    #     return Pmask
+
     def samplingPmask(self, Pmask_rescaled, flag_ND):
         if flag_ND == 0:
             Mask1D = bernoulliSample.apply(Pmask_rescaled)

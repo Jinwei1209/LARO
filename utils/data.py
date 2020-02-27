@@ -192,7 +192,6 @@ class Logger():
 
     def __init__(
         self, 
-        logName, 
         rootName,
         opt, 
         flagFrint=True, 
@@ -202,8 +201,8 @@ class Logger():
         self.flagFrint = flagFrint
         self.flagSave = flagSave
 
-        self.logName = logName
-        self.rootName = rootName
+        self.logName = 'logs'
+        self.rootName = os.path.join(rootName, opt['weight_dir'])
 
         K = opt['K']
         flag_ND = opt['flag_ND']

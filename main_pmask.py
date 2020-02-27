@@ -41,6 +41,7 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
+    parser.add_argument('--weight_dir', type=str, default='weights_new')
     parser.add_argument('--flag_ND', type=int, default=3)
     parser.add_argument('--flag_solver', type=int, default=0)
     parser.add_argument('--flag_TV', type=int, default=1)
@@ -88,7 +89,7 @@ if __name__ == '__main__':
     #     contrast=opt['contrast'], 
     #     split='train'
     #     )
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
+    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=16)
 
     dataLoader_val = kdata_loader_GE(
         rootDir=rootName,
@@ -100,7 +101,7 @@ if __name__ == '__main__':
     #     contrast=opt['contrast'], 
     #     split='val'
     #     )
-    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
+    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=16)
     
     # netG_dc = DC_with_Prop_Mask(
     #     input_channels=2, 
@@ -158,7 +159,7 @@ if __name__ == '__main__':
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
 
     # logger
-    logger = Logger('logs', rootName, opt)
+    logger = Logger(rootName, opt)
     
     while epoch < niter:
         epoch += 1 
@@ -263,6 +264,6 @@ if __name__ == '__main__':
 
         # save weights
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
-                                                        opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
+                       opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
 

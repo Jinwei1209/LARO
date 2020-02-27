@@ -87,6 +87,19 @@ class ResBlock2(nn.Module):
             layers.append(nn.ReLU(inplace=True))
         else:
             layers.append(nn.Conv2d(input_dim, output_dim, 1))
+        # else:
+        #     layers.append(nn.Conv2d(
+        #         input_dim, 
+        #         output_dim, 
+        #         self.kernel_size, 
+        #         self.stride, 
+        #         self.padding)
+        #     )
+        #     if self.use_norm == 1:
+        #         layers.append(nn.BatchNorm2d(output_dim))
+        #     elif self.use_norm == 2:
+        #         layers.append(nn.GroupNorm(output_dim, output_dim))
+        #     layers.append(nn.ReLU(inplace=True))
         basicBlock = nn.Sequential(*layers)
         basicBlock.apply(init_weights)
         return basicBlock
