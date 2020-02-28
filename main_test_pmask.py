@@ -28,8 +28,8 @@ if __name__ == '__main__':
     niter = 1000
     batch_size = 1
     display_iters = 10
-    lambda_dll2 = 1e-4
-    lambda_tv = 1e-4
+    lambda_dll2 = 1e-4  # 1e-4 as default
+    lambda_tv = 1e-4  # 1e-4 as default
     rho_penalty = lambda_tv*100  # 2 as previous default, 100 current best
     use_uncertainty = False
     passSigmoid = False
@@ -84,6 +84,7 @@ if __name__ == '__main__':
         ncoil=32
     )
     netG_dc.to(device)
+    print(netG_dc)
     weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
                               opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
     if opt['flag_solver'] == -3:
@@ -140,7 +141,7 @@ if __name__ == '__main__':
     # Display the output images
     plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, np.amax(Pmask)))
     plt.clf()
-    plot(Mask)
+    plot(Pmask)
     plt.axis('off')
     plt.title('Solver = {0}, TV = {1}'.format(opt['flag_solver'], opt['flag_TV']))
     plt.show()

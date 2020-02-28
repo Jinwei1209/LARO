@@ -29,14 +29,15 @@ if __name__ == '__main__':
     niter = 500
     batch_size = 1
     display_iters = 10
-    lambda_dll2 = 1e-4
-    lambda_tv = 1e-4
+    lambda_dll2 = 2e-4
+    lambda_tv = 2e-4
     rho_penalty = lambda_tv*100
     use_uncertainty = False
-    passSigmoid = True
+    passSigmoid = False
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True
+    flag_save_pmask = 0
 
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
@@ -129,7 +130,7 @@ if __name__ == '__main__':
 
     netG_dc = DC_ST_Pmask(
         input_channels=2, 
-        filter_channels=8, 
+        filter_channels=32, 
         lambda_dll2=lambda_dll2,
         lambda_tv=lambda_tv,
         rho_penalty=rho_penalty,
@@ -266,4 +267,30 @@ if __name__ == '__main__':
         if Validation_loss[-1] == min(Validation_loss):
             torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
                        opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+        
+        # save weights on 30%
+        if torch.mean(netG_dc.Pmask) < 0.30 and flag_save_pmask == 0:
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.30.pt'.format(
+                       opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+            flag_save_pmask += 1
+        # save weights on 30%
+        if torch.mean(netG_dc.Pmask) < 0.29 and flag_save_pmask == 1:
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.29.pt'.format(
+                       opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+            flag_save_pmask += 1
+        # save weights on 30%
+        if torch.mean(netG_dc.Pmask) < 0.28 and flag_save_pmask == 2:
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.28.pt'.format(
+                       opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+            flag_save_pmask += 1
+        # save weights on 30%
+        if torch.mean(netG_dc.Pmask) < 0.27 and flag_save_pmask == 3:
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.27.pt'.format(
+                       opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+            flag_save_pmask += 1
+        # save weights on 30%
+        if torch.mean(netG_dc.Pmask) < 0.26 and flag_save_pmask == 4:
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.26.pt'.format(
+                       opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+            flag_save_pmask += 1
 
