@@ -40,6 +40,7 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
+    parser.add_argument('--weight_dir', type=str, default='weights_new')
     parser.add_argument('--flag_ND', type=int, default=3)
     parser.add_argument('--flag_solver', type=int, default=0)
     parser.add_argument('--flag_TV', type=int, default=1)
@@ -83,8 +84,8 @@ if __name__ == '__main__':
         ncoil=32
     )
     netG_dc.to(device)
-    weights_dict = torch.load(rootName+'/weights/Solver={0}_K={1}_flag_ND={2}_ratio={3}.pt'.format(
-                              opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+    weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
+                              opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
     if opt['flag_solver'] == -3:
         weights_dict['lambda_dll2'] = (torch.ones(1)*lambda_dll2).to(device)
         print('Lambda_dll2={0}'.format(netG_dc.lambda_dll2))
@@ -120,7 +121,8 @@ if __name__ == '__main__':
 
             adict = {}
             Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
-            Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
+            Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
+            Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
             adict['Pmask'] = Pmask
             sio.savemat(rootName+'/results/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
                         opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
@@ -136,9 +138,9 @@ if __name__ == '__main__':
                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
     # Display the output images
-    plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, .6))
+    plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, np.amax(Pmask)))
     plt.clf()
-    plot(Recons)
+    plot(Mask)
     plt.axis('off')
     plt.title('Solver = {0}, TV = {1}'.format(opt['flag_solver'], opt['flag_TV']))
     plt.show()

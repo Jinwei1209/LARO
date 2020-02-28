@@ -33,7 +33,7 @@ if __name__ == '__main__':
     lambda_tv = 1e-4
     rho_penalty = lambda_tv*100
     use_uncertainty = False
-    passSigmoid = False
+    passSigmoid = True
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     #     contrast=opt['contrast'], 
     #     split='train'
     #     )
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=16)
+    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
     dataLoader_val = kdata_loader_GE(
         rootDir=rootName,
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     #     contrast=opt['contrast'], 
     #     split='val'
     #     )
-    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=16)
+    valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
     
     # netG_dc = DC_with_Prop_Mask(
     #     input_channels=2, 
@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
     netG_dc = DC_ST_Pmask(
         input_channels=2, 
-        filter_channels=32, 
+        filter_channels=8, 
         lambda_dll2=lambda_dll2,
         lambda_tv=lambda_tv,
         rho_penalty=rho_penalty,
