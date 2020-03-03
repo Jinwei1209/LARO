@@ -28,7 +28,7 @@ if __name__ == '__main__':
     niter = 1000
     batch_size = 1
     display_iters = 10
-    lambda_dll2 = 1e-4  # 1e-4 as default
+    lambda_dll2 = 1e-4  # 1e-4 as default, 1e-5 best
     lambda_tv = 1e-4  # 1e-4 as default
     rho_penalty = lambda_tv*100  # 2 as previous default, 100 current best
     use_uncertainty = False
@@ -112,6 +112,7 @@ if __name__ == '__main__':
         Recons.append(Xs[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
         if idx == 0:
+            print('Pmask: {}, \n'.format(torch.mean(netG_dc.Pmask)))
             print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
             adict = {}
             Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))

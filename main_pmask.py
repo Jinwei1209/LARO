@@ -29,8 +29,8 @@ if __name__ == '__main__':
     niter = 500
     batch_size = 1
     display_iters = 10
-    lambda_dll2 = 2e-4
-    lambda_tv = 2e-4
+    lambda_dll2 = 1e-4
+    lambda_tv = 1e-4
     rho_penalty = lambda_tv*100
     use_uncertainty = False
     passSigmoid = False
@@ -48,7 +48,8 @@ if __name__ == '__main__':
     parser.add_argument('--flag_TV', type=int, default=1)
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
-    parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # 0.1/0.2
+    parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Adjoint
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -144,17 +145,18 @@ if __name__ == '__main__':
         samplingRatio=opt['samplingRatio'],
         nrow=256,
         ncol=192,
-        ncoil=32
+        ncoil=32,
+        flag_fix=opt['flag_fix']
     )
 
     print(netG_dc)
     netG_dc.to(device)
 
-    # # load pre-trained weights with pmask
-    # netG_dc.load_state_dict(torch.load(rootName+'/'+folderName+'/weights/{}'.format(math.floor(samplingRatio*100))+
-    #             '/weights_ratio_pmask={}%_optimal_ST.pt'.format(math.floor(samplingRatio*100))))
-    # netG_dc.eval()
-    # print('Load Pmask weights')
+    # load pre-trained weights with fixed mask
+    if opt['flag_fix']:
+        netG_dc.load_state_dict(torch.load(rootName+
+        '/weights_new/Solver={0}_K=1_flag_ND=3_ratio=0.1.pt'.format(opt['flag_solver'])))
+        print('Load Pmask weights')
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
