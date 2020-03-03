@@ -177,6 +177,7 @@ def netG_dc_train_intermediate(
 
 
 def netG_dc_train_pmask(
+    opt,
     inputs,
     targets,
     csms,
@@ -186,7 +187,6 @@ def netG_dc_train_pmask(
     unc_map,
     lambda_Pmask
 ):
-
     optimizerG_dc.zero_grad()
     if unc_map:
         Xs, Unc_maps = netG_dc(inputs, csms)
@@ -209,11 +209,13 @@ def netG_dc_train_pmask(
         optimizerG_dc.step()
         return lossl2_sum.item(), loss_unc_sum.item(), loss_Pmask.item()
     else:
-        for i in range(len(Xs)):
-            lossl2_sum += lossl1(Xs[i]*brain_masks, targets*brain_masks)
+        if opt['contrast'] == 'T1':
+            for i in range(len(Xs)):
+                lossl2_sum += lossl1(Xs[i]*brain_masks, targets*brain_masks)
+        elif opt['contrast'] == 'T2':
+            for i in range(len(Xs)):
+                lossl2_sum += lossl1(Xs[i], targets)
         # lossl2_sum += lossl1(Xs[-1]*brain_masks, targets*brain_masks)
-        loss_Pmask = lambda_Pmask*torch.mean(netG_dc.Pmask)
-        loss_total = lossl2_sum + loss_Pmask
-        loss_total.backward()
+        lossl2_sum.backward()
         optimizerG_dc.step()
-        return  lossl2_sum.item(), loss_Pmask.item()
+        return  lossl2_sum.item()

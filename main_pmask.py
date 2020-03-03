@@ -79,7 +79,7 @@ if __name__ == '__main__':
     t0 = time.time()
     epoch = 0
     gen_iterations = 1
-    errL2_dc_sum = Pmask_ratio = 0
+    errL2_dc_sum = 0
     PSNRs_val = []
     Validation_loss = []
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -200,14 +200,16 @@ if __name__ == '__main__':
                     print('Average PSNR in Validation dataset is %.2f' 
                     % (np.mean(np.asarray(metrices_val.PSNRs))))
 
-                errL2_dc_sum = Pmask_ratio = 0
+                errL2_dc_sum = 0
             
             inputs = inputs.to(device)
             targets = targets.to(device)
             csms = csms.to(device)
-            brain_masks = brain_masks.to(device)
+            if opt['contrast'] == 'T1':
+                brain_masks = brain_masks.to(device)
 
-            errL2_dc, loss_Pmask = netG_dc_train_pmask(
+            errL2_dc = netG_dc_train_pmask(
+                opt,
                 inputs, 
                 targets, 
                 csms,
@@ -217,12 +219,14 @@ if __name__ == '__main__':
                 use_uncertainty,
                 lambda_Pmask=0
             )
-            errL2_dc_sum += errL2_dc 
-            Pmask_ratio += loss_Pmask
+            errL2_dc_sum += errL2_dc
 
             # calculating metrices
             Xs = netG_dc(inputs, csms)
-            metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
+            if opt['contrast'] == 'T1':
+                metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
+            elif opt['contrast'] == 'T2':
+                metrices_train.get_metrices(Xs[-1], targets)
 
             del(inputs)
             del(targets)
