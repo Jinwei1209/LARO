@@ -218,4 +218,4 @@ def netG_dc_train_pmask(
         # lossl2_sum += lossl1(Xs[-1]*brain_masks, targets*brain_masks)
         lossl2_sum.backward()
         optimizerG_dc.step()
-        return  lossl2_sum.item()
+        return  lossl2_sum.item(), Xs[-1]

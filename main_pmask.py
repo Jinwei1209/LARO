@@ -208,7 +208,7 @@ if __name__ == '__main__':
             if opt['contrast'] == 'T1':
                 brain_masks = brain_masks.to(device)
 
-            errL2_dc = netG_dc_train_pmask(
+            errL2_dc, X = netG_dc_train_pmask(
                 opt,
                 inputs, 
                 targets, 
@@ -222,11 +222,11 @@ if __name__ == '__main__':
             errL2_dc_sum += errL2_dc
 
             # calculating metrices
-            Xs = netG_dc(inputs, csms)
+            # Xs = netG_dc(inputs, csms)
             if opt['contrast'] == 'T1':
-                metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
+                metrices_train.get_metrices(X*brain_masks, targets*brain_masks)
             elif opt['contrast'] == 'T2':
-                metrices_train.get_metrices(Xs[-1], targets)
+                metrices_train.get_metrices(X, targets)
 
             del(inputs)
             del(targets)
