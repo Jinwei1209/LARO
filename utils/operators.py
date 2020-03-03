@@ -36,11 +36,12 @@ class Back_forward():
         # forward
         img_new = img.permute(0, 2, 3, 1)
         img_new = img_new[:, None, ...]  # multiply order matters (in torch implementation)
-        coilImages = cplx_mlpy(self.csm, img_new)
-        coilImages = cplx_mlpy(coilImages, self.flip) # for GE kdata
-        coilImages = fft_shift_row(coilImages, self.nrow) # for GE kdata
-        kspace = torch.fft(coilImages, 2)  
-        temp = cplx_mlpy(kspace, self.mask)
+        # coilImages = cplx_mlpy(self.csm, img_new)
+        # coilImages = cplx_mlpy(coilImages, self.flip) # for GE kdata
+        # coilImages = fft_shift_row(coilImages, self.nrow) # for GE kdata
+        # kspace = torch.fft(coilImages, 2)  
+        # temp = cplx_mlpy(kspace, self.mask)  
+        temp = cplx_mlpy(torch.fft(fft_shift_row(cplx_mlpy(cplx_mlpy(self.csm, img_new), self.flip), self.nrow), 2), self.mask)
         # inverse
         coilImgs = torch.ifft(temp, 2)
         coilImgs = fft_shift_row(coilImgs, self.nrow) # for GE kdata
