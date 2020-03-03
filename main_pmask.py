@@ -1,8 +1,10 @@
+# PYTHON_ARGCOMPLETE_OK
 import os
 import time
 import torch
 import math
 import argparse
+import argcomplete
 import numpy as np
 
 from torch.utils import data
@@ -50,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # 0.1/0.2
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Adjoint
+    argcomplete.autocomplete(parser)
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -220,6 +223,11 @@ if __name__ == '__main__':
             # calculating metrices
             Xs = netG_dc(inputs, csms)
             metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
+
+            del(inputs)
+            del(targets)
+            del(csms)
+            del(brain_masks)
 
             gen_iterations += 1
             

@@ -117,17 +117,9 @@ class ResBlock2(nn.Module):
         x = self.basicBlock1(x)
         # x = out + identity
 
-        identity = x
-        out = self.basicBlock2(x)
-        x = out + identity
-
-        identity = x
-        out = self.basicBlock3(x)
-        x = out + identity
-
-        identity = x
-        out = self.basicBlock4(x)
-        x = out + identity
+        x = self.basicBlock2(x) + x
+        x = self.basicBlock3(x) + x
+        x = self.basicBlock4(x) + x
 
         # identity = self.latent2img(x)
         x = self.basicBlock5(x)
