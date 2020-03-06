@@ -27,8 +27,8 @@ class kdata_loader_GE(data.Dataset):
     dataRangeT2 = {
         'train': ['0', '300'],   
         'val': ['300', '400'],
-        # 'test': ['400', '500']
-        'test': ['450', '451']
+        'test': ['400', '500']
+        # 'test': ['450', '451']
     }
 
     # # for the phantom study

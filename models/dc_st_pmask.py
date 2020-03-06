@@ -208,7 +208,7 @@ class DC_ST_Pmask(nn.Module):
         elif self.flag_fix == 2:
             masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Adjoint
         elif self.flag_fix == 3:
-            masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/Adjoint.mat', 'Mask')  # LOUPE/VD/Adjoint
+            masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/Uniform.mat', 'Mask')  # LOUPE/VD/Adjoint
         if self.flag_fix:
             masks = masks[np.newaxis, ..., np.newaxis]
             masks = torch.tensor(masks, device=device).float()

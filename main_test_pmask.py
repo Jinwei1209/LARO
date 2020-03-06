@@ -47,6 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
+    parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -81,10 +82,11 @@ if __name__ == '__main__':
         samplingRatio=opt['samplingRatio'],
         nrow=256,
         ncol=192,
-        ncoil=32
+        ncoil=32,
+        flag_fix=opt['flag_fix']
     )
     netG_dc.to(device)
-    print(netG_dc)
+    # print(netG_dc)
     weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
                               opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
     if opt['flag_solver'] == -3:
@@ -140,7 +142,8 @@ if __name__ == '__main__':
                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
     # Display the output images
-    plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, np.amax(Pmask)))
+    # plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, np.amax(Pmask)))
+    plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, 0.371))
     plt.clf()
     plot(Pmask)
     plt.axis('off')
