@@ -75,7 +75,7 @@ if __name__ == '__main__':
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
         flag_TV=opt['flag_TV'],
-        K=opt['K'], 
+        K=opt['K']+10,  # +10 for TV
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
