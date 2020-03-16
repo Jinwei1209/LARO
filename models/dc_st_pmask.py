@@ -304,8 +304,10 @@ class DC_ST_Pmask(nn.Module):
                 # update x using CG block
                 rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
                 dc_layer = DC_layer(A, rhs, use_dll2=2)
-                if self.flag_fix > 0:
+                if self.flag_fix == 3:
                     x = dc_layer.CG_iter(max_iter=30)  # 20/30 for test (30 only for uniform mask)
+                elif self.flag_fix > 0:
+                    x = dc_layer.CG_iter(max_iter=20)  # 20/30 for test (30 only for uniform mask)
                 else:
                     x = dc_layer.CG_iter(max_iter=10)  # for training
                 Xs.append(x)

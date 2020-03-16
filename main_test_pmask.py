@@ -50,6 +50,18 @@ if __name__ == '__main__':
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
     opt = {**vars(parser.parse_args())}
 
+    if opt['flag_fix'] == 1:
+        result_dir = '/results_test/results_loupe'
+        opt['weight_dir'] = 'weights_loupe'
+    elif opt['flag_fix'] == 2:
+        result_dir = '/results_test/results_vd'
+        opt['weight_dir'] = 'weights_vd'
+    elif opt['flag_fix'] == 3:
+        result_dir = '/results_test/results_uniform'
+        opt['weight_dir'] = 'weights_uniform'
+    else:
+        result_dir = '/results'
+
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -66,6 +78,11 @@ if __name__ == '__main__':
     #     )
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
+    if opt['flag_solver'] == 0 or -1:
+        K = opt['K']
+    else:
+        K = opt['K'] + 10
+
     netG_dc = DC_ST_Pmask(
         input_channels=2, 
         filter_channels=32, 
@@ -75,7 +92,7 @@ if __name__ == '__main__':
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
         flag_TV=opt['flag_TV'],
-        K=opt['K']+10,  # +10 for TV
+        K=K,  # +10 for TV
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
@@ -113,23 +130,23 @@ if __name__ == '__main__':
         Xs = netG_dc(inputs, csms)
         Recons.append(Xs[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
-        if idx == 0:
-            print('Pmask: {}, \n'.format(torch.mean(netG_dc.Pmask)))
-            print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
-            adict = {}
-            Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
-            Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
-            adict['Mask'] = Mask
-            sio.savemat(rootName+'/results/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
-                        opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+        # if idx == 0:
+        #     print('Pmask: {}, \n'.format(torch.mean(netG_dc.Pmask)))
+        #     print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
+        #     adict = {}
+        #     Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
+        #     Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
+        #     adict['Mask'] = Mask
+        #     sio.savemat(rootName+'/results/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
+        #                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
-            adict = {}
-            Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
-            Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
-            Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
-            adict['Pmask'] = Pmask
-            sio.savemat(rootName+'/results/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
-                        opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+        #     adict = {}
+        #     Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
+        #     Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
+        #     Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
+        #     adict['Pmask'] = Pmask
+        #     sio.savemat(rootName+'/results/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
+        #                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
     print(np.mean(np.asarray(metrices_test.PSNRs)))
     Recons = np.concatenate(Recons, axis=0)
@@ -138,17 +155,17 @@ if __name__ == '__main__':
 
     adict = {}
     adict['Recons'] = Recons
-    sio.savemat(rootName+'/results/Recons_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
+    sio.savemat(rootName+result_dir+'/Recons_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
-    # Display the output images
-    # plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, np.amax(Pmask)))
-    plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, 0.371))
-    plt.clf()
-    plot(Pmask)
-    plt.axis('off')
-    plt.title('Solver = {0}, TV = {1}'.format(opt['flag_solver'], opt['flag_TV']))
-    plt.show()
+    # # Display the output images
+    # # plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, np.amax(Pmask)))
+    # plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, 0.371))
+    # plt.clf()
+    # plot(Pmask)
+    # plt.axis('off')
+    # plt.title('Solver = {0}, TV = {1}'.format(opt['flag_solver'], opt['flag_TV']))
+    # plt.show()
 
 
 
