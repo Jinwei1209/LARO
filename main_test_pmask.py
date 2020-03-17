@@ -130,23 +130,21 @@ if __name__ == '__main__':
         Xs = netG_dc(inputs, csms)
         Recons.append(Xs[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
-        # if idx == 0:
-        #     print('Pmask: {}, \n'.format(torch.mean(netG_dc.Pmask)))
-        #     print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
-        #     adict = {}
-        #     Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
-        #     Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
-        #     adict['Mask'] = Mask
-        #     sio.savemat(rootName+'/results/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
-        #                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+        if idx == 0:
+            print('Pmask: {}, \n'.format(torch.mean(netG_dc.Pmask)))
+            print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
+            adict = {}
+            Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
+            Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
+            adict['Mask'] = Mask
+            sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
-        #     adict = {}
-        #     Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
-        #     Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
-        #     Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
-        #     adict['Pmask'] = Pmask
-        #     sio.savemat(rootName+'/results/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
-        #                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+            adict = {}
+            Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
+            Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
+            Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
+            adict['Pmask'] = Pmask
+            sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
     print(np.mean(np.asarray(metrices_test.PSNRs)))
     Recons = np.concatenate(Recons, axis=0)
