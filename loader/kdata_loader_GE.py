@@ -17,12 +17,19 @@ class kdata_loader_GE(data.Dataset):
         'CardiacSub6': '/Total_slices_multi_echo_sub6/'
     }
 
+    # dataRangeT1 = {
+    #     # 'train': ['150', '1200'],
+    #     'train': ['150', '600'],   
+    #     'val': ['1200', '1350'],  # 1200 1350
+    #     'test': ['1350', '1650']  # 1350 1650
+    #     # 'test': ['1400', '1401']
+    # }
+
     dataRangeT1 = {
-        # 'train': ['150', '1200'],
-        'train': ['150', '600'],   
-        'val': ['1200', '1350'],  # 1200 1350
-        'test': ['1350', '1650']  # 1350 1650
-        # 'test': ['1400', '1401']
+        'train': ['0', '300'],   
+        'val': ['300', '400'],
+        'test': ['400', '600']
+        # 'test': ['440', '441']
     }
 
     dataRangeT2 = {
@@ -111,10 +118,11 @@ class kdata_loader_GE(data.Dataset):
         kdata = np.transpose(kdata, (2, 0, 1))
         kdata = c2r_kdata(kdata)
         if self.contrast == 'T1':
-            tmp = load_mat(self.dataFD + 'brain_mask_slice_%d.mat' %(idx), 'brain_mask_slice')
-            brain_mask = np.zeros(org.shape, dtype=np.float32)
-            brain_mask[0, ...] = tmp
-            brain_mask[1, ...] = tmp 
+            # tmp = load_mat(self.dataFD + 'brain_mask_slice_%d.mat' %(idx), 'brain_mask_slice')
+            # brain_mask = np.zeros(org.shape, dtype=np.float32)
+            # brain_mask[0, ...] = tmp
+            # brain_mask[1, ...] = tmp
+            brain_mask = np.ones(org.shape, dtype=np.float32) 
         else:
             brain_mask = np.ones(org.shape, dtype=np.float32)
         return kdata, org, csm, brain_mask

@@ -149,7 +149,8 @@ if __name__ == '__main__':
         nrow=256,
         ncol=192,
         ncoil=32,
-        flag_fix=opt['flag_fix']
+        flag_fix=opt['flag_fix'],
+        contrast=opt['contrast']
     )
 
     print(netG_dc)

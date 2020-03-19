@@ -44,7 +44,8 @@ class DC_ST_Pmask(nn.Module):
         stochasticSampling=True,
         rescale=False,
         samplingRatio=0.1, # sparsity level of the sampling mask
-        flag_fix=0  # 0 not fix, 1 LOUPE, 2 VD, 3 Adjoint
+        flag_fix=0,  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
+        contrast='T2'
     ):
         super(DC_ST_Pmask, self).__init__()
         self.K = K
@@ -61,6 +62,7 @@ class DC_ST_Pmask(nn.Module):
         self.rescale = rescale
         self.samplingRatio = samplingRatio
         self.flag_fix = flag_fix
+        self.contrast = contrast
         # flag for sampling pattern designs
         if flag_ND == 0:
             temp = (torch.rand(nrow)-0.5)*30
@@ -204,11 +206,11 @@ class DC_ST_Pmask(nn.Module):
         # masks = torch.cat((masks[:, :, self.ncol//2:self.ncol, :], masks[:, :, 0:self.ncol//2, :]), dim=2)
         # load fixed mask
         if self.flag_fix == 1:
-            masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/LOUPE.mat', 'Mask')  # LOUPE/VD/Adjoint
+            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/LOUPE.mat', 'Mask')  # LOUPE/VD/Adjoint
         elif self.flag_fix == 2:
-            masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Adjoint
+            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Adjoint
         elif self.flag_fix == 3:
-            masks = load_mat('/data/Jinwei/T2_slice_recon_GE/Fixed_masks/Uniform.mat', 'Mask')  # LOUPE/VD/Adjoint
+            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/Uniform.mat', 'Mask')  # LOUPE/VD/Adjoint
         if self.flag_fix:
             masks = masks[np.newaxis, ..., np.newaxis]
             masks = torch.tensor(masks, device=device).float()

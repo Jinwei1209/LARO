@@ -92,7 +92,7 @@ if __name__ == '__main__':
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
         flag_TV=opt['flag_TV'],
-        K=K,  # +10 for TV
+        K=K+15,  # +10 for TV
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,
@@ -100,7 +100,8 @@ if __name__ == '__main__':
         nrow=256,
         ncol=192,
         ncoil=32,
-        flag_fix=opt['flag_fix']
+        flag_fix=opt['flag_fix'],
+        contrast=opt['contrast']
     )
     netG_dc.to(device)
     # print(netG_dc)
@@ -135,14 +136,16 @@ if __name__ == '__main__':
             print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
             adict = {}
             Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
-            Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
+            # Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
+            Mask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = 1
             adict['Mask'] = Mask
             sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
             adict = {}
             Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
             Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
-            Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
+            # Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
+            Pmask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = np.amax(Pmask)
             adict['Pmask'] = Pmask
             sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
 
