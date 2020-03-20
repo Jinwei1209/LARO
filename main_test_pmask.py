@@ -28,9 +28,9 @@ if __name__ == '__main__':
     niter = 1000
     batch_size = 1
     display_iters = 10
-    lambda_dll2 = 1e-4  # 1e-4 as default, 1e-5 best
-    lambda_tv = 1e-4  # 1e-4 as default
-    rho_penalty = lambda_tv*100  # 2 as previous default, 100 current best
+    lambda_dll2 = 2e-4  # 1e-4 for T2 (MICCAI)
+    lambda_tv = 2e-4  # 1e-4 for T2 (MICCAI)
+    rho_penalty = lambda_tv*100  # 100 for T2 (MICCAI)
     use_uncertainty = False
     passSigmoid = False
     fixed_mask = False  # +/-
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         flag_ND=opt['flag_ND'],
         flag_solver=opt['flag_solver'],
         flag_TV=opt['flag_TV'],
-        K=K+15,  # +10 for TV
+        K=K,  # +10 for TV
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
         rescale=rescale,

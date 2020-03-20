@@ -28,8 +28,8 @@ class kdata_loader_GE(data.Dataset):
     dataRangeT1 = {
         'train': ['0', '300'],   
         'val': ['300', '400'],
-        'test': ['400', '600']
-        # 'test': ['440', '441']
+        # 'test': ['400', '600']
+        'test': ['440', '441']
     }
 
     dataRangeT2 = {

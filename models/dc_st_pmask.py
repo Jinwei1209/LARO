@@ -236,7 +236,7 @@ class DC_ST_Pmask(nn.Module):
                 elif self.flag_TV == 1:
                     rhs = x_start - A.AtA(x, use_dll2=3)
                     dc_layer = DC_layer(A, rhs, use_dll2=3)
-                delta_x = dc_layer.CG_iter()
+                delta_x = dc_layer.CG_iter(max_iter=20)
                 x = x + delta_x
                 Xs.append(x)
                 # if i % 10 == 0:

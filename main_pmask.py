@@ -159,7 +159,7 @@ if __name__ == '__main__':
     # load pre-trained weights with fixed mask
     if opt['flag_fix']:
         netG_dc.load_state_dict(torch.load(rootName+
-        '/weights_new/Solver={0}_K=2_flag_ND=3_ratio=0.1.pt'.format(opt['flag_solver'])))
+        '/weights_new/Solver={0}_K=5_flag_ND=3_ratio=0.1.pt'.format(opt['flag_solver'])))
         print('Load Pmask weights')
 
     # optimizer
