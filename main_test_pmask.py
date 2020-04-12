@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
 from loader.real_and_kdata_loader import real_and_kdata_loader
+from loader.prosp_kdata_loader_GE import prosp_kdata_loader_GE
 from models.unet import Unet
 from models.initialization import *
 from models.dc_blocks import *
@@ -46,16 +47,20 @@ if __name__ == '__main__':
     parser.add_argument('--flag_TV', type=int, default=1)
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
-    parser.add_argument('--samplingRatio', type=float, default=0.1) # 0.1/0.2
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # 0.1/0.2
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
+    parser.add_argument('--flag_prosp', type=int, default=0)  # 0 for retrospective test, 1 for prospective test
+    parser.add_argument('--sub_prosp', type=int, default=1)  # subject number of prospective recon
     opt = {**vars(parser.parse_args())}
 
     if opt['flag_fix'] == 1:
         result_dir = '/results_test/results_loupe'
         opt['weight_dir'] = 'weights_loupe'
+        mask_prosp = 'LOUPE_' + str(int(opt['samplingRatio']*100))
     elif opt['flag_fix'] == 2:
         result_dir = '/results_test/results_vd'
         opt['weight_dir'] = 'weights_vd'
+        mask_prosp = 'VD_' + str(int(opt['samplingRatio']*100))
     elif opt['flag_fix'] == 3:
         result_dir = '/results_test/results_uniform'
         opt['weight_dir'] = 'weights_uniform'
@@ -66,16 +71,18 @@ if __name__ == '__main__':
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    dataLoader_test = kdata_loader_GE(
-        rootDir=rootName,
-        contrast=opt['contrast'], 
-        split='test'
+    if opt['flag_prosp'] == 0:
+        dataLoader_test = kdata_loader_GE(
+            rootDir=rootName,
+            contrast=opt['contrast'], 
+            split='test'
         )
-    # dataLoader_test = real_and_kdata_loader(
-    #     rootDir='/data/Jinwei/T2_slice_recon_GE/',
-    #     contrast=opt['contrast'], 
-    #     split='test'
-    #     )
+    elif opt['flag_prosp'] == 1:
+        dataLoader_test = prosp_kdata_loader_GE(
+            rootDir=rootName+'/prospective_data',
+            subject='sub'+str(opt['sub_prosp']), 
+            mask=mask_prosp
+        )
     testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
     if opt['flag_solver'] == 0 or -1:

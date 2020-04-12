@@ -186,6 +186,95 @@ class backward_forward_CardiacQSM():
             coilComb = coilComb + self.lambda_dll2*img
         return coilComb
 
+"""
+    forward and Jacobian operators of multi-echo gradient echo data
+"""
+class OperatorsMultiEcho():
+    
+    def __init__(
+        self,
+        mask,
+        csm,
+        M_0,
+        R_2,
+        phi_0,
+        f,
+        lambda_dll2,
+    ):
+        self.device = csm.get_device()
+        self.num_samples = csm.shape[0]
+        self.num_coils = csm.shape[1]
+        self.num_echos = csm.shape[2]
+        self.num_rows = csm.shape[3] 
+        self.num_cols = csm.shape[4] 
+        self.csm = csm
+        self.mask = mask
+        self.M_0 = M_0.repeat(1, self.num_echos, 1, 1)
+        self.R_2 = R_2.repeat(1, self.num_echos, 1, 1)
+        self.phi_0 = phi_0.repeat(1, self.num_echos, 1, 1)
+        self.f = f.repeat(1, self.num_echos, 1, 1)
+        self.lambda_dll2 = lambda_dll2  # lambda for l2 regularization
+        
+        # time slots for multi-echo data
+        self.time_intervals = torch.arange(0, self.num_echos)[None, :, None, None].float()
+        self.time_intervals = self.time_intervals.repeat(self.num_samples, 
+                              1, self.num_rows, self.num_cols).to(self.device)
+
+    def forward_operator(self):
+        self.tj_coils = self.time_intervals[:, None, ..., None]
+        self.tj_coils = torch.cat((self.tj_coils, torch.zeros(self.tj_coils.shape).to(
+                                   self.device)), dim=-1).repeat(1, self.num_coils, 1, 1, 1, 1)
+
+        img0 = (torch.exp(-self.R_2 * self.time_intervals))[..., None]
+        img0 = torch.cat((img0, torch.zeros(img0.shape).to(self.device)), dim=-1)
+        self.img0 = img0[:, None, ...].repeat(1, self.num_coils, 1, 1, 1, 1)
+
+        img1 = (self.M_0 * torch.exp(-self.R_2 * self.time_intervals))[..., None]
+        img1 = torch.cat((img1, torch.zeros(img1.shape).to(self.device)), dim=-1)
+        self.img1 = img1[:, None, ...].repeat(1, self.num_coils, 1, 1, 1, 1)
+
+        img2_real = torch.cos(self.phi_0 + self.f * self.time_intervals)
+        img2_imag = torch.sin(self.phi_0 + self.f * self.time_intervals)  
+        img2 = torch.cat((img2_real[..., None], img2_imag[..., None]), dim=-1)
+        self.img2 = img2[:, None, ...].repeat(1, self.num_coils, 1, 1, 1, 1)
+
+        img = cplx_mlpy(img1, img2)[:, None, ...]
+        img = img.repeat(1, self.num_coils, 1, 1, 1, 1)
+
+        img_coils = cplx_mlpy(self.csm, img)
+        kdata_coils = torch.fft(img_coils, signal_ndim=2)
+        kdata_coils_under = cplx_mlpy(self.mask, kdata_coils)
+        return kdata_coils_under
+
+    def jacobian_conj(self, kdata):
+        kdata_under = cplx_mlpy(self.mask, kdata)
+        img_under = torch.ifft(kdata_under, signal_ndim=2)
+        img_coils = cplx_mlpy(cplx_conj(self.csm), img_under)
+
+        # for M_0, torch.Size([batchsize, ncoils, nechos, nrows, ncols, 2])
+        J1 = cplx_mlpy(self.img0, img_coils)
+        J1 = cplx_mlpy(cplx_conj(self.img2), J1)
+        # for R_2, the same dim
+        J2 = cplx_mlpy(self.img1, img_coils)
+        J2 = cplx_mlpy(cplx_conj(self.img2), J2)
+        J2 = cplx_mlpy(-self.tj_coils, J2)
+        # for phi_0
+        J3 = cplx_mlpy(self.img1, img_coils)
+        J3 = cplx_mlpy(cplx_conj(self.img2), J3)
+        J3 = torch.cat((J3[..., 1:2], -J3[..., 0:1]), dim=-1)
+        # for f
+        J4 = cplx_mlpy(self.img1, img_coils)
+        J4 = cplx_mlpy(cplx_conj(self.img2), J4)
+        J4 = cplx_mlpy(self.tj_coils, J4)
+        J4 = torch.cat((J4[..., 1:2], -J4[..., 0:1]), dim=-1)
+
+        J1 = torch.sum(J1, dim=(1,2), keepdim=False)[:, None, ...]
+        J2 = torch.sum(J2, dim=(1,2), keepdim=False)[:, None, ...]
+        J3 = torch.sum(J3, dim=(1,2), keepdim=False)[:, None, ...]
+        J4 = torch.sum(J4, dim=(1,2), keepdim=False)[:, None, ...]
+        J = torch.cat((J1, J2, J3, J4), dim=1)
+        return J
+
 
 
 

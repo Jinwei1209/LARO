@@ -47,7 +47,7 @@ def load_mat(filename, varname='data'):
 
     try:
         f = sio.loadmat(filename)
-        data = f[varname]        
+        data = f[varname]
     except:
         print(filename)
         data = load_h5(filename, varname=varname)
@@ -123,6 +123,11 @@ def cplx_mlpy(a, b):
     out[..., 0] = a[..., 0]*b[..., 0] - a[..., 1]*b[..., 1]
     out[..., 1] = a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
     return out
+
+
+def my_isnan(a):
+    print(torch.sum(a[torch.isnan(a)]))
+    return 0
 
 
 def cplx_dvd(a, b):

@@ -9,9 +9,9 @@ class prosp_kdata_loader_GE(data.Dataset):
 
 
     def __init__(self,
-        rootDir = '/data/Jinwei/T1_slice_recon_GE',
+        rootDir = '/data/Jinwei/T1_slice_recon_GE/prospective_data',
         subject = 'sub1',
-        mask = 'LOUPE_20',
+        mask = 'LOUPE_10',
         batchSize = 1,
         augmentations = [None]
     ):
@@ -54,8 +54,10 @@ class prosp_kdata_loader_GE(data.Dataset):
         kdata = load_mat(self.dataFD + 'kdata_slice_%d.mat' %(idx), 'kdata_slice')
         kdata = np.transpose(kdata, (2, 0, 1))
         kdata = c2r_kdata(kdata)
+
+        brain_mask = np.ones(org.shape, dtype=np.float32)
         
-        return kdata, org, csm
+        return kdata, org, csm, brain_mask
 
 
 

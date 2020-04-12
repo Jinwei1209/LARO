@@ -16,7 +16,7 @@ from models.initialization import *
 from models.discriminator import Basic_D
 from utils.train import *
 from IPython.display import clear_output
-from utils.loss import *
+from utils.loss import *    
 from models.dc_blocks import *
 from models.unet_with_dc import *
 from models.dc_with_prop_mask import *
@@ -58,7 +58,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
 
-    # # pre-occupy the memory
+    # # pre-occupy the memory   
     # total, used = os.popen(
     #     '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
     #         ).read().split('\n')[int(opt['gpu_id'])].split(',')
