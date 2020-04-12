@@ -272,7 +272,7 @@ class OperatorsMultiEcho():
         J2 = torch.sum(J2, dim=(1,2), keepdim=False)[:, None, ...]
         J3 = torch.sum(J3, dim=(1,2), keepdim=False)[:, None, ...]
         J4 = torch.sum(J4, dim=(1,2), keepdim=False)[:, None, ...]
-        J = torch.cat((J1, J2, J3, J4), dim=1)
+        J = torch.cat((J1, J2, J3, J4), dim=1)[..., 0]
         return J
 
 
