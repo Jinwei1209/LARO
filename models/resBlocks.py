@@ -6,7 +6,8 @@ from models.initialization import *
 
 def ResBlock(
     input_dim, 
-    filter_dim, 
+    filter_dim,
+    output_dim=2, 
     kernel_size=3,
     stride=1,
     padding=1, 
@@ -31,9 +32,9 @@ def ResBlock(
             layers.append(nn.GroupNorm(filter_dim, filter_dim))
         layers.append(nn.ReLU(inplace=True))
     if unc_map:
-        layers.append(nn.Conv2d(filter_dim, input_dim+2, 1))
+        layers.append(nn.Conv2d(filter_dim, output_dim+2, 1))
     else:
-        layers.append(nn.Conv2d(filter_dim, input_dim, 1))
+        layers.append(nn.Conv2d(filter_dim, output_dim, 1))
 
     return layers
 

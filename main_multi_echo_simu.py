@@ -21,57 +21,88 @@ from models.unet_with_dc import *
 from models.dc_with_prop_mask import *
 from models.dc_with_straight_through_pmask import *
 from models.dc_st_pmask import *
+from models.dc_multi_echo import *
 from utils.test import *
 from utils.operators import OperatorsMultiEcho
 
 
 if __name__ == '__main__':
 
-    rootName = '/data/Jinwei/Multi_echo_kspace/dataset'
+    rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs = ['MS1']
-    batch_size = 10
-    niter = 1  # 500
+    num_echos = 6
+    lambda_dll2 = np.array([0.01, 0.01, 0.01, 0.01])
+    gd_stepsize = np.array([0.001])
+    batch_size = 1
+    niter = 500
     epoch = 0
+    lrG_dc = 1e-3
 
-    dataLoader = MultiEchoSimu(rootDir=rootName, subject_IDs=subject_IDs)
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
+    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs)
+    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # network
+    netG_dc = MultiEchoDC(
+        input1_channels=num_echos*2, 
+        filter1_channels=32,
+        output1_channels=4,
+        filter2_channels=32,
+        lambda_dll2=lambda_dll2,
+        gd_stepsize=gd_stepsize,
+        K=1
+    )
+    # print(netG_dc)
+    netG_dc.to(device)
+
+    # optimizer
+    optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
+    # loss
+    lossl1 = lossL1()
 
     while epoch < niter:
         epoch += 1 
 
         # training phase
+        netG_dc.train()
         for idx, (target, brain_mask, mask, csm, kdata) in enumerate(trainLoader):
-            # print(target.shape)
-            # print(brain_mask.shape)
-            # print(mask.shape)
-            # print(csm.shape)
-            print(kdata.shape)
-
+            target = target.to(device)
             mask = mask.to(device)
             csm = csm.to(device)
-            M_0 = target[:, 0:1, ...].to(device)
-            R_2 = target[:, 1:2, ...].to(device)
-            phi_0 = target[:, 2:3, ...].to(device)
-            f = target[:, 3:4, ...].to(device)
-            lambda_dll2 = torch.tensor([0.001]).to(device)
             kdata = kdata.to(device)
+            # forward
+            init_params, final_params = netG_dc(mask, csm, kdata)
+            # stochastic gradient descnet
+            optimizerG_dc.zero_grad()
+            loss_total = lossl1(init_params, target) + lossl1(final_params, target)
+            loss_total.backward()
+            optimizerG_dc.step()
+            print('Loss = {0}'.format(loss_total.item()))
 
-            operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, lambda_dll2)
-            kdata_forward = operators.forward_operator()
+        torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
 
-            gradient_forward = operators.jacobian_conj(kdata_forward)
-            gradient = operators.jacobian_conj(kdata)
-            diff = gradient_forward - gradient
 
-            img_forward = torch.ifft(kdata_forward, signal_ndim=2)
-            img = torch.ifft(kdata, signal_ndim=2)
 
-            if idx == 3:
-                adict = {}
-                adict['diff'] = np.squeeze(np.asarray(diff.cpu().detach()))
-                sio.savemat('diff.mat', adict)
+            # M_0 = target[:, 0:1, ...].to(device)
+            # R_2 = target[:, 1:2, ...].to(device)
+            # phi_0 = target[:, 2:3, ...].to(device)
+            # f = target[:, 3:4, ...].to(device)
 
-                break
+            # operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, lambda_dll2)
+            # kdata_forward = operators.forward_operator()
+
+            # gradient_forward = operators.jacobian_conj(kdata_forward)
+            # gradient = operators.jacobian_conj(kdata)
+            # diff = gradient_forward - gradient
+
+            # img_forward = torch.ifft(kdata_forward, signal_ndim=2)
+            # img = torch.ifft(kdata, signal_ndim=2)
+
+            # if idx == 3:
+            #     adict = {}
+            #     adict['diff'] = np.squeeze(np.asarray(diff.cpu().detach()))
+            #     sio.savemat('diff.mat', adict)
+
+            #     break

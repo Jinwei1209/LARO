@@ -198,8 +198,7 @@ class OperatorsMultiEcho():
         M_0,
         R_2,
         phi_0,
-        f,
-        lambda_dll2,
+        f
     ):
         self.device = csm.get_device()
         self.num_samples = csm.shape[0]
@@ -213,7 +212,6 @@ class OperatorsMultiEcho():
         self.R_2 = R_2.repeat(1, self.num_echos, 1, 1)
         self.phi_0 = phi_0.repeat(1, self.num_echos, 1, 1)
         self.f = f.repeat(1, self.num_echos, 1, 1)
-        self.lambda_dll2 = lambda_dll2  # lambda for l2 regularization
         
         # time slots for multi-echo data
         self.time_intervals = torch.arange(0, self.num_echos)[None, :, None, None].float()
