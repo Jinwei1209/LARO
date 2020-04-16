@@ -31,11 +31,11 @@ class MultiEchoSimu(data.Dataset):
             print('Loading case: {0}'.format(idx))
             dataFD = self.rootDir + '/' + subject_ID
             M_0.append(np.real(load_mat(dataFD+'/water.mat', 'water'))[np.newaxis, ...])
-            # r_2 = load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...]
-            # r_2[r_2 > 1e+1] = 0
-            # r_2[r_2 < -1e+1] = 0
-            # R_2.append(r_2)
-            R_2.append(load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...])
+            r_2 = load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...]
+            r_2[r_2 > 1e+1] = 0
+            r_2[r_2 < -1e+1] = 0
+            R_2.append(r_2)
+            # R_2.append(load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...])
             phi_0.append(load_mat(dataFD+'/p0.mat', 'p0')[np.newaxis, ...])
             phi_1.append(load_mat(dataFD+'/p1.mat', 'p1')[np.newaxis, ...])
             iField.append(load_mat(dataFD+'/iField.mat', 'iField')[np.newaxis, ...])

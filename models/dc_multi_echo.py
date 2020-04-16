@@ -71,8 +71,8 @@ class MultiEchoDC(nn.Module):
         self.resnet_prior_f.apply(init_weights)
 
         self.K = K
-        self.lambda_dll2 = nn.Parameter(torch.tensor(lambda_dll2), requires_grad=True).float()
-        self.gd_stepsize = nn.Parameter(torch.tensor(gd_stepsize), requires_grad=True).float()
+        self.lambda_dll2 = nn.Parameter(torch.ones(4)*lambda_dll2, requires_grad=True).float()
+        self.gd_stepsize = nn.Parameter(torch.ones(1)*gd_stepsize, requires_grad=False).float()
 
     def forward(self, mask, csm, kdata, mag, phase):
         device = kdata.get_device()

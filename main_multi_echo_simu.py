@@ -31,9 +31,10 @@ if __name__ == '__main__':
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs = ['MS1']
     num_echos = 11
-    lambda_dll2 = np.array([0.01, 0.01, 0.01, 0.01])
-    gd_stepsize = np.array([0.1])
+    lambda_dll2 = 0.01
+    gd_stepsize = 0.1
     batch_size = 1
+    K = 3
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
@@ -51,12 +52,12 @@ if __name__ == '__main__':
         filter2_channels=32,
         lambda_dll2=lambda_dll2,
         gd_stepsize=gd_stepsize,
-        K=1
+        K=K
     )
     # print(netG_dc)
     netG_dc.to(device)
-    # weights_dict = torch.load(rootName+'/weights/weight.pt')
-    # netG_dc.load_state_dict(weights_dict)
+    weights_dict = torch.load(rootName+'/weights/weight.pt')
+    netG_dc.load_state_dict(weights_dict)
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -79,15 +80,17 @@ if __name__ == '__main__':
             para_start, paras_prior, paras = netG_dc(mask, csm, kdata, mag, phase)
             # stochastic gradient descnet
             optimizerG_dc.zero_grad()
-            loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
-            # loss_total = lossl1(paras[-1], target)
+            # loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
+            loss_total = lossl1(para_start, target)
+            for i in range(K):
+                loss_total = loss_total + lossl1(paras[i], target)
             loss_total.backward()
             optimizerG_dc.step()
             print('Loss = {0}'.format(loss_total.item()))
             print('Lambda = {0}'.format(netG_dc.lambda_dll2))
             print('Step size = {0}'.format(netG_dc.gd_stepsize))
 
-        torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
+        torch.save(netG_dc.state_dict(), rootName+'/weights/weight2.pt')
 
 
 
