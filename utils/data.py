@@ -127,7 +127,7 @@ def cplx_mlpy(a, b):
 
 def my_isnan(a, i):
     print('K = {0}, {1}'.format(i, torch.sum(a[torch.isnan(a)])))
-    return 0
+    return torch.sum(a[torch.isnan(a)])
 
 
 def cplx_dvd(a, b):

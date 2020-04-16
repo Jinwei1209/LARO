@@ -8,6 +8,7 @@ import argcomplete
 import numpy as np
 
 from torch.utils import data
+from torch import autograd
 from loader.multi_echo_simu_loader import MultiEchoSimu
 from utils.data import *
 from models.unet import Unet
@@ -30,19 +31,19 @@ if __name__ == '__main__':
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs = ['MS1']
-    num_echos = 11
+    num_echos = 3
     lambda_dll2 = 0.01
     gd_stepsize = 0.1
     batch_size = 1
-    K = 3
+    K = 1
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
 
     dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs, num_echos=num_echos)
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
+    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # network
@@ -56,8 +57,8 @@ if __name__ == '__main__':
     )
     # print(netG_dc)
     netG_dc.to(device)
-    weights_dict = torch.load(rootName+'/weights/weight.pt')
-    netG_dc.load_state_dict(weights_dict)
+    # weights_dict = torch.load(rootName+'/weights/weight.pt')
+    # netG_dc.load_state_dict(weights_dict)
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -70,27 +71,32 @@ if __name__ == '__main__':
         # training phase
         netG_dc.train()
         for idx, (target, brain_mask, mask, csm, kdata, mag, phase) in enumerate(trainLoader):
-            target = target.to(device)
-            mask = mask.to(device)
-            csm = csm.to(device)
-            kdata = kdata.to(device)
-            mag = mag.to(device)
-            phase = phase.to(device)
-            # forward
-            para_start, paras_prior, paras = netG_dc(mask, csm, kdata, mag, phase)
-            # stochastic gradient descnet
-            optimizerG_dc.zero_grad()
-            # loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
-            loss_total = lossl1(para_start, target)
-            for i in range(K):
-                loss_total = loss_total + lossl1(paras[i], target)
-            loss_total.backward()
-            optimizerG_dc.step()
-            print('Loss = {0}'.format(loss_total.item()))
-            print('Lambda = {0}'.format(netG_dc.lambda_dll2))
-            print('Step size = {0}'.format(netG_dc.gd_stepsize))
+            with autograd.detect_anomaly():
+                print(idx)
+                target = target.to(device)
+                mask = mask.to(device)
+                csm = csm.to(device)
+                kdata = kdata.to(device)
+                mag = mag.to(device)
+                phase = phase.to(device)
+                # forward
+                para_start, paras_prior, paras = netG_dc(mask, csm, kdata, mag, phase)
+                # stochastic gradient descnet
+                optimizerG_dc.zero_grad()
 
-        torch.save(netG_dc.state_dict(), rootName+'/weights/weight2.pt')
+                loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
+
+                # loss_total = lossl1(para_start, target)
+                # for i in range(K):
+                #     loss_total = loss_total + lossl1(paras[i], target)
+
+                loss_total.backward()
+                optimizerG_dc.step()
+                print('Loss = {0}'.format(loss_total.item()))
+                print('Lambda = {0}'.format(netG_dc.lambda_dll2))
+                print('Step size = {0}'.format(netG_dc.gd_stepsize))
+
+        torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
 
 
 

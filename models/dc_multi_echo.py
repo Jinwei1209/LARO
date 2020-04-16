@@ -102,7 +102,7 @@ class MultiEchoDC(nn.Module):
             phi_0_prior = self.resnet_prior_phi_0(phi_0)
             f_prior = self.resnet_prior_f(f)
             para_prior = torch.cat((M_0_prior, R_2_prior, phi_0_prior, f_prior), dim=1)
-            my_isnan(para_prior, i)
+            # my_isnan(para_prior, i)
             # gradient prior
             gradient_prior_M0 = lambda_dll2[0]  * (M_0 - M_0_prior)
             gradient_prior_R_2 = lambda_dll2[1]  * (R_2 - R_2_prior)
@@ -113,7 +113,7 @@ class MultiEchoDC(nn.Module):
             # generate fidelity operator
             operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f)
             kdata_generated = operators.forward_operator()
-            my_isnan(kdata_generated, i)
+            # my_isnan(kdata_generated, i)
             kdata_diff = kdata_generated - kdata
             # calculate fidelity gradient
             gradient_fidelity = operators.jacobian_conj(kdata_diff)

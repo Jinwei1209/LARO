@@ -24,21 +24,23 @@ class MultiEchoSimu(data.Dataset):
         self.load_subjects()
 
     def load_subjects(self):
-        M_0, R_2, phi_0, phi_1, iField, mask = [], [], [], [], [], []
+        M_0, R_2, phi_0, phi_1, iField, phase, mask = [], [], [], [], [], [], []
         self.num_subjects = len(self.subject_IDs)
         self.num_slices = np.zeros(self.num_subjects)
         for idx, subject_ID in enumerate(self.subject_IDs):
             print('Loading case: {0}'.format(idx))
             dataFD = self.rootDir + '/' + subject_ID
             M_0.append(np.real(load_mat(dataFD+'/water.mat', 'water'))[np.newaxis, ...])
-            r_2 = load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...]
-            r_2[r_2 > 1e+1] = 0
-            r_2[r_2 < -1e+1] = 0
-            R_2.append(r_2)
-            # R_2.append(load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...])
+            # r_2 = load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...]
+            # r_2[r_2 > 1e+1] = 0
+            # r_2[r_2 < -1e+1] = 0
+            # R_2.append(r_2)
+            R_2.append(load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...])
             phi_0.append(load_mat(dataFD+'/p0.mat', 'p0')[np.newaxis, ...])
-            phi_1.append(load_mat(dataFD+'/p1.mat', 'p1')[np.newaxis, ...])
+            # phi_1.append(load_mat(dataFD+'/p1.mat', 'p1')[np.newaxis, ...])
+            phi_1.append(load_mat(dataFD+'/p1_unwrap.mat', 'p1')[np.newaxis, ...])
             iField.append(load_mat(dataFD+'/iField.mat', 'iField')[np.newaxis, ...])
+            phase.append(load_mat(dataFD+'/phase_unwrapped.mat', 'phase_unwrapped')[np.newaxis, ...])
             mask.append(load_mat(dataFD+'/Mask.mat', 'Mask')[np.newaxis, ...])
 
             self.num_slices[idx] = load_mat(dataFD+'/Mask.mat', 'Mask').shape[2]
@@ -48,8 +50,9 @@ class MultiEchoSimu(data.Dataset):
         self.phi_0 = np.concatenate(phi_0, axis=0)
         self.phi_1 = np.concatenate(phi_1, axis=0)
         self.iField = np.concatenate(iField, axis=0)
+        self.phase = np.concatenate(phase, axis=0)
         # conj of iField because in fit_ppm_complex code there was M = conj(M)
-        self.iField = np.conjugate(self.iField)
+        self.iField, self.phase = np.conjugate(self.iField), -self.phase
         self.mask = np.concatenate(mask, axis=0)
         self.num_samples = np.sum(self.num_slices)
         # sampling pattern
@@ -90,7 +93,8 @@ class MultiEchoSimu(data.Dataset):
         # coil-combined image, magnitude and temperal unwrapped phase
         kdata_slice, image_slice = self.generate_kdata(iField_slice, csm_slice_mat)
         mag_slice = abs(image_slice)
-        unwrapped_phase = self.phase_unwrap(image_slice)
+        # unwrapped_phase = self.phase_unwrap(image_slice)  # temperal unwrapping, not good
+        unwrapped_phase = self.phase[idx_subject, :, :, idx_slice, 0:self.num_echos]  # spatial unwrapped (pre-processed, not good in the later echos)
         mag_slice = np.float32(np.transpose(mag_slice, (2, 0, 1)))
         unwrapped_phase = np.float32(np.transpose(unwrapped_phase, (2, 0, 1)))
 
