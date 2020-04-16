@@ -30,25 +30,24 @@ if __name__ == '__main__':
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs = ['MS1']
-    num_echos = 6
+    num_echos = 11
     lambda_dll2 = np.array([0.01, 0.01, 0.01, 0.01])
-    gd_stepsize = np.array([0.001])
+    gd_stepsize = np.array([0.1])
     batch_size = 1
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
 
-    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs)
+    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs, num_echos=num_echos)
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # network
     netG_dc = MultiEchoDC(
-        input1_channels=num_echos*2, 
+        input1_channels=num_echos, 
         filter1_channels=32,
-        output1_channels=4,
         filter2_channels=32,
         lambda_dll2=lambda_dll2,
         gd_stepsize=gd_stepsize,
@@ -56,6 +55,8 @@ if __name__ == '__main__':
     )
     # print(netG_dc)
     netG_dc.to(device)
+    # weights_dict = torch.load(rootName+'/weights/weight.pt')
+    # netG_dc.load_state_dict(weights_dict)
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -67,19 +68,24 @@ if __name__ == '__main__':
 
         # training phase
         netG_dc.train()
-        for idx, (target, brain_mask, mask, csm, kdata) in enumerate(trainLoader):
+        for idx, (target, brain_mask, mask, csm, kdata, mag, phase) in enumerate(trainLoader):
             target = target.to(device)
             mask = mask.to(device)
             csm = csm.to(device)
             kdata = kdata.to(device)
+            mag = mag.to(device)
+            phase = phase.to(device)
             # forward
-            init_params, final_params = netG_dc(mask, csm, kdata)
+            para_start, paras_prior, paras = netG_dc(mask, csm, kdata, mag, phase)
             # stochastic gradient descnet
             optimizerG_dc.zero_grad()
-            loss_total = lossl1(init_params, target) + lossl1(final_params, target)
+            loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
+            # loss_total = lossl1(paras[-1], target)
             loss_total.backward()
             optimizerG_dc.step()
             print('Loss = {0}'.format(loss_total.item()))
+            print('Lambda = {0}'.format(netG_dc.lambda_dll2))
+            print('Step size = {0}'.format(netG_dc.gd_stepsize))
 
         torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
 

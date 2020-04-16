@@ -20,50 +20,73 @@ class MultiEchoDC(nn.Module):
         self,
         input1_channels,
         filter1_channels,
-        output1_channels,  # equivalent to input2_channels
         filter2_channels,
-        lambda_dll2, # initializing lambda_dll2
+        lambda_dll2,
         gd_stepsize,
         K=1
     ):
         super(MultiEchoDC, self).__init__()
-        # wrnup resnet to provide initialization of optimization
-        self.resnet_init = []
-        layers = ResBlock(input1_channels, filter1_channels, output_dim=output1_channels, use_norm=2)
+        # two warmup resnets to provide initialization of optimization
+        self.resnet_init_mag = []
+        layers = ResBlock(input1_channels, filter1_channels, output_dim=2, use_norm=2)
         for layer in layers:
-            self.resnet_init.append(layer)
-        self.resnet_init = nn.Sequential(*self.resnet_init)
-        self.resnet_init.apply(init_weights)
+            self.resnet_init_mag.append(layer)
+        self.resnet_init_mag = nn.Sequential(*self.resnet_init_mag)
+        self.resnet_init_mag.apply(init_weights)
+
+        self.resnet_init_phase = []
+        layers = ResBlock(input1_channels, filter1_channels, output_dim=2, use_norm=2)
+        for layer in layers:
+            self.resnet_init_phase.append(layer)
+        self.resnet_init_phase = nn.Sequential(*self.resnet_init_phase)
+        self.resnet_init_phase.apply(init_weights)
+
         # prior resnet to do l2-regularized optimization
-        self.resnet_prior = []
-        layers = ResBlock(output1_channels, filter2_channels, output_dim=output1_channels, use_norm=2)
+        self.resnet_prior_M_0 = []
+        layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
         for layer in layers:
-            self.resnet_prior.append(layer)
-        self.resnet_prior = nn.Sequential(*self.resnet_prior)
-        self.resnet_prior.apply(init_weights)
+            self.resnet_prior_M_0.append(layer)
+        self.resnet_prior_M_0 = nn.Sequential(*self.resnet_prior_M_0)
+        self.resnet_prior_M_0.apply(init_weights)
+
+        self.resnet_prior_R_2 = []
+        layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
+        for layer in layers:
+            self.resnet_prior_R_2.append(layer)
+        self.resnet_prior_R_2 = nn.Sequential(*self.resnet_prior_R_2)
+        self.resnet_prior_R_2.apply(init_weights)
+
+        self.resnet_prior_phi_0 = []
+        layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
+        for layer in layers:
+            self.resnet_prior_phi_0.append(layer)
+        self.resnet_prior_phi_0 = nn.Sequential(*self.resnet_prior_phi_0)
+        self.resnet_prior_phi_0.apply(init_weights)
+
+        self.resnet_prior_f = []
+        layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
+        for layer in layers:
+            self.resnet_prior_f.append(layer)
+        self.resnet_prior_f = nn.Sequential(*self.resnet_prior_f)
+        self.resnet_prior_f.apply(init_weights)
 
         self.K = K
         self.lambda_dll2 = nn.Parameter(torch.tensor(lambda_dll2), requires_grad=True).float()
         self.gd_stepsize = nn.Parameter(torch.tensor(gd_stepsize), requires_grad=True).float()
 
-    def forward(self, mask, csm, kdata):
+    def forward(self, mask, csm, kdata, mag, phase):
         device = kdata.get_device()
-        zero_filled = torch.ifft(kdata, signal_ndim=2)
-        init_start = torch.sum(
-            cplx_mlpy(zero_filled, cplx_conj(csm)),
-            dim=1,
-            keepdim=False
-        )
-        init_start = torch.cat((init_start[..., 0], init_start[..., 1]), dim=1)
-        para_start = self.resnet_init(init_start)
+        para_start1 = self.resnet_init_mag(mag)
+        para_start2 = self.resnet_init_phase(phase)
+        para_start = torch.cat((para_start1, para_start2), dim=1)
         
         lambda_dll2 = self.lambda_dll2.to(device)
-        lambda_dll2 = lambda_dll2[None, :, None, None]
-        lambda_dll2 = lambda_dll2.repeat(csm.shape[0], 1, csm.shape[3], csm.shape[4])
+        # lambda_dll2 = lambda_dll2[None, :, None, None]
+        # lambda_dll2 = lambda_dll2.repeat(csm.shape[0], 1, csm.shape[3], csm.shape[4])
 
         gd_stepsize = self.gd_stepsize.to(device)
-        gd_stepsize = gd_stepsize[None, :, None, None]
-        gd_stepsize = gd_stepsize.repeat(csm.shape[0], 4, csm.shape[3], csm.shape[4])
+        # gd_stepsize = gd_stepsize[None, :, None, None]
+        # gd_stepsize = gd_stepsize.repeat(csm.shape[0], 1, csm.shape[3], csm.shape[4])
 
         paras = []
         paras_prior = []
@@ -73,19 +96,31 @@ class MultiEchoDC(nn.Module):
             R_2 = para[:, 1:2, ...]
             phi_0 = para[:, 2:3, ...]
             f = para[:, 3:4, ...]
-            para_prior = self.resnet_prior(para)
+            # concatenate priors
+            M_0_prior = self.resnet_prior_M_0(M_0)
+            R_2_prior = self.resnet_prior_R_2(R_2)
+            phi_0_prior = self.resnet_prior_phi_0(phi_0)
+            f_prior = self.resnet_prior_f(f)
+            para_prior = torch.cat((M_0_prior, R_2_prior, phi_0_prior, f_prior), dim=1)
             my_isnan(para_prior, i)
-            # generate operator
+            # gradient prior
+            gradient_prior_M0 = lambda_dll2[0]  * (M_0 - M_0_prior)
+            gradient_prior_R_2 = lambda_dll2[1]  * (R_2 - R_2_prior)
+            gradient_prior_phi_0 = lambda_dll2[2]  * (phi_0 - phi_0_prior)
+            gradient_prior_f = lambda_dll2[3]  * (f - f_prior)
+            gradient_prior = torch.cat((gradient_prior_M0, gradient_prior_R_2, 
+                                        gradient_prior_phi_0, gradient_prior_f), dim=1)
+            # generate fidelity operator
             operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f)
             kdata_generated = operators.forward_operator()
             my_isnan(kdata_generated, i)
             kdata_diff = kdata_generated - kdata
-            # calculate gradient
+            # calculate fidelity gradient
             gradient_fidelity = operators.jacobian_conj(kdata_diff)
-            gradient_prior = lambda_dll2  * (para - para_prior)
+            # total gradient
             gradient_total = gradient_fidelity + gradient_prior
             # gradient descent step
             para = para - gd_stepsize * gradient_total
             paras.append(para)
             paras_prior.append(para_prior)
-        return para_start, paras[-1]
+        return para_start, paras_prior, paras
