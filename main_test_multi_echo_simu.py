@@ -34,7 +34,7 @@ if __name__ == '__main__':
     lambda_dll2 = 0.01
     gd_stepsize = 0.1
     batch_size = 1
-    K = 3
+    K = 1
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     )
     # print(netG_dc)
     netG_dc.to(device)
-    weights_dict = torch.load(rootName+'/weights/weight2.pt')
+    weights_dict = torch.load(rootName+'/weights/weight.pt')
     netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
 
