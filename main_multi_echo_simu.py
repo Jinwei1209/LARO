@@ -35,15 +35,15 @@ if __name__ == '__main__':
     lambda_dll2 = 0.01
     gd_stepsize = 0.1
     batch_size = 1
-    K = 1
+    K = 4
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
 
     dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs, num_echos=num_echos)
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
+    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # network
@@ -57,8 +57,8 @@ if __name__ == '__main__':
     )
     # print(netG_dc)
     netG_dc.to(device)
-    # weights_dict = torch.load(rootName+'/weights/weight.pt')
-    # netG_dc.load_state_dict(weights_dict)
+    weights_dict = torch.load(rootName+'/weights/weight.pt')
+    netG_dc.load_state_dict(weights_dict)
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -84,11 +84,11 @@ if __name__ == '__main__':
                 # stochastic gradient descnet
                 optimizerG_dc.zero_grad()
 
-                loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
+                # loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
 
-                # loss_total = lossl1(para_start, target)
-                # for i in range(K):
-                #     loss_total = loss_total + lossl1(paras[i], target)
+                loss_total = lossl1(para_start, target)
+                for i in range(K):
+                    loss_total = loss_total + lossl1(paras[i], target)
 
                 loss_total.backward()
                 optimizerG_dc.step()
@@ -96,7 +96,7 @@ if __name__ == '__main__':
                 print('Lambda = {0}'.format(netG_dc.lambda_dll2))
                 print('Step size = {0}'.format(netG_dc.gd_stepsize))
 
-        torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
+        torch.save(netG_dc.state_dict(), rootName+'/weights/weight2.pt')
 
 
 
