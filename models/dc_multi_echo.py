@@ -45,7 +45,9 @@ class MultiEchoDC(nn.Module):
         self.resnet_init = Unet(
             input_channels=input1_channels*2, 
             output_channels=4, 
-            num_filters=[2**i for i in range(5, 10)]
+            num_filters=[2**i for i in range(5, 10)],
+            use_bn=2,
+            use_deconv=0
         )
 
         # # prior resnet to do l2-regularized optimization
@@ -80,7 +82,9 @@ class MultiEchoDC(nn.Module):
         self.resnet_prior = Unet(
             input_channels=4, 
             output_channels=4, 
-            num_filters=[2**i for i in range(5, 10)]
+            num_filters=[2**i for i in range(5, 10)],
+            use_bn=2,
+            use_deconv=0
         )
 
         self.K = K

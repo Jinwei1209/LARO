@@ -11,6 +11,7 @@ class Unet(nn.Module):
         output_channels,
         num_filters,
         use_bn=1,
+        use_deconv=1,
         skip_connect=False
     ):
 
@@ -39,7 +40,7 @@ class Unet(nn.Module):
             input_dim = self.num_filters[i+1]
             output_dim = self.num_filters[i]
 
-            self.upsampling_path.append(UpConvBlock(input_dim, output_dim, use_bn=use_bn))
+            self.upsampling_path.append(UpConvBlock(input_dim, output_dim, use_bn=use_bn, use_deconv=use_deconv))
         
         self.last_layer = nn.Conv2d(output_dim, self.output_channels, kernel_size=1)
 

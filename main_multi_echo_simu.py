@@ -31,11 +31,11 @@ if __name__ == '__main__':
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs = ['MS1']
-    num_echos = 5
+    num_echos = 3
     lambda_dll2 = 0.01
     gd_stepsize = 0.1
     batch_size = 1
-    K = 4
+    K = 6
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
