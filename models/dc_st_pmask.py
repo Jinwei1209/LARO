@@ -245,10 +245,10 @@ class DC_ST_Pmask(nn.Module):
                 x_old = x
                 if self.flag_TV == 0:
                     rhs = x_start - A.AtA(x, use_dll2=2)
-                    dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=2)
+                    dc_layer = DC_layer(A, rhs, flag_precond=self.flag_precond, precond=precond, use_dll2=2)
                 elif self.flag_TV == 1:
                     rhs = x_start - A.AtA(x, use_dll2=3)
-                    dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=3)
+                    dc_layer = DC_layer(A, rhs, flag_precond=self.flag_precond, precond=precond, use_dll2=3)
 
                 delta_x = dc_layer.CG_iter(max_iter=10)  # 20 for test
                 x = x + delta_x
@@ -267,7 +267,7 @@ class DC_ST_Pmask(nn.Module):
                 x_block = self.resnet_block(x)
                 x_block1 = x - x_block[:, 0:2, ...]
                 rhs = x_start + self.lambda_dll2*x_block1
-                dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=1)
+                dc_layer = DC_layer(A, rhs, flag_precond=self.flag_precond, precond=precond, use_dll2=1)
                 x = dc_layer.CG_iter()
                 Xs.append(x)
                 if self.unc_map:
@@ -290,7 +290,7 @@ class DC_ST_Pmask(nn.Module):
                 # update x using CG block
                 x0 = v_block1 - uk/self.lambda_dll2
                 rhs = x_start + self.lambda_dll2*x0
-                dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=1)
+                dc_layer = DC_layer(A, rhs, flag_precond=self.flag_precond, precond=precond, use_dll2=1)
                 x = dc_layer.CG_iter()
                 Xs.append(x)
                 # update dual variable uk
@@ -319,7 +319,7 @@ class DC_ST_Pmask(nn.Module):
                 x_old = x
                 # update x using CG block
                 rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
-                dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=2)
+                dc_layer = DC_layer(A, rhs, flag_precond=self.flag_precond, precond=precond, use_dll2=2)
                 if self.flag_fix == 3:
                     x = dc_layer.CG_iter(max_iter=30)  # 20/30 for test (30 only for uniform mask)
                 elif self.flag_fix > 0:

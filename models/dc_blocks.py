@@ -29,15 +29,15 @@ def conj_in_cg(a):
     return out
 
 class DC_layer():
-    def __init__(self, A, rhs, precond=0, use_dll2=1):
+    def __init__(self, A, rhs, flag_precond=0, precond=0, use_dll2=1):
         self.AtA = lambda z: A.AtA(z, use_dll2=use_dll2)
         self.rhs = rhs
         self.device = rhs.get_device()
-        self.M_inv = mlpy_in_cg(precond, precond)  # precond: C^-1, M_inv = C^-TC^-1
-        if precond == 0:
-            self.flag_precond = 0
+        if flag_precond == 0:
+            self.flag_precond = flag_precond
         else:
-            self.flag_precond = 1
+            self.flag_precond = flag_precond
+            self.M_inv = mlpy_in_cg(precond, precond)  # precond: C^-1, M_inv = C^-TC^-1
 
     def CG_body(self, i, rTr, x, r, p):
         Ap = self.AtA(p)

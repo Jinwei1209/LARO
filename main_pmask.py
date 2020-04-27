@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # 0.1/0.2
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
+    parser.add_argument('--flag_precond', type=int, default=0)  # 0 not use, 1 use
     argcomplete.autocomplete(parser)
     opt = {**vars(parser.parse_args())}
 
@@ -150,6 +151,7 @@ if __name__ == '__main__':
         ncol=192,
         ncoil=32,
         flag_fix=opt['flag_fix'],
+        flag_precond=opt['flag_precond'],
         contrast=opt['contrast']
     )
 
@@ -157,7 +159,7 @@ if __name__ == '__main__':
     netG_dc.to(device)
 
     # load pre-trained weights with fixed mask
-    if opt['flag_fix']:
+    if opt['flag_fix'] and not opt['flag_precond']:
         netG_dc.load_state_dict(torch.load(rootName+
         '/weights_new/Solver={0}_K=5_flag_ND=3_ratio=0.1.pt'.format(opt['flag_solver'])))
         print('Load Pmask weights')
