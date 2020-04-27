@@ -39,7 +39,7 @@ if __name__ == '__main__':
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True
-    flag_save_pmask = 0
+    # flag_save_pmask = 0
 
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')

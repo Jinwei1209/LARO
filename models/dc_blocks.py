@@ -8,7 +8,6 @@ from utils.data import *
 from utils.loss import *
 from utils.operators import *
 
-
 def mlpy_in_cg(a, b):
     """
     multiply two 'complex' tensors (with the second dim = 2, representing real and imaginary parts)
@@ -18,7 +17,6 @@ def mlpy_in_cg(a, b):
     out[:,0,...] = a[:,0,...]*b[:,0,...] - a[:,1,...]*b[:,1,...]
     out[:,1,...] = a[:,0,...]*b[:,1,...] + a[:,1,...]*b[:,0,...]
     return out
-
 
 def conj_in_cg(a):
     """
@@ -30,20 +28,19 @@ def conj_in_cg(a):
     out[:,1,...] = -a[:,1,...]
     return out
 
-
 class DC_layer():
-
-
-    def __init__(self, A, rhs, use_dll2=1):
+    def __init__(self, A, rhs, precond=0, use_dll2=1):
         self.AtA = lambda z: A.AtA(z, use_dll2=use_dll2)
         self.rhs = rhs
         self.device = rhs.get_device()
-
+        self.M_inv = mlpy_in_cg(precond, precond)  # precond: C^-1, M_inv = C^-TC^-1
+        if precond == 0:
+            self.flag_precond = 0
+        else:
+            self.flag_precond = 1
 
     def CG_body(self, i, rTr, x, r, p):
-
         Ap = self.AtA(p)
-
         alpha = rTr / torch.sum(mlpy_in_cg(conj_in_cg(p), Ap))
         alpha = torch.ones(x.shape).to(self.device)*alpha
         alpha[:,1,...] = 0
@@ -56,24 +53,49 @@ class DC_layer():
         beta = torch.ones(x.shape).to(self.device)*beta
         beta[:,1,...] = 0
         p = r + mlpy_in_cg(p, beta)
-
         return i+1, rTrNew, x, r, p
 
+    def precond_CG_body(self, i, rTy, x, r, y, p):
+        Ap = self.AtA(p)
+        alpha = cplx_dvd(rTy, torch.sum(mlpy_in_cg(conj_in_cg(p), Ap), dim=(0, 2, 3)))
+        alpha = alpha.repeat(x.shape[0], x.shape[2], x.shape[3], 1).permute(0, 3, 1, 2)
+
+        x = x + mlpy_in_cg(p, alpha)
+        r = r + mlpy_in_cg(Ap, alpha)
+        y = mlpy_in_cg(self.M_inv, r)
+
+        rTyNew = torch.sum(mlpy_in_cg(conj_in_cg(r), y), dim=(0, 2, 3))
+        beta = cplx_dvd(rTyNew, rTy)
+        beta = beta.repeat(x.shape[0], x.shape[2], x.shape[3], 1).permute(0, 3, 1, 2)
+        p = -y + mlpy_in_cg(beta, p)
+        return i+1, rTyNew, x, r, y, p
+
+    def precond_CG_residual(self, r):
+        res = mlpy_in_cg(self.M_inv, r)
+        res = torch.sum(mlpy_in_cg(conj_in_cg(r), res))
+        return res
 
     def while_cond(self, i, rTr, max_iter=10):
         return (i<max_iter) and (rTr>1e-10)
 
-
     def CG_iter(self, max_iter=10):
-      
         x = torch.zeros(self.rhs.shape).to(self.device)
-        i, r, p = 0, self.rhs, self.rhs
-        rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
 
-        while self.while_cond(i, rTr, max_iter):
-            i, rTr, x, r, p = self.CG_body(i, rTr, x, r, p)
-            # print('i = {0}, rTr = {1}'.format(i, rTr))
-
+        if self.flag_precond == 0:
+            i, r, p = 0, self.rhs, self.rhs
+            rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
+            while self.while_cond(i, rTr, max_iter):
+                i, rTr, x, r, p = self.CG_body(i, rTr, x, r, p)
+                # print('i = {0}, rTr = {1}'.format(i, rTr))
+        elif self.flag_precond == 1:
+            i, r = 0, -self.rhs
+            y = mlpy_in_cg(self.M_inv, r)
+            p = -y
+            rTy = torch.sum(mlpy_in_cg(conj_in_cg(r), y), dim=(0, 2, 3))  #(2,) tensor
+            res = self.precond_CG_residual(r)
+            while self.while_cond(i, res, max_iter):
+                i, rTy, x, r, y, p = self.precond_CG_body(i, rTy, x, r, y, p)
+                res = self.precond_CG_residual(r)
         return x
         
 

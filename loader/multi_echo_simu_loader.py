@@ -57,7 +57,7 @@ class MultiEchoSimu(data.Dataset):
         self.num_samples = np.sum(self.num_slices)
         # sampling pattern
         self.sampling_mask = load_mat(self.rootDir+'/sampling_pattern_30.mat', 'mask')
-        self.sampling_mask = np.ones(self.sampling_mask.shape)
+        # self.sampling_mask = np.ones(self.sampling_mask.shape)
         self.sampling_mask = np.fft.fftshift(self.sampling_mask)[..., np.newaxis, np.newaxis]
         self.sampling_mask = np.tile(self.sampling_mask, [1, 1, 1, self.num_echos])
 
@@ -93,8 +93,8 @@ class MultiEchoSimu(data.Dataset):
         # coil-combined image, magnitude and temperal unwrapped phase
         kdata_slice, image_slice = self.generate_kdata(iField_slice, csm_slice_mat)
         mag_slice = abs(image_slice)
-        # unwrapped_phase = self.phase_unwrap(image_slice)  # temperal unwrapping, not good
-        unwrapped_phase = self.phase[idx_subject, :, :, idx_slice, 0:self.num_echos]  # spatial unwrapped (pre-processed, not good in the later echos)
+        unwrapped_phase = self.phase_unwrap(image_slice)  # temperal unwrapping, not good
+        # unwrapped_phase = self.phase[idx_subject, :, :, idx_slice, 0:self.num_echos]  # spatial unwrapped (pre-processed, not good in the later echos)
         mag_slice = np.float32(np.transpose(mag_slice, (2, 0, 1)))
         unwrapped_phase = np.float32(np.transpose(unwrapped_phase, (2, 0, 1)))
 

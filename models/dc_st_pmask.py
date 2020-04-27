@@ -44,7 +44,8 @@ class DC_ST_Pmask(nn.Module):
         stochasticSampling=True,
         rescale=False,
         samplingRatio=0.1, # sparsity level of the sampling mask
-        flag_fix=0,  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
+        flag_fix=0,  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform,
+        flag_precond=0,  # o not using preconditional, 1 use
         contrast='T2'
     ):
         super(DC_ST_Pmask, self).__init__()
@@ -62,7 +63,9 @@ class DC_ST_Pmask(nn.Module):
         self.rescale = rescale
         self.samplingRatio = samplingRatio
         self.flag_fix = flag_fix
+        self.flag_precond = flag_precond
         self.contrast = contrast
+
         # flag for sampling pattern designs
         if flag_ND == 0:
             temp = (torch.rand(nrow)-0.5)*30
@@ -83,6 +86,7 @@ class DC_ST_Pmask(nn.Module):
         else:
             self.weight_parameters1 = nn.Parameter(temp1, requires_grad=True)
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
+
         # flag for all the solvers
         if flag_solver == -3:
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
@@ -107,6 +111,10 @@ class DC_ST_Pmask(nn.Module):
         elif flag_solver == 2:
             self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=False)
             self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=False)
+
+        # flag for using preconditioning:
+        if self.flag_precond == 1:
+            self.preconditioner = Unet(input_channels, input_channels, num_filters=[2**i for i in range(4, 8)])
 
     def rescalePmask(self, Pmask, samplingRatio):
         device = Pmask.get_device()
@@ -221,6 +229,11 @@ class DC_ST_Pmask(nn.Module):
         x = self.At(kdata, masks, csms)    
         # input
         x_start = x
+        # generate preconditioner
+        if self.flag_precond == 1:
+            precond = self.preconditioner(x_start)
+        else:
+            precond = 0
 
         # Quasi_newton
         if self.flag_solver < -1:
@@ -232,11 +245,12 @@ class DC_ST_Pmask(nn.Module):
                 x_old = x
                 if self.flag_TV == 0:
                     rhs = x_start - A.AtA(x, use_dll2=2)
-                    dc_layer = DC_layer(A, rhs, use_dll2=2)
+                    dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=2)
                 elif self.flag_TV == 1:
                     rhs = x_start - A.AtA(x, use_dll2=3)
-                    dc_layer = DC_layer(A, rhs, use_dll2=3)
-                delta_x = dc_layer.CG_iter(max_iter=20)
+                    dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=3)
+
+                delta_x = dc_layer.CG_iter(max_iter=10)  # 20 for test
                 x = x + delta_x
                 Xs.append(x)
                 # if i % 10 == 0:
@@ -253,7 +267,7 @@ class DC_ST_Pmask(nn.Module):
                 x_block = self.resnet_block(x)
                 x_block1 = x - x_block[:, 0:2, ...]
                 rhs = x_start + self.lambda_dll2*x_block1
-                dc_layer = DC_layer(A, rhs, use_dll2=1)
+                dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=1)
                 x = dc_layer.CG_iter()
                 Xs.append(x)
                 if self.unc_map:
@@ -276,7 +290,7 @@ class DC_ST_Pmask(nn.Module):
                 # update x using CG block
                 x0 = v_block1 - uk/self.lambda_dll2
                 rhs = x_start + self.lambda_dll2*x0
-                dc_layer = DC_layer(A, rhs, use_dll2=1)
+                dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=1)
                 x = dc_layer.CG_iter()
                 Xs.append(x)
                 # update dual variable uk
@@ -305,7 +319,7 @@ class DC_ST_Pmask(nn.Module):
                 x_old = x
                 # update x using CG block
                 rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
-                dc_layer = DC_layer(A, rhs, use_dll2=2)
+                dc_layer = DC_layer(A, rhs, precond=precond, use_dll2=2)
                 if self.flag_fix == 3:
                     x = dc_layer.CG_iter(max_iter=30)  # 20/30 for test (30 only for uniform mask)
                 elif self.flag_fix > 0:
