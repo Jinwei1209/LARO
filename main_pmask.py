@@ -82,8 +82,7 @@ if __name__ == '__main__':
     epoch = 0
     gen_iterations = 1
     errL2_dc_sum = 0
-    PSNRs_val = []
-    Validation_loss = []
+    Training_loss, Validation_loss = [], []
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     dataLoader = kdata_loader_GE(
@@ -181,6 +180,7 @@ if __name__ == '__main__':
         # training phase
         netG_dc.train()
         metrices_train = Metrices()
+        loss_total_list = []
         for idx, (inputs, targets, csms, brain_masks) in enumerate(trainLoader):
             
             if gen_iterations%display_iters == 0:
@@ -201,6 +201,7 @@ if __name__ == '__main__':
 
                 print('netG_dc --- loss_L2_dc: %f'
                     % (errL2_dc_sum/display_iters))
+                    loss_total_list.append(errL2_dc_sum/display_iters)
 
                 print('Average PSNR in Training dataset is %.2f' 
                 % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
@@ -240,8 +241,9 @@ if __name__ == '__main__':
             del(targets)
             del(csms)
             del(brain_masks)
-
             gen_iterations += 1
+            
+        Training_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
 
         scheduler.step(epoch)
             
@@ -265,13 +267,13 @@ if __name__ == '__main__':
                 brain_masks = np.asarray(brain_masks.cpu().detach())
                 lossl2_sum = loss_unc_sum = 0
 
-                # for i in range(len(Xs)):
-                #     Xs_i = np.asarray(Xs[i].cpu().detach())
-                #     temp = abs(Xs_i - targets) * brain_masks
-                #     lossl2_sum += np.mean(temp)
-                Xs_i = np.asarray(Xs[-1].cpu().detach())
-                temp = abs(Xs_i - targets) * brain_masks
-                lossl2_sum += np.mean(temp)
+                for i in range(len(Xs)):
+                    Xs_i = np.asarray(Xs[i].cpu().detach())
+                    temp = abs(Xs_i - targets) * brain_masks
+                    lossl2_sum += np.mean(temp)
+                # Xs_i = np.asarray(Xs[-1].cpu().detach())
+                # temp = abs(Xs_i - targets) * brain_masks
+                # lossl2_sum += np.mean(temp)
 
                 temp = np.asarray(netG_dc.Pmask.cpu().detach())
                 loss_Pmask = 0*np.mean(temp)
@@ -282,9 +284,9 @@ if __name__ == '__main__':
             Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
 
         # save log
-        logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f, Pmask: %f' 
-        % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs)), torch.mean(netG_dc.Pmask)))
-        logger.print_and_save('Epoch: [%d/%d], PSNR in validation: %.2f, loss in validation: %.5f' 
+        logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f, loss in training: %.10f, Pmask: %f' 
+        % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs)), Training_loss[-1], torch.mean(netG_dc.Pmask)))
+        logger.print_and_save('Epoch: [%d/%d], PSNR in validation: %.2f, loss in validation: %.10f' 
         % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
 
         # save weights
