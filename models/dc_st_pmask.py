@@ -46,6 +46,7 @@ class DC_ST_Pmask(nn.Module):
         samplingRatio=0.1, # sparsity level of the sampling mask
         flag_fix=0,  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform,
         flag_precond=0,  # o not using preconditional, 1 use
+        flag_print_precond=0,
         contrast='T2'
     ):
         super(DC_ST_Pmask, self).__init__()
@@ -64,6 +65,7 @@ class DC_ST_Pmask(nn.Module):
         self.samplingRatio = samplingRatio
         self.flag_fix = flag_fix
         self.flag_precond = flag_precond
+        self.flag_print_precond = flag_print_precond
         self.contrast = contrast
 
         # flag for sampling pattern designs
@@ -104,7 +106,7 @@ class DC_ST_Pmask(nn.Module):
 
             # self.resnet_block = Unet(input_channels, input_channels, num_filters=[2**i for i in range(4, 8)], use_bn=2)
 
-            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
         elif flag_solver == 1:
             self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=True)
             self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=True)
@@ -231,7 +233,8 @@ class DC_ST_Pmask(nn.Module):
         x_start = x
         # generate preconditioner
         if self.flag_precond == 1:
-            precond = self.preconditioner(x_start)
+            precond = 9 / (1 + torch.exp(-0.1 * self.preconditioner(x_start))) + 1
+            precond[:, 1, ...] = 0
         else:
             precond = 0
 
@@ -255,14 +258,16 @@ class DC_ST_Pmask(nn.Module):
                 Xs.append(x)
                 # if i % 10 == 0:
                 # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
-            return Xs
+            if self.flag_print_precond == 0:
+                return Xs
+            else:
+                return Xs, precond
 
         # Deep Quasi_newton (MoDL)
         elif self.flag_solver == -1:
             self.lambda_dll2 = self.lambda_dll2.to(device)
             A = Back_forward(csms, masks, self.lambda_dll2)
             Xs = []
-            Unc_maps = []
             for i in range(self.K):
                 x_block = self.resnet_block(x)
                 x_block1 = x - x_block[:, 0:2, ...]
@@ -270,12 +275,10 @@ class DC_ST_Pmask(nn.Module):
                 dc_layer = DC_layer(A, rhs, flag_precond=self.flag_precond, precond=precond, use_dll2=1)
                 x = dc_layer.CG_iter()
                 Xs.append(x)
-                if self.unc_map:
-                    Unc_maps.append(x_block[:, 2:4, ...])
-            if self.unc_map:
-                return Xs, Unc_maps
-            else:
+            if self.flag_print_precond == 0:
                 return Xs
+            else:
+                return Xs, precond
 
         # Deep ADMM
         elif self.flag_solver == 0:
@@ -295,7 +298,10 @@ class DC_ST_Pmask(nn.Module):
                 Xs.append(x)
                 # update dual variable uk
                 uk = uk + self.lambda_dll2*(x - v_block1)
-            return Xs
+            if self.flag_print_precond == 0:
+                return Xs
+            else:
+                return Xs, precond
 
         # ADMM
         elif 0 < self.flag_solver < 3:
@@ -332,7 +338,10 @@ class DC_ST_Pmask(nn.Module):
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
                 # if i % 10 == 0:
                 # print('Relative Change: {0}'.format(torch.mean(torch.abs((x-x_old)/(x_old+epsilon)))))
-            return Xs
+            if self.flag_print_precond == 0:
+                return Xs
+            else:
+                return Xs, precond
 
         elif self.flag_solver == 3:
             Xs = []

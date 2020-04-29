@@ -4,9 +4,10 @@ import time
 import torch
 import math
 import argparse
-import argcomplete
+# import argcomplete
 import numpy as np
 
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
 from loader.real_and_kdata_loader import real_and_kdata_loader
@@ -28,7 +29,7 @@ from utils.test import *
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 500
+    niter = 60  # 500 for mask experiment
     batch_size = 1
     display_iters = 10
     lambda_dll2 = 1e-4
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # 0.1/0.2
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
     parser.add_argument('--flag_precond', type=int, default=0)  # 0 not use, 1 use
-    argcomplete.autocomplete(parser)
+    # argcomplete.autocomplete(parser)
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -159,13 +160,17 @@ if __name__ == '__main__':
     netG_dc.to(device)
 
     # load pre-trained weights with fixed mask
-    if opt['flag_fix'] and not opt['flag_precond']:
+    # if opt['flag_fix'] and not opt['flag_precond']:
+    if 0:
         netG_dc.load_state_dict(torch.load(rootName+
         '/weights_new/Solver={0}_K=5_flag_ND=3_ratio=0.1.pt'.format(opt['flag_solver'])))
         print('Load Pmask weights')
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
+    ms = [0.2, 0.4, 0.6, 0.8]
+    ms = [np.floor(m * niter).astype(int) for m in ms]
+    scheduler = MultiStepLR(optimizerG_dc, milestones = ms, gamma = 0.2)
 
     # logger
     logger = Logger(rootName, opt)
@@ -237,6 +242,8 @@ if __name__ == '__main__':
             del(brain_masks)
 
             gen_iterations += 1
+
+        scheduler.step(epoch)
             
         # validation phase
         netG_dc.eval()
@@ -281,33 +288,10 @@ if __name__ == '__main__':
         % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
 
         # save weights
+        # if Validation_loss[-1] == min(Validation_loss):
+        #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
+        #             opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
-                       opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        
-        # # save weights on 30%
-        # if torch.mean(netG_dc.Pmask) < 0.30 and flag_save_pmask == 0:
-        #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.30.pt'.format(
-        #                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        #     flag_save_pmask += 1
-        # # save weights on 30%
-        # if torch.mean(netG_dc.Pmask) < 0.29 and flag_save_pmask == 1:
-        #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.29.pt'.format(
-        #                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        #     flag_save_pmask += 1
-        # # save weights on 30%
-        # if torch.mean(netG_dc.Pmask) < 0.28 and flag_save_pmask == 2:
-        #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.28.pt'.format(
-        #                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        #     flag_save_pmask += 1
-        # # save weights on 30%
-        # if torch.mean(netG_dc.Pmask) < 0.27 and flag_save_pmask == 3:
-        #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.27.pt'.format(
-        #                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        #     flag_save_pmask += 1
-        # # save weights on 30%
-        # if torch.mean(netG_dc.Pmask) < 0.26 and flag_save_pmask == 4:
-        #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}_pmask=0.26.pt'.format(
-        #                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        #     flag_save_pmask += 1
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
+                    opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
 

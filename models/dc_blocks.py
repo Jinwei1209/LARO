@@ -37,6 +37,7 @@ class DC_layer():
             self.flag_precond = flag_precond
         else:
             self.flag_precond = flag_precond
+            epsilon = torch.ones(precond.shape).to(self.device)*1e-4
             self.M_inv = mlpy_in_cg(precond, precond)  # precond: C^-1, M_inv = C^-TC^-1
 
     def CG_body(self, i, rTr, x, r, p):
@@ -70,11 +71,6 @@ class DC_layer():
         p = -y + mlpy_in_cg(beta, p)
         return i+1, rTyNew, x, r, y, p
 
-    def precond_CG_residual(self, r):
-        res = mlpy_in_cg(self.M_inv, r)
-        res = torch.sum(mlpy_in_cg(conj_in_cg(r), res))
-        return res
-
     def while_cond(self, i, rTr, max_iter=10):
         return (i<max_iter) and (rTr>1e-10)
 
@@ -92,10 +88,11 @@ class DC_layer():
             y = mlpy_in_cg(self.M_inv, r)
             p = -y
             rTy = torch.sum(mlpy_in_cg(conj_in_cg(r), y), dim=(0, 2, 3))  #(2,) tensor
-            res = self.precond_CG_residual(r)
-            while self.while_cond(i, res, max_iter):
+            rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
+            while self.while_cond(i, rTr, max_iter):
                 i, rTy, x, r, y, p = self.precond_CG_body(i, rTy, x, r, y, p)
-                res = self.precond_CG_residual(r)
+                rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
+                # print('i = {0}, rTr = {1}'.format(i, rTr))
         return x
         
 

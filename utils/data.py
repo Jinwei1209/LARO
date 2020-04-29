@@ -210,9 +210,8 @@ class Logger():
         self.rootName = os.path.join(rootName, opt['weight_dir'])
 
         K = opt['K']
-        flag_ND = opt['flag_ND']
-        ratio = opt['samplingRatio']
         solver = opt['flag_solver']
+        precond = opt['flag_precond']
 
         if(not os.path.exists(self.rootName)):
             os.mkdir(self.rootName)
@@ -221,7 +220,7 @@ class Logger():
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'Solver={0}_K={1}_flag_ND={2}_ratio={3}'.format(solver, K, flag_ND, ratio) + '.log'
+        self.fileName = 'Solver={0}_K={1}_flag_precond={2}'.format(solver, K, precond) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 
         if self.flagSave:

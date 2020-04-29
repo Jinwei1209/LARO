@@ -51,11 +51,15 @@ if __name__ == '__main__':
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
     parser.add_argument('--flag_prosp', type=int, default=0)  # 0 for retrospective test, 1 for prospective test
     parser.add_argument('--sub_prosp', type=int, default=1)  # subject number of prospective recon
+    parser.add_argument('--flag_precond', type=int, default=0)  # 0 not use, 1 use
     opt = {**vars(parser.parse_args())}
 
     if opt['flag_fix'] == 1:
-        result_dir = '/results_test/results_loupe'
-        opt['weight_dir'] = 'weights_loupe'
+        # result_dir = '/results_test/results_loupe'
+        # opt['weight_dir'] = 'weights_loupe'
+        # mask_prosp = 'LOUPE_' + str(int(opt['samplingRatio']*100))
+        result_dir = '/results_test/results_precond'
+        opt['weight_dir'] = 'weights_precond'
         mask_prosp = 'LOUPE_' + str(int(opt['samplingRatio']*100))
     elif opt['flag_fix'] == 2:
         result_dir = '/results_test/results_vd'
@@ -108,12 +112,19 @@ if __name__ == '__main__':
         ncol=192,
         ncoil=32,
         flag_fix=opt['flag_fix'],
+        flag_precond=opt['flag_precond'],
+        flag_print_precond=opt['flag_precond'],
         contrast=opt['contrast']
     )
     netG_dc.to(device)
-    # print(netG_dc)
-    weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
-                              opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+    if opt['flag_precond'] == 0:
+        # weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
+        #                         opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
+                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
+    else:
+        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
+                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
     if opt['flag_solver'] == -3:
         weights_dict['lambda_dll2'] = (torch.ones(1)*lambda_dll2).to(device)
         print('Lambda_dll2={0}'.format(netG_dc.lambda_dll2))
@@ -127,7 +138,7 @@ if __name__ == '__main__':
 
     metrices_test = Metrices()
 
-    Recons = []
+    Recons, Preconds = [], []
     for idx, (inputs, targets, csms, brain_masks) in enumerate(testLoader):
         # if idx % 10 == 0:
         print(idx)
@@ -135,7 +146,11 @@ if __name__ == '__main__':
         targets = targets.to(device)
         csms = csms.to(device)
         # calculating metrices
-        Xs = netG_dc(inputs, csms)
+        if opt['flag_precond'] == 0:
+            Xs = netG_dc(inputs, csms)
+        else:
+            Xs, precond = netG_dc(inputs, csms)
+            Preconds.append(precond.cpu().detach())
         Recons.append(Xs[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
         if idx == 0:
@@ -165,6 +180,16 @@ if __name__ == '__main__':
     adict['Recons'] = Recons
     sio.savemat(rootName+result_dir+'/Recons_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
                 opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+
+    if opt['flag_precond'] == 1:
+        Preconds = np.concatenate(Preconds, axis=0)
+        Preconds = np.transpose(Preconds, [2,3,0,1])
+        Preconds = np.squeeze(np.sqrt(Preconds[..., 0]**2 + Preconds[..., 1]**2))
+
+        adict = {}
+        adict['Preconds'] = Preconds
+        sio.savemat(rootName+result_dir+'/Recons_Solver={0}_K={1}_flag_precond={2}.mat'.format(
+                    opt['flag_solver'], opt['K'], opt['flag_precond']), adict)
 
     # # Display the output images
     # # plot= lambda x: plt.imshow(x,cmap=plt.cm.gray, clim=(0.0, np.amax(Pmask)))
