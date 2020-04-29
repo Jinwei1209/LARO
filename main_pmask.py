@@ -201,7 +201,7 @@ if __name__ == '__main__':
 
                 print('netG_dc --- loss_L2_dc: %f'
                     % (errL2_dc_sum/display_iters))
-                    loss_total_list.append(errL2_dc_sum/display_iters)
+                loss_total_list.append(errL2_dc_sum/display_iters)
 
                 print('Average PSNR in Training dataset is %.2f' 
                 % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
