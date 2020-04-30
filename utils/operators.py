@@ -218,7 +218,12 @@ class OperatorsMultiEcho():
         self.time_intervals = self.time_intervals.repeat(self.num_samples, 
                               1, self.num_rows, self.num_cols).to(self.device)
 
-    def forward_operator(self):
+    def forward_operator(self, flag=0):
+        # flag = 0: no additional operation
+        # flag = 1: M_0, W/M0
+        # flag = 2: R_2, W*(-T)
+        # flag = 3: phi_0, W*(i)
+        # flag = 4: f, W*(iT)
         self.tj_coils = self.time_intervals[:, None, ..., None]
         self.tj_coils = torch.cat((self.tj_coils, torch.zeros(self.tj_coils.shape).to(
                                    self.device)), dim=-1).repeat(1, self.num_coils, 1, 1, 1, 1)
@@ -236,8 +241,25 @@ class OperatorsMultiEcho():
         img2 = torch.cat((img2_real[..., None], img2_imag[..., None]), dim=-1)
         self.img2 = img2[:, None, ...].repeat(1, self.num_coils, 1, 1, 1, 1)
 
-        img = cplx_mlpy(img1, img2)[:, None, ...]
-        img = img.repeat(1, self.num_coils, 1, 1, 1, 1)
+        if flag == 0:
+            img = cplx_mlpy(img1, img2)[:, None, ...]
+            img = img.repeat(1, self.num_coils, 1, 1, 1, 1)
+        elif flag == 1:
+            img = cplx_mlpy(img0, img2)[:, None, ...]
+            img = img.repeat(1, self.num_coils, 1, 1, 1, 1)
+        elif flag == 2:
+            img = cplx_mlpy(img1, img2)[:, None, ...]
+            img = img.repeat(1, self.num_coils, 1, 1, 1, 1)
+            img = cplx_mlpy(img, -self.tj_coils)
+        elif flag == 3:
+            img = cplx_mlpy(img1, img2)[:, None, ...]
+            img = img.repeat(1, self.num_coils, 1, 1, 1, 1)
+            img = torch.cat((-img[..., 1:2], img[..., 0:1]), dim=-1)
+        elif flag == 4:
+            img = cplx_mlpy(img1, img2)[:, None, ...]
+            img = img.repeat(1, self.num_coils, 1, 1, 1, 1)
+            img = torch.cat((-img[..., 1:2], img[..., 0:1]), dim=-1)
+            img = cplx_mlpy(img, self.tj_coils)
 
         img_coils = cplx_mlpy(self.csm, img)
         kdata_coils = torch.fft(img_coils, signal_ndim=2)
