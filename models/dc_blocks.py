@@ -28,6 +28,7 @@ def conj_in_cg(a):
     out[:,1,...] = -a[:,1,...]
     return out
 
+# complex valued CG layer
 class DC_layer():
     def __init__(self, A, rhs, flag_precond=0, precond=0, use_dll2=1):
         self.AtA = lambda z: A.AtA(z, use_dll2=use_dll2)
@@ -94,6 +95,36 @@ class DC_layer():
                 rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
                 # print('i = {0}, rTr = {1}'.format(i, rTr))
         return x
+
+# real valued CG layer for undersampled field estimation problem
+class DC_layer_real():
+    def __init__(self, A, rhs, flag, use_dll2=1):
+        self.AtA = lambda z: A.AtA(z, flag=flag, use_dll2=use_dll2)
+        self.rhs = rhs
+        self.device = rhs.get_device()
+
+    def CG_body(self, i, rTr, x, r, p):
+        Ap = self.AtA(p)
+        alpha = rTr / torch.sum(p*Ap)
+        x = x + p*alpha
+        r = r - Ap*alpha
+        rTrNew = torch.sum(r**2)
+        beta = rTrNew /  rTr
+        p = r + p*beta
+        return i+1, rTrNew, x, r, p
+
+    def while_cond(self, i, rTr, max_iter=10):
+        return (i<max_iter) and (rTr>1e-10)
+
+    def CG_iter(self, max_iter=10):
+        x = torch.zeros(self.rhs.shape).to(self.device)
+        i, r, p = 0, self.rhs, self.rhs
+        rTr = torch.sum(r**2)
+        while self.while_cond(i, rTr, max_iter):
+            i, rTr, x, r, p = self.CG_body(i, rTr, x, r, p)
+            # print('i = {0}, rTr = {1}'.format(i, rTr))
+        return x
+
         
 
 

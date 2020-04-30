@@ -55,7 +55,6 @@ if __name__ == '__main__':
         gd_stepsize=gd_stepsize,
         K=K
     )
-    # print(netG_dc)
     netG_dc.to(device)
     weights_dict = torch.load(rootName+'/weights/weight.pt')
     netG_dc.load_state_dict(weights_dict)
