@@ -35,7 +35,7 @@ if __name__ == '__main__':
     lambda_dll2 = 0.01
     gd_stepsize = 0.1
     batch_size = 1
-    K = 6
+    K = 1
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
@@ -56,8 +56,8 @@ if __name__ == '__main__':
         K=K
     )
     netG_dc.to(device)
-    weights_dict = torch.load(rootName+'/weights/weight.pt')
-    netG_dc.load_state_dict(weights_dict)
+    # weights_dict = torch.load(rootName+'/weights/weight.pt')
+    # netG_dc.load_state_dict(weights_dict)
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -95,7 +95,7 @@ if __name__ == '__main__':
                 print('Lambda = {0}'.format(netG_dc.lambda_dll2))
                 print('Step size = {0}'.format(netG_dc.gd_stepsize))
 
-        torch.save(netG_dc.state_dict(), rootName+'/weights/weight2.pt')
+        torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
 
 
 
