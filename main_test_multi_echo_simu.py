@@ -31,10 +31,10 @@ if __name__ == '__main__':
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs = ['MS1']
     num_echos = 3
-    lambda_dll2 = 0.01
+    lambda_dll2 = 1
     gd_stepsize = 0.1
     batch_size = 1
-    K = 6
+    K = 1
     niter = 500
     epoch = 0
     lrG_dc = 1e-3
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     )
     # print(netG_dc)
     netG_dc.to(device)
-    weights_dict = torch.load(rootName+'/weights/weight2.pt')
+    weights_dict = torch.load(rootName+'/weights/weight.pt')
     netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
 
@@ -64,7 +64,7 @@ if __name__ == '__main__':
         for idx, (target, brain_mask, mask, csm, kdata, mag, phase) in enumerate(trainLoader):
             print(idx)
             print(netG_dc.lambda_dll2)
-            print(netG_dc.gd_stepsize)
+            # print(netG_dc.gd_stepsize)
             target = target.to(device)
             mask = mask.to(device)
             csm = csm.to(device)

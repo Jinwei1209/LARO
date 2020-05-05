@@ -14,7 +14,8 @@ class MultiEchoSimu(data.Dataset):
     def __init__(self,
         rootDir = '/data/Jinwei/Multi_echo_kspace/dataset',
         subject_IDs = ['MS1'],
-        num_echos = 6
+        num_echos = 3,
+        flag_input = 0  # 0 for four parameter under input, 1 for iField input
     ):
 
         self.rootDir = rootDir
@@ -22,37 +23,49 @@ class MultiEchoSimu(data.Dataset):
         self.num_echos = num_echos
         self.num_coils = 1
         self.load_subjects()
+        self.flag_input = flag_input
+        self.num_echos = num_echos
 
     def load_subjects(self):
         M_0, R_2, phi_0, phi_1, iField, phase, mask = [], [], [], [], [], [], []
+        M_0_under, R_2_under, phi_0_under, phi_1_under = [], [], [], []
         self.num_subjects = len(self.subject_IDs)
         self.num_slices = np.zeros(self.num_subjects)
         for idx, subject_ID in enumerate(self.subject_IDs):
             print('Loading case: {0}'.format(idx))
             dataFD = self.rootDir + '/' + subject_ID
-            M_0.append(np.real(load_mat(dataFD+'/water.mat', 'water'))[np.newaxis, ...])
+            M_0.append(np.real(load_mat(dataFD+'/m0.mat', 'm0'))[np.newaxis, ..., 0:68])
+            M_0_under.append(np.real(load_mat(dataFD+'/m0_{0}.mat'.format(self.num_echos), 'm0'))[np.newaxis, ..., 0:68])
             # r_2 = load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...]
             # r_2[r_2 > 1e+1] = 0
             # r_2[r_2 < -1e+1] = 0
             # R_2.append(r_2)
-            R_2.append(load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ...])
-            phi_0.append(load_mat(dataFD+'/p0.mat', 'p0')[np.newaxis, ...])
-            # phi_1.append(load_mat(dataFD+'/p1.mat', 'p1')[np.newaxis, ...])
-            phi_1.append(load_mat(dataFD+'/p1_unwrap.mat', 'p1')[np.newaxis, ...])
-            iField.append(load_mat(dataFD+'/iField.mat', 'iField')[np.newaxis, ...])
-            phase.append(load_mat(dataFD+'/phase_unwrapped.mat', 'phase_unwrapped')[np.newaxis, ...])
-            mask.append(load_mat(dataFD+'/Mask.mat', 'Mask')[np.newaxis, ...])
+            R_2.append(load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, ..., 0:68])
+            R_2_under.append(load_mat(dataFD+'/R2s_{0}.mat'.format(self.num_echos), 'R2s')[np.newaxis, ..., 0:68])
+            phi_0.append(load_mat(dataFD+'/f0.mat', 'f0')[np.newaxis, ..., 0:68])
+            phi_0_under.append(load_mat(dataFD+'/f0_{0}.mat'.format(self.num_echos), 'f0')[np.newaxis, ..., 0:68])
+            phi_1.append(load_mat(dataFD+'/p.mat', 'p')[np.newaxis, ..., 0:68])
+            phi_1_under.append(load_mat(dataFD+'/p_{0}.mat'.format(self.num_echos), 'p')[np.newaxis, ..., 0:68])
+            # phi_1.append(load_mat(dataFD+'/p1_unwrap.mat', 'p1')[np.newaxis, ...])
+            iField.append(load_mat(dataFD+'/iField.mat', 'iField')[np.newaxis, :, :, 0:68, :])
+            # phase.append(load_mat(dataFD+'/phase_unwrapped.mat', 'phase_unwrapped')[np.newaxis, ...])
+            mask.append(load_mat(dataFD+'/Mask.mat', 'Mask')[np.newaxis, ..., 0:68])
 
-            self.num_slices[idx] = load_mat(dataFD+'/Mask.mat', 'Mask').shape[2]
+            # self.num_slices[idx] = load_mat(dataFD+'/Mask.mat', 'Mask').shape[2]
+            self.num_slices[idx] = 68
 
         self.M_0 = np.concatenate(M_0, axis=0)
+        self.M_0_under = np.concatenate(M_0_under, axis=0)
         self.R_2 = np.concatenate(R_2, axis=0)
+        self.R_2_under = np.concatenate(R_2_under, axis=0)
         self.phi_0 = np.concatenate(phi_0, axis=0)
+        self.phi_0_under = np.concatenate(phi_0_under, axis=0)
         self.phi_1 = np.concatenate(phi_1, axis=0)
+        self.phi_1_under = np.concatenate(phi_1_under, axis=0)
         self.iField = np.concatenate(iField, axis=0)
-        self.phase = np.concatenate(phase, axis=0)
-        # conj of iField because in fit_ppm_complex code there was M = conj(M)
-        self.iField, self.phase = np.conjugate(self.iField), -self.phase
+        # self.phase = np.concatenate(phase, axis=0)
+        # # conj of iField because in fit_ppm_complex code there was M = conj(M)
+        # self.iField, self.phase = np.conjugate(self.iField), -self.phase
         self.mask = np.concatenate(mask, axis=0)
         self.num_samples = np.sum(self.num_slices)
         # sampling pattern
@@ -60,6 +73,33 @@ class MultiEchoSimu(data.Dataset):
         # self.sampling_mask = np.ones(self.sampling_mask.shape)
         self.sampling_mask = np.fft.fftshift(self.sampling_mask)[..., np.newaxis, np.newaxis]
         self.sampling_mask = np.tile(self.sampling_mask, [1, 1, 1, self.num_echos])
+
+        # compute mean
+        self.mean_M_0 = np.mean(self.M_0[self.mask==1])
+        self.mean_M_0_under = np.mean(self.M_0_under[self.mask==1])
+        self.mean_R_2 = np.mean(self.R_2[self.mask==1])
+        self.mean_R_2_under = np.mean(self.R_2_under[self.mask==1])
+        self.mean_phi_0 = np.mean(self.phi_0[self.mask==1])
+        self.mean_phi_0_under = np.mean(self.phi_0_under[self.mask==1])
+        self.mean_phi_1 = np.mean(self.phi_1[self.mask==1])
+        self.mean_phi_1_under = np.mean(self.phi_1_under[self.mask==1])
+
+        # compute std
+        self.std_M_0 = np.std(self.M_0[self.mask==1])
+        self.std_M_0_under = np.std(self.M_0_under[self.mask==1])
+        self.std_R_2 = np.std(self.R_2[self.mask==1])
+        self.std_R_2_under = np.std(self.R_2_under[self.mask==1])
+        self.std_phi_0 = np.std(self.phi_0[self.mask==1])
+        self.std_phi_0_under = np.std(self.phi_0_under[self.mask==1])
+        self.std_phi_1 = np.std(self.phi_1[self.mask==1])
+        self.std_phi_1_under = np.std(self.phi_1_under[self.mask==1])
+
+        print([self.mean_M_0, self.mean_M_0_under, self.mean_R_2, self.mean_R_2_under, 
+               self.mean_phi_0, self.mean_phi_0_under, self.mean_phi_1, self.mean_phi_1_under])
+
+        print([self.std_M_0, self.std_M_0_under, self.std_R_2, self.std_R_2_under, 
+               self.std_phi_0, self.std_phi_0_under, self.std_phi_1, self.std_phi_1_under])
+
 
     def __len__(self):
         return int(self.num_samples)
@@ -75,39 +115,45 @@ class MultiEchoSimu(data.Dataset):
                 idx_subject += 1
 
         M_0_slice = self.M_0[idx_subject, :, :, idx_slice][np.newaxis, ...]
+        M_0_under_slice = self.M_0_under[idx_subject, :, :, idx_slice][np.newaxis, ...]
         R_2_slice = self.R_2[idx_subject, :, :, idx_slice][np.newaxis, ...]
+        R_2_under_slice = self.R_2_under[idx_subject, :, :, idx_slice][np.newaxis, ...]
         phi_0_slice = self.phi_0[idx_subject, :, :, idx_slice][np.newaxis, ...]
+        phi_0_under_slice = self.phi_0_under[idx_subject, :, :, idx_slice][np.newaxis, ...]
         phi_1_slice = self.phi_1[idx_subject, :, :, idx_slice][np.newaxis, ...]
+        phi_1_under_slice = self.phi_1_under[idx_subject, :, :, idx_slice][np.newaxis, ...]
         mask_slice = self.mask[idx_subject, :, :, idx_slice][np.newaxis, ...]
 
         # assuming 1 coil and num_echos
         iField_slice = self.iField[idx_subject, :, :, idx_slice, np.newaxis, 0:self.num_echos]
+        targets = np.concatenate((M_0_slice, R_2_slice, phi_0_slice, phi_1_slice), axis=0)
+        mask_slice = np.tile(mask_slice, [4, 1, 1])  # brain mask
+        if self.flag_input == 1:
+            # sensitivity maps are all ones, with dims = (coil, echo, row, column, 2)
+            csm_slice_mat = np.ones(iField_slice.shape[0:2] + (self.num_coils, self.num_echos, ))
+            csm_slice = np.ones((self.num_coils, self.num_echos, ) + iField_slice.shape[0:2])
+            csm_slice = np.float32(csm_slice)
+            csm_slice = np.float32(np.concatenate((csm_slice[..., np.newaxis], 
+                                np.zeros(csm_slice.shape+(1,))), axis=-1))
 
-        # sensitivity maps are all ones, with dims = (coil, echo, row, column, 2)
-        csm_slice_mat = np.ones(iField_slice.shape[0:2] + (self.num_coils, self.num_echos, ))
-        csm_slice = np.ones((self.num_coils, self.num_echos, ) + iField_slice.shape[0:2])
-        csm_slice = np.float32(csm_slice)
-        csm_slice = np.float32(np.concatenate((csm_slice[..., np.newaxis], 
-                               np.zeros(csm_slice.shape+(1,))), axis=-1))
+            # coil-combined image, magnitude and temperal unwrapped phase
+            kdata_slice, image_slice = self.generate_kdata(iField_slice, csm_slice_mat)
+            mag_slice = abs(image_slice)
+            unwrapped_phase = self.phase_unwrap(image_slice)  # temperal unwrapping, not good
+            # unwrapped_phase = self.phase[idx_subject, :, :, idx_slice, 0:self.num_echos]  # spatial unwrapped (pre-processed, not good in the later echos)
+            mag_slice = np.float32(np.transpose(mag_slice, (2, 0, 1)))
+            unwrapped_phase = np.float32(np.transpose(unwrapped_phase, (2, 0, 1)))
 
-        # coil-combined image, magnitude and temperal unwrapped phase
-        kdata_slice, image_slice = self.generate_kdata(iField_slice, csm_slice_mat)
-        mag_slice = abs(image_slice)
-        unwrapped_phase = self.phase_unwrap(image_slice)  # temperal unwrapping, not good
-        # unwrapped_phase = self.phase[idx_subject, :, :, idx_slice, 0:self.num_echos]  # spatial unwrapped (pre-processed, not good in the later echos)
-        mag_slice = np.float32(np.transpose(mag_slice, (2, 0, 1)))
-        unwrapped_phase = np.float32(np.transpose(unwrapped_phase, (2, 0, 1)))
-
-        # sampling pattern, with dims = (coil, echo, row, column, 2)
-        sampling_mask_slice = np.transpose(self.sampling_mask, (2, 3, 0, 1))
-        sampling_mask_slice = np.float32(sampling_mask_slice)
-        sampling_mask_slice = np.float32(np.concatenate((sampling_mask_slice[..., np.newaxis], 
-                                         np.zeros(sampling_mask_slice.shape+(1,))), axis=-1))
-
-        target = np.concatenate((M_0_slice, R_2_slice, phi_0_slice, phi_1_slice), axis=0)
-        mask_slice = np.tile(mask_slice, [4, 1, 1])
-
-        return target, mask_slice, sampling_mask_slice, csm_slice, kdata_slice, mag_slice, unwrapped_phase
+            # sampling pattern, with dims = (coil, echo, row, column, 2)
+            sampling_mask_slice = np.transpose(self.sampling_mask, (2, 3, 0, 1))
+            sampling_mask_slice = np.float32(sampling_mask_slice)
+            sampling_mask_slice = np.float32(np.concatenate((sampling_mask_slice[..., np.newaxis], 
+                                            np.zeros(sampling_mask_slice.shape+(1,))), axis=-1))
+            return targets, mask_slice, sampling_mask_slice, csm_slice, kdata_slice, mag_slice, unwrapped_phase
+        else:
+            inputs = np.concatenate((M_0_under_slice, R_2_under_slice, 
+                                     phi_0_under_slice, phi_1_under_slice), axis=0)
+            return targets, mask_slice, iField_slice, inputs
 
     def generate_kdata(self, iField_slice, csm_slice, noise_std=0.00):
         kdata_full = np.fft.fft2(iField_slice, axes=(0, 1), norm=None)

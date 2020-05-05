@@ -30,9 +30,9 @@ from utils.operators import OperatorsMultiEcho
 if __name__ == '__main__':
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
-    subject_IDs = ['MS1']
+    subject_IDs_train = ['MS1', 'MS2']
     num_echos = 3
-    lambda_dll2 = 0.01
+    lambda_dll2 = 1
     gd_stepsize = 0.1
     batch_size = 1
     K = 1
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     epoch = 0
     lrG_dc = 1e-3
 
-    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs, num_echos=num_echos)
+    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs_train, num_echos=num_echos)
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -78,45 +78,26 @@ if __name__ == '__main__':
                 kdata = kdata.to(device)
                 mag = mag.to(device)
                 phase = phase.to(device)
+                brain_mask = brain_mask.cuda()
                 # forward
                 para_start, paras_prior, paras = netG_dc(mask, csm, kdata, mag, phase)
                 # stochastic gradient descnet
                 optimizerG_dc.zero_grad()
 
+                # for CG style pre-trian
+                loss_total = lossl1(para_start, target*brain_mask)
+                # # for Jacobian style pre-train
                 # loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
 
-                loss_total = lossl1(para_start, target)
-                for i in range(K):
-                    loss_total = loss_total + lossl1(paras[i], target)
+                # further-train
+                # loss_total = lossl1(para_start, target)
+                # for i in range(K):
+                #     loss_total = loss_total + lossl1(paras[i], target)
 
                 loss_total.backward()
                 optimizerG_dc.step()
                 print('Loss = {0}'.format(loss_total.item()))
                 print('Lambda = {0}'.format(netG_dc.lambda_dll2))
-                print('Step size = {0}'.format(netG_dc.gd_stepsize))
+                # print('Step size = {0}'.format(netG_dc.gd_stepsize))
 
         torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
-
-
-
-            # M_0 = target[:, 0:1, ...].to(device)
-            # R_2 = target[:, 1:2, ...].to(device)
-            # phi_0 = target[:, 2:3, ...].to(device)
-            # f = target[:, 3:4, ...].to(device)
-
-            # operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, lambda_dll2)
-            # kdata_forward = operators.forward_operator()
-
-            # gradient_forward = operators.jacobian_conj(kdata_forward)
-            # gradient = operators.jacobian_conj(kdata)
-            # diff = gradient_forward - gradient
-
-            # img_forward = torch.ifft(kdata_forward, signal_ndim=2)
-            # img = torch.ifft(kdata, signal_ndim=2)
-
-            # if idx == 3:
-            #     adict = {}
-            #     adict['diff'] = np.squeeze(np.asarray(diff.cpu().detach()))
-            #     sio.savemat('diff.mat', adict)
-
-            #     break

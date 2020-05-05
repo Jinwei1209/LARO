@@ -21,14 +21,14 @@ def ConvBlock(
         layers.append(nn.BatchNorm2d(output_dim))
     elif use_bn == 2:
         layers.append(nn.GroupNorm(output_dim, output_dim))
-    layers.append(nn.ReLU(inplace=True))
+    layers.append(nn.LeakyReLU(inplace=False))
 
     layers.append(nn.Conv2d(output_dim, output_dim, kernel_size, stride, padding))
     if use_bn == 1:
         layers.append(nn.BatchNorm2d(output_dim))
     elif use_bn == 2:
         layers.append(nn.GroupNorm(output_dim, output_dim))
-    layers.append(nn.ReLU(inplace=True))
+    layers.append(nn.LeakyReLU(inplace=False))
 
     return layers
 

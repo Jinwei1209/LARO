@@ -47,7 +47,7 @@ class MultiEchoDC(nn.Module):
             output_channels=4, 
             num_filters=[2**i for i in range(5, 10)],
             use_bn=2,
-            use_deconv=0
+            use_deconv=1
         )
 
         # # prior resnet to do l2-regularized optimization
@@ -79,13 +79,13 @@ class MultiEchoDC(nn.Module):
         # self.resnet_prior_f = nn.Sequential(*self.resnet_prior_f)
         # self.resnet_prior_f.apply(init_weights)
 
-        self.resnet_prior = Unet(
-            input_channels=4, 
-            output_channels=4, 
-            num_filters=[2**i for i in range(5, 10)],
-            use_bn=2,
-            use_deconv=0
-        )
+        # self.resnet_prior = Unet(
+        #     input_channels=4, 
+        #     output_channels=4, 
+        #     num_filters=[2**i for i in range(5, 10)],
+        #     use_bn=2,
+        #     use_deconv=0
+        # )
 
         self.K = K
         self.lambda_dll2 = nn.Parameter(torch.ones(4)*lambda_dll2, requires_grad=True).float()
@@ -93,7 +93,7 @@ class MultiEchoDC(nn.Module):
 
     def forward(self, mask, csm, kdata, mag, phase):
         device = kdata.get_device()
-        para_start = self.resnet_init(torch.cat(mag, phase), dim=1)
+        para_start = self.resnet_init(torch.cat((mag, phase), dim=1))
         M_0 = para_start[:, 0:1, ...]
         R_2 = para_start[:, 1:2, ...]
         phi_0 = para_start[:, 2:3, ...]
@@ -105,28 +105,28 @@ class MultiEchoDC(nn.Module):
         operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, self.lambda_dll2[0])
         W = operators.forward_operator()
         rhs = self.lambda_dll2[0]*M_0 + operators.jacobian_conj(kdata, flag=1)
-        dc_layer = DC_layer_real(operators, rhs, flag=1)
-        M_0 = dc_layer.CG_iter()
+        dc_layer = DC_layer_real(operators, rhs, flag=1, use_dll2=1)
+        M_0_new = dc_layer.CG_iter(max_iter=2)
         # DC layer for R_2
-        operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, self.lambda_dll2[1])
+        operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2, phi_0, f, self.lambda_dll2[1])
         B = operators.forward_operator() - kdata
         rhs = - operators.jacobian_conj(B, flag=2)
-        dc_layer = DC_layer_real(operators, rhs, flag=2)
-        R_2 += dc_layer.CG_iter()
+        dc_layer = DC_layer_real(operators, rhs, flag=2, use_dll2=1)
+        R_2_new = R_2 + dc_layer.CG_iter(max_iter=2)
         # DC layer for phi_0
-        operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, self.lambda_dll2[2])
+        operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2_new, phi_0, f, self.lambda_dll2[2])
         B = operators.forward_operator() - kdata
         rhs = - operators.jacobian_conj(B, flag=3)
-        dc_layer = DC_layer_real(operators, rhs, flag=3)
-        phi_0 += dc_layer.CG_iter()
+        dc_layer = DC_layer_real(operators, rhs, flag=3, use_dll2=1)
+        phi_0_new = phi_0 + dc_layer.CG_iter(max_iter=2)
         # DC layer for f
-        operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, self.lambda_dll2[3])
+        operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2_new, phi_0_new, f, self.lambda_dll2[3])
         B = operators.forward_operator() - kdata
         rhs = - operators.jacobian_conj(B, flag=4)
-        dc_layer = DC_layer_real(operators, rhs, flag=4)
-        f += dc_layer.CG_iter()
+        dc_layer = DC_layer_real(operators, rhs, flag=4, use_dll2=1)
+        f_new = f + dc_layer.CG_iter(max_iter=2)
         # concatenate
-        para = torch.cat((M_0, R_2, phi_0, f), dim=1)
+        para = torch.cat((M_0_new, R_2_new, phi_0_new, f_new), dim=1)
         paras.append(para)
 
         return para_start, paras, paras
