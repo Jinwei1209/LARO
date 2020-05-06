@@ -98,8 +98,8 @@ class DC_layer():
 
 # real valued CG layer for undersampled field estimation problem
 class DC_layer_real():
-    def __init__(self, A, rhs, flag, use_dll2=1):
-        self.AtA = lambda z: A.AtA(z, flag=flag, use_dll2=use_dll2)
+    def __init__(self, A, rhs, flag, use_dll2=1, lambda_dll2=1):
+        self.AtA = lambda z: A.AtA(z, flag=flag, use_dll2=use_dll2, lambda_dll2=lambda_dll2)
         self.rhs = rhs
         self.device = rhs.get_device()
 

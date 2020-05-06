@@ -66,3 +66,25 @@ class Unet(nn.Module):
             x = x + x_start
 
         return x
+
+    
+def multi_unet(
+    input_channels,
+    output_channels,
+    num_filters,
+    use_bn=1,
+    use_deconv=1,
+    skip_connect=False,
+    K=1
+):
+    unet_list = nn.ModuleList()
+    for i in range(K):
+        unet_list.append(Unet(
+            input_channels,
+            output_channels,
+            num_filters,
+            use_bn,
+            use_deconv,
+            skip_connect
+        ))
+    return unet_list

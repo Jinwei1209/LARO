@@ -4,7 +4,6 @@ import time
 import torch
 import math
 import argparse
-import argcomplete
 import numpy as np
 
 from torch.utils import data
@@ -22,36 +21,46 @@ from models.dc_with_prop_mask import *
 from models.dc_with_straight_through_pmask import *
 from models.dc_st_pmask import *
 from models.dc_multi_echo import *
+from models.dc_multi_echo2 import *
 from utils.test import *
 from utils.operators import OperatorsMultiEcho
 
 
 if __name__ == '__main__':
 
-    rootName = '/data/Jinwei/Multi_echo_kspace'
-    subject_IDs = ['MS1']
-    num_echos = 3
-    lambda_dll2 = 1
-    gd_stepsize = 0.1
-    batch_size = 1
-    K = 1
-    niter = 500
-    epoch = 0
-    lrG_dc = 1e-3
-
-    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs, num_echos=num_echos)
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
-
-    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    rootName = '/data/Jinwei/Multi_echo_kspace'
+    subject_IDs_test = ['MS1']
+    num_echos = 3
+    lambda_dll2 = np.array([1e-3, 1e-3, 1e-2, 1e-2])
+    batch_size = 1
+    K = 3
+
+    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', 
+        subject_IDs=subject_IDs_test, 
+        num_echos=num_echos,
+        flag_train=0)
+    testLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
+
+    para_means, para_stds = np.load(rootName+'/parameters_means.npy'), np.load(rootName+'/parameters_stds.npy')
+
     # network
+    # netG_dc = MultiEchoDC2(
+    #     filter_channels=32,
+    #     num_echos=num_echos,
+    #     lambda_dll2=lambda_dll2,
+    #     norm_means=para_means,
+    #     norm_stds=para_stds,
+    #     K=K
+    # )
     netG_dc = MultiEchoDC(
-        input1_channels=num_echos, 
-        filter1_channels=32,
-        filter2_channels=32,
+        filter_channels=32,
+        num_echos=num_echos,
         lambda_dll2=lambda_dll2,
-        gd_stepsize=gd_stepsize,
+        norm_means=para_means,
+        norm_stds=para_stds,
         K=K
     )
     # print(netG_dc)
@@ -61,22 +70,20 @@ if __name__ == '__main__':
     netG_dc.eval()
 
     with torch.no_grad():
-        for idx, (target, brain_mask, mask, csm, kdata, mag, phase) in enumerate(trainLoader):
+        for idx, (targets, brain_mask, iField, inputs) in enumerate(testLoader):
             print(idx)
-            print(netG_dc.lambda_dll2)
-            # print(netG_dc.gd_stepsize)
-            target = target.to(device)
-            mask = mask.to(device)
-            csm = csm.to(device)
-            kdata = kdata.to(device)
-            mag = mag.to(device)
-            phase = phase.to(device)
-            para_start, paras_prior, paras = netG_dc(mask, csm, kdata, mag, phase)
+            # print(idx)
+            brain_mask = brain_mask.to(device)
+            inputs = inputs.to(device) * brain_mask
+            targets = targets.to(device) * brain_mask
+            brain_mask_iField = brain_mask[:, 0, None, None, :, :, None].repeat(1, 1, num_echos, 1, 1, 2)
+            iField = iField.to(device).permute(0, 3, 4, 1, 2, 5) * brain_mask_iField
+            paras, paras_prior = netG_dc(inputs, iField)
 
             if idx == 30:
-                adict = {}
-                adict['para_start'] = np.squeeze(np.asarray(para_start.cpu().detach()))
-                sio.savemat('para_start.mat', adict)
+                # adict = {}
+                # adict['para_start'] = np.squeeze(np.asarray(para_start.cpu().detach()))
+                # sio.savemat('para_start.mat', adict)
 
                 adict = {}
                 adict['para_prior'] = np.squeeze(np.asarray(paras_prior[-1].cpu().detach()))

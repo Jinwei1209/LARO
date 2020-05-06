@@ -19,175 +19,136 @@ class MultiEchoDC(nn.Module):
 
     def __init__(
         self,
-        input1_channels,
-        filter1_channels,
-        filter2_channels,
+        filter_channels,
+        num_echos,
         lambda_dll2,
-        gd_stepsize,
+        norm_means,  # means for normalization
+        norm_stds,  # stds for normalization
         K=1
     ):
         super(MultiEchoDC, self).__init__()
-        # two warmup resnets to provide initialization of optimization
-        # self.resnet_init_mag = []
-        # layers = ResBlock(input1_channels, filter1_channels, output_dim=2, use_norm=2)
-        # for layer in layers:
-        #     self.resnet_init_mag.append(layer)
-        # self.resnet_init_mag = nn.Sequential(*self.resnet_init_mag)
-        # self.resnet_init_mag.apply(init_weights)
-
-        # self.resnet_init_phase = []
-        # layers = ResBlock(input1_channels, filter1_channels, output_dim=2, use_norm=2)
-        # for layer in layers:
-        #     self.resnet_init_phase.append(layer)
-        # self.resnet_init_phase = nn.Sequential(*self.resnet_init_phase)
-        # self.resnet_init_phase.apply(init_weights)
-
-        self.resnet_init = Unet(
-            input_channels=input1_channels*2, 
-            output_channels=4, 
-            num_filters=[2**i for i in range(5, 10)],
+        # resnet to do l2-regularized optimization
+        self.resnet_prior_M_0 = multi_unet(
+            input_channels=1, 
+            output_channels=1, 
+            num_filters=[2**i for i in range(4, 8)],
             use_bn=2,
-            use_deconv=1
+            use_deconv=1,
+            K=K
+        )
+        self.resnet_prior_R_2 = multi_unet(
+            input_channels=1, 
+            output_channels=1, 
+            num_filters=[2**i for i in range(4, 8)],
+            use_bn=2,
+            use_deconv=1,
+            K=K
+        )
+        self.resnet_prior_phi_0 = multi_unet(
+            input_channels=1, 
+            output_channels=1, 
+            num_filters=[2**i for i in range(4, 8)],
+            use_bn=2,
+            use_deconv=1,
+            K=K
+        )
+        self.resnet_prior_f = multi_unet(
+            input_channels=1, 
+            output_channels=1, 
+            num_filters=[2**i for i in range(4, 8)],
+            use_bn=2,
+            use_deconv=1,
+            K=K
         )
 
-        # # prior resnet to do l2-regularized optimization
-        # self.resnet_prior_M_0 = []
-        # layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
-        # for layer in layers:
-        #     self.resnet_prior_M_0.append(layer)
-        # self.resnet_prior_M_0 = nn.Sequential(*self.resnet_prior_M_0)
-        # self.resnet_prior_M_0.apply(init_weights)
-
-        # self.resnet_prior_R_2 = []
-        # layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
-        # for layer in layers:
-        #     self.resnet_prior_R_2.append(layer)
-        # self.resnet_prior_R_2 = nn.Sequential(*self.resnet_prior_R_2)
-        # self.resnet_prior_R_2.apply(init_weights)
-
-        # self.resnet_prior_phi_0 = []
-        # layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
-        # for layer in layers:
-        #     self.resnet_prior_phi_0.append(layer)
-        # self.resnet_prior_phi_0 = nn.Sequential(*self.resnet_prior_phi_0)
-        # self.resnet_prior_phi_0.apply(init_weights)
-
-        # self.resnet_prior_f = []
-        # layers = ResBlock(1, filter2_channels, output_dim=1, use_norm=2)
-        # for layer in layers:
-        #     self.resnet_prior_f.append(layer)
-        # self.resnet_prior_f = nn.Sequential(*self.resnet_prior_f)
-        # self.resnet_prior_f.apply(init_weights)
-
-        # self.resnet_prior = Unet(
-        #     input_channels=4, 
-        #     output_channels=4, 
-        #     num_filters=[2**i for i in range(5, 10)],
-        #     use_bn=2,
-        #     use_deconv=0
-        # )
-
+        self.num_echos = num_echos
         self.K = K
-        self.lambda_dll2 = nn.Parameter(torch.ones(4)*lambda_dll2, requires_grad=True).float()
-        # self.gd_stepsize = nn.Parameter(torch.ones(1)*gd_stepsize, requires_grad=False).float()
-
-    def forward(self, mask, csm, kdata, mag, phase):
-        device = kdata.get_device()
-        para_start = self.resnet_init(torch.cat((mag, phase), dim=1))
-        M_0 = para_start[:, 0:1, ...]
-        R_2 = para_start[:, 1:2, ...]
-        phi_0 = para_start[:, 2:3, ...]
-        f = para_start[:, 3:4, ...]
-        self.lambda_dll2 = self.lambda_dll2.to(device)
-
-        paras = []
-        # DC layer for M_0    
-        operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, self.lambda_dll2[0])
-        W = operators.forward_operator()
-        rhs = self.lambda_dll2[0]*M_0 + operators.jacobian_conj(kdata, flag=1)
-        dc_layer = DC_layer_real(operators, rhs, flag=1, use_dll2=1)
-        M_0_new = dc_layer.CG_iter(max_iter=2)
-        # DC layer for R_2
-        operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2, phi_0, f, self.lambda_dll2[1])
-        B = operators.forward_operator() - kdata
-        rhs = - operators.jacobian_conj(B, flag=2)
-        dc_layer = DC_layer_real(operators, rhs, flag=2, use_dll2=1)
-        R_2_new = R_2 + dc_layer.CG_iter(max_iter=2)
-        # DC layer for phi_0
-        operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2_new, phi_0, f, self.lambda_dll2[2])
-        B = operators.forward_operator() - kdata
-        rhs = - operators.jacobian_conj(B, flag=3)
-        dc_layer = DC_layer_real(operators, rhs, flag=3, use_dll2=1)
-        phi_0_new = phi_0 + dc_layer.CG_iter(max_iter=2)
-        # DC layer for f
-        operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2_new, phi_0_new, f, self.lambda_dll2[3])
-        B = operators.forward_operator() - kdata
-        rhs = - operators.jacobian_conj(B, flag=4)
-        dc_layer = DC_layer_real(operators, rhs, flag=4, use_dll2=1)
-        f_new = f + dc_layer.CG_iter(max_iter=2)
-        # concatenate
-        para = torch.cat((M_0_new, R_2_new, phi_0_new, f_new), dim=1)
-        paras.append(para)
-
-        return para_start, paras, paras
+        self.lambda_dll2 = nn.Parameter(torch.Tensor(lambda_dll2), requires_grad=False).float()
+        self.gd_stepsize = nn.Parameter(torch.ones(1)*5, requires_grad=False).float()
+        self.norm_means = torch.Tensor(norm_means).cuda()
+        self.norm_stds = torch.Tensor(norm_stds).cuda()
 
     # def forward(self, mask, csm, kdata, mag, phase):
     #     device = kdata.get_device()
-    #     # option one, two resnet
-    #     # para_start1 = self.resnet_init_mag(mag)
-    #     # para_start2 = self.resnet_init_phase(phase)
-    #     # para_start = torch.cat((para_start1, para_start2), dim=1)
-
-    #     # option two. one big unet
     #     para_start = self.resnet_init(torch.cat((mag, phase), dim=1))
-        
-    #     lambda_dll2 = self.lambda_dll2.to(device)
-    #     # lambda_dll2 = lambda_dll2[None, :, None, None]
-    #     # lambda_dll2 = lambda_dll2.repeat(csm.shape[0], 1, csm.shape[3], csm.shape[4])
-
-    #     gd_stepsize = self.gd_stepsize.to(device)
-    #     # gd_stepsize = gd_stepsize[None, :, None, None]
-    #     # gd_stepsize = gd_stepsize.repeat(csm.shape[0], 1, csm.shape[3], csm.shape[4])
+    #     M_0 = para_start[:, 0:1, ...]
+    #     R_2 = para_start[:, 1:2, ...]
+    #     phi_0 = para_start[:, 2:3, ...]
+    #     f = para_start[:, 3:4, ...]
+    #     self.lambda_dll2 = self.lambda_dll2.to(device)
 
     #     paras = []
-    #     paras_prior = []
-    #     para = para_start
-    #     for i in range(self.K):
-    #         M_0 = para[:, 0:1, ...]
-    #         R_2 = para[:, 1:2, ...]
-    #         phi_0 = para[:, 2:3, ...]
-    #         f = para[:, 3:4, ...]
-    #         # # concatenate priors
-    #         # M_0_prior = self.resnet_prior_M_0(M_0)
-    #         # R_2_prior = self.resnet_prior_R_2(R_2)
-    #         # phi_0_prior = self.resnet_prior_phi_0(phi_0)
-    #         # f_prior = self.resnet_prior_f(f)
-    #         # para_prior = torch.cat((M_0_prior, R_2_prior, phi_0_prior, f_prior), dim=1)
-    #         para_prior = self.resnet_prior(para)
-    #         M_0_prior = para_prior[:, 0:1, ...]
-    #         R_2_prior = para_prior[:, 1:2, ...]
-    #         phi_0_prior = para_prior[:, 2:3, ...]
-    #         f_prior = para_prior[:, 3:4, ...]
-    #         # my_isnan(para_prior, i)
-    #         # gradient prior
-    #         gradient_prior_M0 = lambda_dll2[0]  * (M_0 - M_0_prior)
-    #         gradient_prior_R_2 = lambda_dll2[1]  * (R_2 - R_2_prior)
-    #         gradient_prior_phi_0 = lambda_dll2[2]  * (phi_0 - phi_0_prior)
-    #         gradient_prior_f = lambda_dll2[3]  * (f - f_prior)
-    #         gradient_prior = torch.cat((gradient_prior_M0, gradient_prior_R_2, 
-    #                                     gradient_prior_phi_0, gradient_prior_f), dim=1)
-    #         # generate fidelity operator
-    #         operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f)
-    #         kdata_generated = operators.forward_operator()
-    #         # my_isnan(kdata_generated, i)
-    #         kdata_diff = kdata_generated - kdata
-    #         # calculate fidelity gradient
-    #         gradient_fidelity = operators.jacobian_conj(kdata_diff)
-    #         # total gradient
-    #         gradient_total = gradient_fidelity + gradient_prior
-    #         # gradient descent step
-    #         para = para - gd_stepsize * gradient_total
-    #         paras.append(para)
-    #         paras_prior.append(para_prior)
-    #     return para_start, paras_prior, paras
+    #     # DC layer for M_0    
+    #     operators = OperatorsMultiEcho(mask, csm, M_0, R_2, phi_0, f, self.lambda_dll2[0])
+    #     W = operators.forward_operator()
+    #     rhs = self.lambda_dll2[0]*M_0 + operators.jacobian_conj(kdata, flag=1)
+    #     dc_layer = DC_layer_real(operators, rhs, flag=1, use_dll2=1)
+    #     M_0_new = dc_layer.CG_iter(max_iter=2)
+    #     # DC layer for R_2
+    #     operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2, phi_0, f, self.lambda_dll2[1])
+    #     B = operators.forward_operator() - kdata
+    #     rhs = - operators.jacobian_conj(B, flag=2)
+    #     dc_layer = DC_layer_real(operators, rhs, flag=2, use_dll2=1)
+    #     R_2_new = R_2 + dc_layer.CG_iter(max_iter=2)
+    #     # DC layer for phi_0
+    #     operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2_new, phi_0, f, self.lambda_dll2[2])
+    #     B = operators.forward_operator() - kdata
+    #     rhs = - operators.jacobian_conj(B, flag=3)
+    #     dc_layer = DC_layer_real(operators, rhs, flag=3, use_dll2=1)
+    #     phi_0_new = phi_0 + dc_layer.CG_iter(max_iter=2)
+    #     # DC layer for f
+    #     operators = OperatorsMultiEcho(mask, csm, M_0_new, R_2_new, phi_0_new, f, self.lambda_dll2[3])
+    #     B = operators.forward_operator() - kdata
+    #     rhs = - operators.jacobian_conj(B, flag=4)
+    #     dc_layer = DC_layer_real(operators, rhs, flag=4, use_dll2=1)
+    #     f_new = f + dc_layer.CG_iter(max_iter=2)
+    #     # concatenate
+    #     para = torch.cat((M_0_new, R_2_new, phi_0_new, f_new), dim=1)
+    #     paras.append(para)
+
+    #     return para_start, paras, paras
+
+    def forward(self, inputs, iField):
+        device = inputs.get_device()
+        paras, paras_prior = [], []
+        para = inputs
+        lambda_dll2 = self.lambda_dll2.to(device)
+        gd_stepsize = self.gd_stepsize.to(device)
+        for k in range(self.K):
+            M_0 = para[:, 0:1, ...]
+            R_2 = para[:, 1:2, ...]
+            phi_0 = para[:, 2:3, ...]
+            f = para[:, 3:4, ...]
+
+            # norm
+            M_0_norm = (M_0 - self.norm_means[0]) / self.norm_stds[0]
+            R_2_norm = (R_2 - self.norm_means[1]) / self.norm_stds[1]
+            phi_0_norm = (phi_0 - self.norm_means[2]) / self.norm_stds[2]
+            f_norm = (f - self.norm_means[3]) / self.norm_stds[3]
+            # denorm
+            M_0_prior = self.resnet_prior_M_0[k](M_0_norm) * self.norm_stds[0] + self.norm_means[0]
+            R_2_prior = self.resnet_prior_R_2[k](R_2_norm) * self.norm_stds[1] + self.norm_means[1]
+            phi_0_prior = self.resnet_prior_phi_0[k](phi_0_norm) * self.norm_stds[2] + self.norm_means[2]
+            f_prior = self.resnet_prior_f[k](f_norm) * self.norm_stds[3] + self.norm_means[3]
+            para_prior = torch.cat((M_0_prior, R_2_prior, phi_0_prior, f_prior), dim=1)
+
+            # gradient prior
+            gradient_prior_M0 = lambda_dll2[0] * (M_0 - M_0_prior)
+            gradient_prior_R_2 = lambda_dll2[1] * (R_2 - R_2_prior)
+            gradient_prior_phi_0 = lambda_dll2[2] * (phi_0 - phi_0_prior)
+            gradient_prior_f = lambda_dll2[3] * (f - f_prior)
+            gradient_prior = torch.cat((gradient_prior_M0, gradient_prior_R_2, 
+                                        gradient_prior_phi_0, gradient_prior_f), dim=1)
+            # generate fidelity operator
+            operators = OperatorsMultiEcho(M_0, R_2, phi_0, f, num_echos=self.num_echos)
+            # calculate fidelity gradient
+            gradient_fidelity = operators.jacobian_conj(operators.forward_operator() - iField)
+            # total gradient
+            gradient_total = gradient_fidelity + gradient_prior
+            # gradient descent step
+            para = para - gd_stepsize * gradient_total
+
+            paras.append(para)
+            paras_prior.append(para_prior)
+        return paras, paras_prior
 

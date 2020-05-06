@@ -4,7 +4,6 @@ import time
 import torch
 import math
 import argparse
-import argcomplete
 import numpy as np
 
 from torch.utils import data
@@ -23,38 +22,66 @@ from models.dc_with_prop_mask import *
 from models.dc_with_straight_through_pmask import *
 from models.dc_st_pmask import *
 from models.dc_multi_echo import *
+from models.dc_multi_echo2 import *
 from utils.test import *
 from utils.operators import OperatorsMultiEcho
 
 
 if __name__ == '__main__':
 
-    rootName = '/data/Jinwei/Multi_echo_kspace'
-    subject_IDs_train = ['MS1', 'MS2']
-    num_echos = 3
-    lambda_dll2 = 1
-    gd_stepsize = 0.1
-    batch_size = 1
-    K = 1
-    niter = 500
-    epoch = 0
-    lrG_dc = 1e-3
-
-    dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', subject_IDs=subject_IDs_train, num_echos=num_echos)
-    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
-
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    rootName = '/data/Jinwei/Multi_echo_kspace'
+    subject_IDs_train = ['MS1']
+    subject_IDs_test = ['MS5']
+    num_echos = 3
+    lambda_dll2 = np.array([1e-6, 1e-1, 1e-6, 1e-1])
+    batch_size = 1
+    K = 3
+    niter = 500
+    epoch = 0
+    gen_iterations = 0
+    display_iters = 10
+    lrG_dc = 1e-3
+
+    dataLoader = MultiEchoSimu(
+        rootDir=rootName+'/dataset', 
+        subject_IDs=subject_IDs_train, 
+        num_echos=num_echos,
+        flag_train=1
+    )
+    trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
+    para_means, para_stds = dataLoader.parameters_means, dataLoader.parameters_stds
+    np.save(rootName+'/parameters_means.npy', para_means)
+    np.save(rootName+'/parameters_stds.npy', para_stds)
+
+    # dataLoader = MultiEchoSimu(
+    #     rootDir=rootName+'/dataset', 
+    #     subject_IDs=subject_IDs_test, 
+    #     num_echos=num_echos,
+    #     flag_train=0
+    # )
+    # valLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
+
     # network
+    # netG_dc = MultiEchoDC2(
+    #     filter_channels=32,
+    #     num_echos=num_echos,
+    #     lambda_dll2=lambda_dll2,
+    #     norm_means=para_means,
+    #     norm_stds=para_stds,
+    #     K=K
+    # )
     netG_dc = MultiEchoDC(
-        input1_channels=num_echos, 
-        filter1_channels=32,
-        filter2_channels=32,
+        filter_channels=32,
+        num_echos=num_echos,
         lambda_dll2=lambda_dll2,
-        gd_stepsize=gd_stepsize,
+        norm_means=para_means,
+        norm_stds=para_stds,
         K=K
     )
+    print(netG_dc)
     netG_dc.to(device)
     # weights_dict = torch.load(rootName+'/weights/weight.pt')
     # netG_dc.load_state_dict(weights_dict)
@@ -69,35 +96,29 @@ if __name__ == '__main__':
 
         # training phase
         netG_dc.train()
-        for idx, (target, brain_mask, mask, csm, kdata, mag, phase) in enumerate(trainLoader):
-            with autograd.detect_anomaly():
-                print(idx)
-                target = target.to(device)
-                mask = mask.to(device)
-                csm = csm.to(device)
-                kdata = kdata.to(device)
-                mag = mag.to(device)
-                phase = phase.to(device)
-                brain_mask = brain_mask.cuda()
-                # forward
-                para_start, paras_prior, paras = netG_dc(mask, csm, kdata, mag, phase)
-                # stochastic gradient descnet
-                optimizerG_dc.zero_grad()
+        for idx, (targets, brain_mask, iField, inputs) in enumerate(trainLoader):
+            # with autograd.detect_anomaly():
+            # print(idx)
+            brain_mask = brain_mask.to(device)
+            inputs = inputs.to(device) * brain_mask
+            targets = targets.to(device) * brain_mask
+            brain_mask_iField = brain_mask[:, 0, None, None, :, :, None].repeat(1, 1, num_echos, 1, 1, 2)
+            iField = iField.to(device).permute(0, 3, 4, 1, 2, 5) * brain_mask_iField
+            # forward
+            paras, paras_prior = netG_dc(inputs, iField)
+            # stochastic gradient descent
+            optimizerG_dc.zero_grad()
+            loss_total = 0
+            for i in range(K):
+                loss_total += lossl1(paras_prior[i], targets) + lossl1(paras[i], targets)
+            for i in range(K):
+                loss_total += 10*lossl1(paras_prior[i][:, 0, ...], targets[:, 0, ...]) + 10*lossl1(paras[i][:, 0, ...], targets[:, 0, ...])
+            loss_total.backward()
+            optimizerG_dc.step()
 
-                # for CG style pre-trian
-                loss_total = lossl1(para_start, target*brain_mask)
-                # # for Jacobian style pre-train
-                # loss_total = lossl1(para_start, target) + lossl1(paras_prior[0], target)
-
-                # further-train
-                # loss_total = lossl1(para_start, target)
-                # for i in range(K):
-                #     loss_total = loss_total + lossl1(paras[i], target)
-
-                loss_total.backward()
-                optimizerG_dc.step()
+            if gen_iterations%display_iters == 0:
                 print('Loss = {0}'.format(loss_total.item()))
                 print('Lambda = {0}'.format(netG_dc.lambda_dll2))
-                # print('Step size = {0}'.format(netG_dc.gd_stepsize))
+            gen_iterations += 1
 
         torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')

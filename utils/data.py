@@ -249,6 +249,61 @@ class Logger():
         # self.flagSave = False
         self.file.close()
 
+# def sphere_kernel(matrix_size,voxel_size, radius):
+    
+#     x = np.arange(-matrix_size[1]/2, matrix_size[1]/2, 1)
+#     y = np.arange(-matrix_size[0]/2, matrix_size[0]/2, 1)
+#     z = np.arange(-matrix_size[2]/2, matrix_size[2]/2, 1)
+#     Y, X, Z = np.meshgrid(x, y, z)
+    
+#     X = X*voxel_size[0]
+#     Y = Y*voxel_size[1]
+#     Z = Z*voxel_size[2]
+    
+#     Sphere_out = (np.maximum(abs(X) - 0.5*voxel_size[0], 0)**2 + np.maximum(abs(Y) - 0.5*voxel_size[1], 0)**2 
+#                   + np.maximum(abs(Z) - 0.5*voxel_size[2], 0)**2) > radius**2
+    
+#     Sphere_in = ((abs(X) + 0.5*voxel_size[0])**2 + (abs(Y) + 0.5*voxel_size[1])**2 
+#                   + (abs(Z) + 0.5*voxel_size[2])**2) <= radius**2
+    
+#     Sphere_mid = np.zeros(matrix_size)
+    
+#     split = 10  #such that error is controlled at <1/(2*10)
+    
+#     x_v = np.arange(-split+0.5, split+0.5, 1)
+#     y_v = np.arange(-split+0.5, split+0.5, 1)
+#     z_v = np.arange(-split+0.5, split+0.5, 1)
+#     X_v, Y_v, Z_v = np.meshgrid(x_v, y_v, z_v)
+        
+#     X_v = X_v/(2*split)
+#     Y_v = Y_v/(2*split)
+#     Z_v = Z_v/(2*split)
+    
+#     shell = 1-Sphere_in-Sphere_out
+#     X = X[shell==1]
+#     Y = Y[shell==1]
+#     Z = Z[shell==1]
+#     shell_val = np.zeros(X.shape)
+    
+#     for i in range(X.size):
+#         xx = X[i]
+#         yy = Y[i]
+#         zz = Z[i]
+#         occupied = ((xx+X_v*voxel_size[0])**2+(yy+Y_v*voxel_size[1])**2+(zz+Z_v*voxel_size[2])**2)<=radius**2
+#         shell_val[i] = np.sum(occupied)/X_v.size
+        
+#     Sphere_mid[shell==1] = shell_val
+#     Sphere = Sphere_in + Sphere_mid    
+#     Sphere = Sphere/np.sum(Sphere)
+#     y = np.fft.fftn(np.fft.fftshift(Sphere))
+#     return y
+    
+# def SMV_kernel(matrix_size,voxel_size, radius):
+#     return 1-sphere_kernel(matrix_size, voxel_size,radius)
+
+# def SMV(iFreq,matrix_size,voxel_size,radius):
+#     return np.fft.ifftn(np.fft.fftn(iFreq)*sphere_kernel(matrix_size, voxel_size,radius))
+
 
     
 
