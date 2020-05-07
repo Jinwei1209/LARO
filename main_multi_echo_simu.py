@@ -33,8 +33,9 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
-    subject_IDs_train = ['MS1']
-    subject_IDs_test = ['MS5']
+    subject_IDs_train = ['MS2', 'MS3', 'MS4', 'MS5', 'MS6']
+    # subject_IDs_train = ['MS1']
+    subject_IDs_val = ['MS7']
     num_echos = 3
     lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
     batch_size = 1
@@ -56,13 +57,13 @@ if __name__ == '__main__':
     np.save(rootName+'/parameters_means.npy', para_means)
     np.save(rootName+'/parameters_stds.npy', para_stds)
 
-    # dataLoader = MultiEchoSimu(
-    #     rootDir=rootName+'/dataset', 
-    #     subject_IDs=subject_IDs_test, 
-    #     num_echos=num_echos,
-    #     flag_train=0
-    # )
-    # valLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
+    dataLoader = MultiEchoSimu(
+        rootDir=rootName+'/dataset', 
+        subject_IDs=subject_IDs_val, 
+        num_echos=num_echos,
+        flag_train=0
+    )
+    valLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
 
     # network
     # netG_dc = MultiEchoDC2(
@@ -83,13 +84,12 @@ if __name__ == '__main__':
     )
     print(netG_dc)
     netG_dc.to(device)
-    # weights_dict = torch.load(rootName+'/weights/weight.pt')
-    # netG_dc.load_state_dict(weights_dict)
 
     # optimizer
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     # loss
     lossl1 = lossL1()
+    Validation_loss = []
 
     while epoch < niter:
         epoch += 1 
@@ -116,7 +116,26 @@ if __name__ == '__main__':
 
                 if gen_iterations%display_iters == 0:
                     print('Loss = {0}'.format(loss_total.item()))
-                    print('Lambda = {0}'.format(netG_dc.lambda_dll2))
                 gen_iterations += 1
 
-        torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
+        # validation phase
+        netG_dc.eval()
+        loss_total_list = []
+        with torch.no_grad():  # to solve memory exploration issue
+            for idx, (targets, brain_mask, iField, inputs) in enumerate(valLoader):
+                brain_mask = brain_mask.to(device)
+                inputs = inputs.to(device) * brain_mask
+                targets = targets.to(device) * brain_mask
+                targets = torch.cat((targets[:, 1:2, ...], targets[:, 3:4, ...]), dim=1)
+                brain_mask_iField = brain_mask[:, 0, None, None, :, :, None].repeat(1, 1, num_echos, 1, 1, 2)
+                iField = iField.to(device).permute(0, 3, 4, 1, 2, 5) * brain_mask_iField
+                # forward
+                paras, paras_prior = netG_dc(inputs, iField)
+                loss_total = 0
+                for i in range(K):
+                    loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
+                loss_total_list.append(np.asarray(loss_total.cpu().detach()))
+            Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
+        
+        if Validation_loss[-1] == min(Validation_loss):
+            torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')

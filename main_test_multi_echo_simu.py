@@ -32,11 +32,11 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
-    subject_IDs_test = ['MS1']
+    subject_IDs_test = ['MS2']
     num_echos = 3
     lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
     batch_size = 1
-    K = 10
+    K = 9
 
     dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', 
         subject_IDs=subject_IDs_test, 
