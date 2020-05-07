@@ -32,7 +32,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
-    subject_IDs_test = ['MS2']
+    subject_IDs_test = ['MS1']
     num_echos = 3
     lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
     batch_size = 1
@@ -69,10 +69,10 @@ if __name__ == '__main__':
     netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
 
+    Paras = []
     with torch.no_grad():
         for idx, (targets, brain_mask, iField, inputs) in enumerate(testLoader):
             print(idx)
-            # print(idx)
             brain_mask = brain_mask.to(device)
             inputs = inputs.to(device) * brain_mask
             targets = targets.to(device) * brain_mask
@@ -80,17 +80,10 @@ if __name__ == '__main__':
             iField = iField.to(device).permute(0, 3, 4, 1, 2, 5) * brain_mask_iField
             paras, paras_prior = netG_dc(inputs, iField)
 
-            if idx == 30:
-                # adict = {}
-                # adict['para_start'] = np.squeeze(np.asarray(para_start.cpu().detach()))
-                # sio.savemat('para_start.mat', adict)
+            Paras.append(paras[-1].cpu().detach())
 
-                adict = {}
-                adict['para_prior'] = np.squeeze(np.asarray(paras_prior[-1].cpu().detach()))
-                sio.savemat('para_prior.mat', adict)
-
-                adict = {}
-                adict['para'] = np.squeeze(np.asarray(paras[-1].cpu().detach()))
-                sio.savemat('para.mat', adict)
-
-                break
+    Paras = np.squeeze(np.concatenate(Paras, axis=0))
+    Paras = np.transpose(Paras, [2,3,0,1])
+    adict = {}
+    adict['Paras'] = Paras
+    sio.savemat(rootName+'/Paras.mat', adict)

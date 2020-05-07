@@ -106,9 +106,8 @@ class MultiEchoSimu(data.Dataset):
             if (idx_slice - self.num_slices[idx_subject] < 0):
                 break
             else:
-                idx_slice -= self.num_slices[idx_subject]
+                idx_slice -= int(self.num_slices[idx_subject])
                 idx_subject += 1
-
         M_0_slice = self.M_0[idx_subject, :, :, idx_slice][np.newaxis, ...]
         M_0_under_slice = self.M_0_under[idx_subject, :, :, idx_slice][np.newaxis, ...]
 

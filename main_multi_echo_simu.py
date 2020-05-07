@@ -28,23 +28,29 @@ from utils.operators import OperatorsMultiEcho
 
 
 if __name__ == '__main__':
+    # typein parameters
+    parser = argparse.ArgumentParser(description='LOUPE-ST')
+    parser.add_argument('--gpu_id', type=str, default='0')
+    parser.add_argument('--num_echos', type=int, default=3)
+    opt = {**vars(parser.parse_args())}
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+    num_echos = opt['num_echos']
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    rootName = '/data/Jinwei/Multi_echo_kspace'
-    subject_IDs_train = ['MS2', 'MS3', 'MS4', 'MS5', 'MS6']
-    # subject_IDs_train = ['MS1']
-    subject_IDs_val = ['MS7']
-    num_echos = 3
-    lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
+    t0 = time.time()
+    epoch = 0
+    niter = 500
     batch_size = 1
     K = 9
-    niter = 500
-    epoch = 0
+    lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
     gen_iterations = 0
     display_iters = 10
     lrG_dc = 1e-3
+
+    rootName = '/data/Jinwei/Multi_echo_kspace'
+    subject_IDs_train = ['MS2', 'MS3', 'MS4', 'MS5', 'MS6']
+    subject_IDs_val = ['MS7']
 
     dataLoader = MultiEchoSimu(
         rootDir=rootName+'/dataset', 
@@ -52,10 +58,11 @@ if __name__ == '__main__':
         num_echos=num_echos,
         flag_train=1
     )
+    num_samples = dataLoader.num_samples
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
     para_means, para_stds = dataLoader.parameters_means, dataLoader.parameters_stds
-    np.save(rootName+'/parameters_means.npy', para_means)
-    np.save(rootName+'/parameters_stds.npy', para_stds)
+    np.save(rootName+'/weights/parameters_means_{0}.npy'.format(num_echos), para_means)
+    np.save(rootName+'/weights/parameters_stds_{0}.npy'.format(num_echos), para_stds)
 
     dataLoader = MultiEchoSimu(
         rootDir=rootName+'/dataset', 
@@ -63,7 +70,7 @@ if __name__ == '__main__':
         num_echos=num_echos,
         flag_train=0
     )
-    valLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
+    valLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
 
     # network
     # netG_dc = MultiEchoDC2(
@@ -115,7 +122,10 @@ if __name__ == '__main__':
                 optimizerG_dc.step()
 
                 if gen_iterations%display_iters == 0:
-                    print('Loss = {0}'.format(loss_total.item()))
+                    print('epochs: [%d/%d], batchs: [%d/%d], time: %ds, Loss = %f'
+                    % (epoch, niter, idx, num_samples//batch_size+1, time.time()-t0, loss_total.item()))
+                    if epoch > 1:
+                        print('Loss in Validation dataset is %f' % (Validation_loss[-1]))
                 gen_iterations += 1
 
         # validation phase
@@ -138,4 +148,4 @@ if __name__ == '__main__':
             Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
         
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')
+            torch.save(netG_dc.state_dict(), rootName+'/weights/weight_{0}.pt'.format(num_echos))
