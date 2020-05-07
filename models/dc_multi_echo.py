@@ -16,7 +16,6 @@ from utils.data import *
 
 class MultiEchoDC(nn.Module):
 
-
     def __init__(
         self,
         filter_channels,
@@ -28,14 +27,14 @@ class MultiEchoDC(nn.Module):
     ):
         super(MultiEchoDC, self).__init__()
         # resnet to do l2-regularized optimization
-        self.resnet_prior_M_0 = multi_unet(
-            input_channels=1, 
-            output_channels=1, 
-            num_filters=[2**i for i in range(4, 8)],
-            use_bn=2,
-            use_deconv=1,
-            K=K
-        )
+        # self.resnet_prior_M_0 = multi_unet(
+        #     input_channels=1, 
+        #     output_channels=1, 
+        #     num_filters=[2**i for i in range(4, 8)],
+        #     use_bn=2,
+        #     use_deconv=1,
+        #     K=K
+        # )
         self.resnet_prior_R_2 = multi_unet(
             input_channels=1, 
             output_channels=1, 
@@ -44,14 +43,14 @@ class MultiEchoDC(nn.Module):
             use_deconv=1,
             K=K
         )
-        self.resnet_prior_phi_0 = multi_unet(
-            input_channels=1, 
-            output_channels=1, 
-            num_filters=[2**i for i in range(4, 8)],
-            use_bn=2,
-            use_deconv=1,
-            K=K
-        )
+        # self.resnet_prior_phi_0 = multi_unet(
+        #     input_channels=1, 
+        #     output_channels=1, 
+        #     num_filters=[2**i for i in range(4, 8)],
+        #     use_bn=2,
+        #     use_deconv=1,
+        #     K=K
+        # )
         self.resnet_prior_f = multi_unet(
             input_channels=1, 
             output_channels=1, 
@@ -111,42 +110,42 @@ class MultiEchoDC(nn.Module):
     def forward(self, inputs, iField):
         device = inputs.get_device()
         paras, paras_prior = [], []
-        para = inputs
+        para = torch.cat((inputs[:, 1:2, ...], inputs[:, 3:4, ...]), dim=1)
+        M_0 = inputs[:, 0:1, ...]
+        phi_0 = inputs[:, 2:3, ...]
         lambda_dll2 = self.lambda_dll2.to(device)
         gd_stepsize = self.gd_stepsize.to(device)
         for k in range(self.K):
-            M_0 = para[:, 0:1, ...]
-            R_2 = para[:, 1:2, ...]
-            phi_0 = para[:, 2:3, ...]
-            f = para[:, 3:4, ...]
+            R_2 = para[:, 0:1, ...]
+            f = para[:, 1:2, ...]
 
             # norm
-            M_0_norm = (M_0 - self.norm_means[0]) / self.norm_stds[0]
             R_2_norm = (R_2 - self.norm_means[1]) / self.norm_stds[1]
-            phi_0_norm = (phi_0 - self.norm_means[2]) / self.norm_stds[2]
             f_norm = (f - self.norm_means[3]) / self.norm_stds[3]
+
             # denorm
-            M_0_prior = self.resnet_prior_M_0[k](M_0_norm) * self.norm_stds[0] + self.norm_means[0]
             R_2_prior = self.resnet_prior_R_2[k](R_2_norm) * self.norm_stds[1] + self.norm_means[1]
-            phi_0_prior = self.resnet_prior_phi_0[k](phi_0_norm) * self.norm_stds[2] + self.norm_means[2]
             f_prior = self.resnet_prior_f[k](f_norm) * self.norm_stds[3] + self.norm_means[3]
-            para_prior = torch.cat((M_0_prior, R_2_prior, phi_0_prior, f_prior), dim=1)
+            para_prior = torch.cat((R_2_prior, f_prior), dim=1)
 
             # gradient prior
-            gradient_prior_M0 = lambda_dll2[0] * (M_0 - M_0_prior)
             gradient_prior_R_2 = lambda_dll2[1] * (R_2 - R_2_prior)
-            gradient_prior_phi_0 = lambda_dll2[2] * (phi_0 - phi_0_prior)
             gradient_prior_f = lambda_dll2[3] * (f - f_prior)
-            gradient_prior = torch.cat((gradient_prior_M0, gradient_prior_R_2, 
-                                        gradient_prior_phi_0, gradient_prior_f), dim=1)
+
             # generate fidelity operator
             operators = OperatorsMultiEcho(M_0, R_2, phi_0, f, num_echos=self.num_echos)
+
             # calculate fidelity gradient
-            gradient_fidelity = operators.jacobian_conj(operators.forward_operator() - iField)
+            gradient_fidelity_R_2 = operators.jacobian_conj(operators.forward_operator() - iField, flag=2)
+            gradient_fidelity_f = operators.jacobian_conj(operators.forward_operator() - iField, flag=4)
+            
             # total gradient
-            gradient_total = gradient_fidelity + gradient_prior
+            gradient_total_R_2 = gradient_prior_R_2  # + gradient_fidelity_R_2
+            gradient_total_f = gradient_prior_f  # + gradient_fidelity_f
+            
             # gradient descent step
-            para = para - gd_stepsize * gradient_total
+            para[:, 0:1, ...] = para[:, 0:1, ...] - gd_stepsize/(k+1) * gradient_total_R_2
+            para[:, 1:2, ...] = para[:, 1:2, ...] - gd_stepsize/(k+1) * gradient_total_f
 
             paras.append(para)
             paras_prior.append(para_prior)

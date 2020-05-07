@@ -36,9 +36,9 @@ if __name__ == '__main__':
     subject_IDs_train = ['MS1']
     subject_IDs_test = ['MS5']
     num_echos = 3
-    lambda_dll2 = np.array([1e-6, 1e-1, 1e-6, 1e-1])
+    lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
     batch_size = 1
-    K = 3
+    K = 9
     niter = 500
     epoch = 0
     gen_iterations = 0
@@ -97,28 +97,26 @@ if __name__ == '__main__':
         # training phase
         netG_dc.train()
         for idx, (targets, brain_mask, iField, inputs) in enumerate(trainLoader):
-            # with autograd.detect_anomaly():
-            # print(idx)
-            brain_mask = brain_mask.to(device)
-            inputs = inputs.to(device) * brain_mask
-            targets = targets.to(device) * brain_mask
-            brain_mask_iField = brain_mask[:, 0, None, None, :, :, None].repeat(1, 1, num_echos, 1, 1, 2)
-            iField = iField.to(device).permute(0, 3, 4, 1, 2, 5) * brain_mask_iField
-            # forward
-            paras, paras_prior = netG_dc(inputs, iField)
-            # stochastic gradient descent
-            optimizerG_dc.zero_grad()
-            loss_total = 0
-            for i in range(K):
-                loss_total += lossl1(paras_prior[i], targets) + lossl1(paras[i], targets)
-            for i in range(K):
-                loss_total += 10*lossl1(paras_prior[i][:, 0, ...], targets[:, 0, ...]) + 10*lossl1(paras[i][:, 0, ...], targets[:, 0, ...])
-            loss_total.backward()
-            optimizerG_dc.step()
+            with autograd.detect_anomaly():
+                brain_mask = brain_mask.to(device)
+                inputs = inputs.to(device) * brain_mask
+                targets = targets.to(device) * brain_mask
+                targets = torch.cat((targets[:, 1:2, ...], targets[:, 3:4, ...]), dim=1)
+                brain_mask_iField = brain_mask[:, 0, None, None, :, :, None].repeat(1, 1, num_echos, 1, 1, 2)
+                iField = iField.to(device).permute(0, 3, 4, 1, 2, 5) * brain_mask_iField
+                # forward
+                paras, paras_prior = netG_dc(inputs, iField)
+                # stochastic gradient descent
+                optimizerG_dc.zero_grad()
+                loss_total = 0
+                for i in range(K):
+                    loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
+                loss_total.backward()
+                optimizerG_dc.step()
 
-            if gen_iterations%display_iters == 0:
-                print('Loss = {0}'.format(loss_total.item()))
-                print('Lambda = {0}'.format(netG_dc.lambda_dll2))
-            gen_iterations += 1
+                if gen_iterations%display_iters == 0:
+                    print('Loss = {0}'.format(loss_total.item()))
+                    print('Lambda = {0}'.format(netG_dc.lambda_dll2))
+                gen_iterations += 1
 
         torch.save(netG_dc.state_dict(), rootName+'/weights/weight.pt')

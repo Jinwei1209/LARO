@@ -16,7 +16,6 @@ from utils.data import *
 
 class MultiEchoDC2(nn.Module):
 
-
     def __init__(
         self,
         filter_channels,

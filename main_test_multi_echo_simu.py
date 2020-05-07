@@ -34,9 +34,9 @@ if __name__ == '__main__':
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs_test = ['MS1']
     num_echos = 3
-    lambda_dll2 = np.array([1e-3, 1e-3, 1e-2, 1e-2])
+    lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
     batch_size = 1
-    K = 3
+    K = 10
 
     dataLoader = MultiEchoSimu(rootDir=rootName+'/dataset', 
         subject_IDs=subject_IDs_test, 
