@@ -27,13 +27,18 @@ from utils.operators import OperatorsMultiEcho
 
 
 if __name__ == '__main__':
+    # typein parameters
+    parser = argparse.ArgumentParser(description='LOUPE-ST')
+    parser.add_argument('--gpu_id', type=str, default='0')
+    parser.add_argument('--num_echos', type=int, default=3)
+    opt = {**vars(parser.parse_args())}
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+    num_echos = opt['num_echos']
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs_test = ['MS1']
-    num_echos = 3
     lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])
     batch_size = 1
     K = 9
@@ -44,7 +49,8 @@ if __name__ == '__main__':
         flag_train=0)
     testLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
 
-    para_means, para_stds = np.load(rootName+'/parameters_means.npy'), np.load(rootName+'/parameters_stds.npy')
+    para_means = np.load(rootName+'/weights/parameters_means_{0}.npy'.format(num_echos))
+    para_stds = np.load(rootName+'/weights/parameters_stds_{0}.npy'.format(num_echos))
 
     # network
     # netG_dc = MultiEchoDC2(
@@ -65,7 +71,7 @@ if __name__ == '__main__':
     )
     # print(netG_dc)
     netG_dc.to(device)
-    weights_dict = torch.load(rootName+'/weights/weight.pt')
+    weights_dict = torch.load(rootName+'/weights/weight_{0}.pt'.format(num_echos))
     netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
 
@@ -86,4 +92,4 @@ if __name__ == '__main__':
     Paras = np.transpose(Paras, [2,3,0,1])
     adict = {}
     adict['Paras'] = Paras
-    sio.savemat(rootName+'/Paras.mat', adict)
+    sio.savemat(rootName+'/Paras_{0}.mat'.format(num_echos), adict)
