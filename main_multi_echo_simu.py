@@ -26,12 +26,12 @@ from models.dc_multi_echo2 import *
 from utils.test import *
 from utils.operators import OperatorsMultiEcho
 
-
 if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--num_echos', type=int, default=3)
+    parser.add_argument('--model', type=int, default=1)  # 0: Unet, 1: unrolled net 
     opt = {**vars(parser.parse_args())}
 
     num_echos = opt['num_echos']
@@ -73,21 +73,14 @@ if __name__ == '__main__':
     valLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
 
     # network
-    # netG_dc = MultiEchoDC2(
-    #     filter_channels=32,
-    #     num_echos=num_echos,
-    #     lambda_dll2=lambda_dll2,
-    #     norm_means=para_means,
-    #     norm_stds=para_stds,
-    #     K=K
-    # )
     netG_dc = MultiEchoDC(
         filter_channels=32,
         num_echos=num_echos,
         lambda_dll2=lambda_dll2,
         norm_means=para_means,
         norm_stds=para_stds,
-        K=K
+        K=K,
+        flag_model=opt['model']
     )
     print(netG_dc)
     netG_dc.to(device)
@@ -116,8 +109,11 @@ if __name__ == '__main__':
                 # stochastic gradient descent
                 optimizerG_dc.zero_grad()
                 loss_total = 0
-                for i in range(K):
-                    loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
+                if opt['model'] == 1:
+                    for i in range(K):
+                        loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
+                elif opt['model'] == 0:
+                    loss_total = lossl1(paras, targets)
                 loss_total.backward()
                 optimizerG_dc.step()
 
@@ -142,10 +138,16 @@ if __name__ == '__main__':
                 # forward
                 paras, paras_prior = netG_dc(inputs, iField)
                 loss_total = 0
-                for i in range(K):
-                    loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
+                if opt['model'] == 1:
+                    for i in range(K):
+                        loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
+                elif opt['model'] == 0:
+                    loss_total = lossl1(paras, targets)
                 loss_total_list.append(np.asarray(loss_total.cpu().detach()))
             Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
         
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/weights/weight_{0}.pt'.format(num_echos))
+            if opt['model'] == 1:
+                torch.save(netG_dc.state_dict(), rootName+'/weights/weight_{0}.pt'.format(num_echos))
+            elif opt['model'] == 0:
+                torch.save(netG_dc.state_dict(), rootName+'/weights/weight_unet_{0}.pt'.format(num_echos))

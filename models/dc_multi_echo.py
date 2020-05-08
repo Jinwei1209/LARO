@@ -23,42 +23,53 @@ class MultiEchoDC(nn.Module):
         lambda_dll2,
         norm_means,  # means for normalization
         norm_stds,  # stds for normalization
-        K=1
+        K=1,
+        flag_model=1  # 0: Unet, 1: unrolled net
     ):
         super(MultiEchoDC, self).__init__()
-        # resnet to do l2-regularized optimization
-        # self.resnet_prior_M_0 = multi_unet(
-        #     input_channels=1, 
-        #     output_channels=1, 
-        #     num_filters=[2**i for i in range(4, 8)],
-        #     use_bn=2,
-        #     use_deconv=1,
-        #     K=K
-        # )
-        self.resnet_prior_R_2 = multi_unet(
-            input_channels=1, 
-            output_channels=1, 
-            num_filters=[2**i for i in range(4, 8)],
-            use_bn=2,
-            use_deconv=1,
-            K=K
-        )
-        # self.resnet_prior_phi_0 = multi_unet(
-        #     input_channels=1, 
-        #     output_channels=1, 
-        #     num_filters=[2**i for i in range(4, 8)],
-        #     use_bn=2,
-        #     use_deconv=1,
-        #     K=K
-        # )
-        self.resnet_prior_f = multi_unet(
-            input_channels=1, 
-            output_channels=1, 
-            num_filters=[2**i for i in range(4, 8)],
-            use_bn=2,
-            use_deconv=1,
-            K=K
-        )
+        self.flag_model = flag_model
+        if self.flag_model == 1:
+            # resnet to do l2-regularized optimization
+            # self.resnet_prior_M_0 = multi_unet(
+            #     input_channels=1, 
+            #     output_channels=1, 
+            #     num_filters=[2**i for i in range(4, 8)],
+            #     use_bn=2,
+            #     use_deconv=1,
+            #     K=K
+            # )
+            self.resnet_prior_R_2 = multi_unet(
+                input_channels=1, 
+                output_channels=1, 
+                num_filters=[2**i for i in range(4, 8)],
+                use_bn=2,
+                use_deconv=1,
+                K=K
+            )
+            # self.resnet_prior_phi_0 = multi_unet(
+            #     input_channels=1, 
+            #     output_channels=1, 
+            #     num_filters=[2**i for i in range(4, 8)],
+            #     use_bn=2,
+            #     use_deconv=1,
+            #     K=K
+            # )
+            self.resnet_prior_f = multi_unet(
+                input_channels=1, 
+                output_channels=1, 
+                num_filters=[2**i for i in range(4, 8)],
+                use_bn=2,
+                use_deconv=1,
+                K=K
+            )
+        elif self.flag_model == 0:
+            self.unet = Unet(
+                input_channels=2,
+                output_channels=2,
+                num_filters=[2**i for i in range(5, 10)],
+                use_bn=2,
+                use_deconv=1
+            )
 
         self.num_echos = num_echos
         self.K = K
@@ -115,39 +126,56 @@ class MultiEchoDC(nn.Module):
         phi_0 = inputs[:, 2:3, ...]
         lambda_dll2 = self.lambda_dll2.to(device)
         gd_stepsize = self.gd_stepsize.to(device)
-        for k in range(self.K):
+
+        if self.flag_model == 1:
+            for k in range(self.K):
+                R_2 = para[:, 0:1, ...]
+                f = para[:, 1:2, ...]
+
+                # norm
+                R_2_norm = (R_2 - self.norm_means[1]) / self.norm_stds[1]
+                f_norm = (f - self.norm_means[3]) / self.norm_stds[3]
+
+                # denorm
+                R_2_prior = self.resnet_prior_R_2[k](R_2_norm) * self.norm_stds[1] + self.norm_means[1]
+                f_prior = self.resnet_prior_f[k](f_norm) * self.norm_stds[3] + self.norm_means[3]
+                para_prior = torch.cat((R_2_prior, f_prior), dim=1)
+
+                # gradient prior
+                gradient_prior_R_2 = lambda_dll2[1] * (R_2 - R_2_prior)
+                gradient_prior_f = lambda_dll2[3] * (f - f_prior)
+
+                # generate fidelity operator
+                operators = OperatorsMultiEcho(M_0, R_2, phi_0, f, num_echos=self.num_echos)
+
+                # calculate fidelity gradient
+                gradient_fidelity_R_2 = operators.jacobian_conj(operators.forward_operator() - iField, flag=2)
+                gradient_fidelity_f = operators.jacobian_conj(operators.forward_operator() - iField, flag=4)
+                
+                # total gradient
+                gradient_total_R_2 = gradient_prior_R_2  # + gradient_fidelity_R_2
+                gradient_total_f = gradient_prior_f  # + gradient_fidelity_f
+                
+                # gradient descent step
+                para[:, 0:1, ...] = para[:, 0:1, ...] - gd_stepsize/(k+1) * gradient_total_R_2
+                para[:, 1:2, ...] = para[:, 1:2, ...] - gd_stepsize/(k+1) * gradient_total_f
+
+                paras.append(para)
+                paras_prior.append(para_prior)
+            return paras, paras_prior
+
+        elif self.flag_model == 0:
             R_2 = para[:, 0:1, ...]
             f = para[:, 1:2, ...]
-
-            # norm
+            # norm and concat
             R_2_norm = (R_2 - self.norm_means[1]) / self.norm_stds[1]
             f_norm = (f - self.norm_means[3]) / self.norm_stds[3]
-
+            inputs_cat = torch.cat((R_2_norm, f_norm), dim=1)
+            # forward
+            outputs_cat = self.unet(inputs_cat)
             # denorm
-            R_2_prior = self.resnet_prior_R_2[k](R_2_norm) * self.norm_stds[1] + self.norm_means[1]
-            f_prior = self.resnet_prior_f[k](f_norm) * self.norm_stds[3] + self.norm_means[3]
-            para_prior = torch.cat((R_2_prior, f_prior), dim=1)
-
-            # gradient prior
-            gradient_prior_R_2 = lambda_dll2[1] * (R_2 - R_2_prior)
-            gradient_prior_f = lambda_dll2[3] * (f - f_prior)
-
-            # generate fidelity operator
-            operators = OperatorsMultiEcho(M_0, R_2, phi_0, f, num_echos=self.num_echos)
-
-            # calculate fidelity gradient
-            gradient_fidelity_R_2 = operators.jacobian_conj(operators.forward_operator() - iField, flag=2)
-            gradient_fidelity_f = operators.jacobian_conj(operators.forward_operator() - iField, flag=4)
-            
-            # total gradient
-            gradient_total_R_2 = gradient_prior_R_2  # + gradient_fidelity_R_2
-            gradient_total_f = gradient_prior_f  # + gradient_fidelity_f
-            
-            # gradient descent step
-            para[:, 0:1, ...] = para[:, 0:1, ...] - gd_stepsize/(k+1) * gradient_total_R_2
-            para[:, 1:2, ...] = para[:, 1:2, ...] - gd_stepsize/(k+1) * gradient_total_f
-
-            paras.append(para)
-            paras_prior.append(para_prior)
-        return paras, paras_prior
+            R_2_prior = outputs_cat[:, 0:1, ...] * self.norm_stds[1] + self.norm_means[1]
+            f_prior = outputs_cat[:, 1:2, ...] * self.norm_stds[3] + self.norm_means[3]
+            para = torch.cat((R_2_prior, f_prior), dim=1)
+            return para, para
 
