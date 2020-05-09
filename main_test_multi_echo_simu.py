@@ -29,8 +29,9 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
-    parser.add_argument('--num_echos', type=int, default=3)
-    parser.add_argument('--model', type=int, default=1)  # 0: Unet, 1: unrolled net 
+    parser.add_argument('--num_echos', type=int, default=5)
+    # 0: Unet, 1: unrolled unet, 2: unrolled resnet, -1: progressive resnet 
+    parser.add_argument('--model', type=int, default=1)
     opt = {**vars(parser.parse_args())}
 
     num_echos = opt['num_echos']
@@ -53,22 +54,29 @@ if __name__ == '__main__':
     para_stds = np.load(rootName+'/weights/parameters_stds_{0}.npy'.format(num_echos))
 
     # network
-    # network
-    netG_dc = MultiEchoDC(
-        filter_channels=32,
-        num_echos=num_echos,
-        lambda_dll2=lambda_dll2,
-        norm_means=para_means,
-        norm_stds=para_stds,
-        K=K,
-        flag_model=opt['model']
-    )
+    if opt['model'] >= 0:
+        netG_dc = MultiEchoDC(
+            filter_channels=32,
+            num_echos=num_echos,
+            lambda_dll2=lambda_dll2,
+            norm_means=para_means,
+            norm_stds=para_stds,
+            K=K,
+            flag_model=opt['model']
+        )
+    else:
+        netG_dc = MultiEchoPrg(
+            filter_channels=32,
+            num_echos=num_echos,
+            lambda_dll2=lambda_dll2,
+            norm_means=para_means,
+            norm_stds=para_stds,
+            K=K,
+            flag_model=opt['model']
+        )
     # print(netG_dc)
     netG_dc.to(device)
-    if opt['model'] == 1:
-        weights_dict = torch.load(rootName+'/weights/weight_{0}.pt'.format(num_echos))
-    elif opt['model'] == 0:
-        weights_dict = torch.load(rootName+'/weights/weight_unet_{0}.pt'.format(num_echos))
+    weights_dict = torch.load(rootName+'/weights/weight_{0}_model={1}.pt'.format(num_echos, opt['model']))
     netG_dc.load_state_dict(weights_dict)
     netG_dc.eval()
 
@@ -83,7 +91,7 @@ if __name__ == '__main__':
             iField = iField.to(device).permute(0, 3, 4, 1, 2, 5) * brain_mask_iField
             paras, paras_prior = netG_dc(inputs, iField)
 
-            if opt['model'] == 1:
+            if opt['model'] != 0:
                 Paras.append(paras[-1].cpu().detach())
             elif opt['model'] == 0:
                 Paras.append(paras.cpu().detach())
@@ -92,7 +100,4 @@ if __name__ == '__main__':
     Paras = np.transpose(Paras, [2,3,0,1])
     adict = {}
     adict['paras'] = Paras
-    if opt['model'] == 1:
-        sio.savemat(rootName+'/Paras_{0}.mat'.format(num_echos), adict)
-    elif opt['model'] == 0:
-        sio.savemat(rootName+'/Paras_unet_{0}.mat'.format(num_echos), adict)
+    sio.savemat(rootName+'/Paras_{0}_model={1}.mat'.format(num_echos, opt['model']), adict)

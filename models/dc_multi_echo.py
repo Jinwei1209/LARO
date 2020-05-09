@@ -24,20 +24,13 @@ class MultiEchoDC(nn.Module):
         norm_means,  # means for normalization
         norm_stds,  # stds for normalization
         K=1,
-        flag_model=1  # 0: Unet, 1: unrolled net
+        flag_model=1  # 0: Unet, 1: unrolled unet, 2: unrolled resnet
     ):
         super(MultiEchoDC, self).__init__()
+
         self.flag_model = flag_model
         if self.flag_model == 1:
             # resnet to do l2-regularized optimization
-            # self.resnet_prior_M_0 = multi_unet(
-            #     input_channels=1, 
-            #     output_channels=1, 
-            #     num_filters=[2**i for i in range(4, 8)],
-            #     use_bn=2,
-            #     use_deconv=1,
-            #     K=K
-            # )
             self.resnet_prior_R_2 = multi_unet(
                 input_channels=1, 
                 output_channels=1, 
@@ -46,14 +39,6 @@ class MultiEchoDC(nn.Module):
                 use_deconv=1,
                 K=K
             )
-            # self.resnet_prior_phi_0 = multi_unet(
-            #     input_channels=1, 
-            #     output_channels=1, 
-            #     num_filters=[2**i for i in range(4, 8)],
-            #     use_bn=2,
-            #     use_deconv=1,
-            #     K=K
-            # )
             self.resnet_prior_f = multi_unet(
                 input_channels=1, 
                 output_channels=1, 
@@ -62,6 +47,7 @@ class MultiEchoDC(nn.Module):
                 use_deconv=1,
                 K=K
             )
+            
         elif self.flag_model == 0:
             self.unet = Unet(
                 input_channels=2,
@@ -69,6 +55,28 @@ class MultiEchoDC(nn.Module):
                 num_filters=[2**i for i in range(5, 10)],
                 use_bn=2,
                 use_deconv=1
+            )
+
+        elif self.flag_model == 2:
+            self.resnet_prior_R_2 = multi_resnet(
+                input_dim=1, 
+                filter_dim=32,
+                output_dim=1, 
+                kernel_size=3,
+                stride=1,
+                padding=1, 
+                use_norm=2,
+                K=K
+            )
+            self.resnet_prior_f = multi_resnet(
+                input_dim=1, 
+                filter_dim=32,
+                output_dim=1, 
+                kernel_size=3,
+                stride=1,
+                padding=1, 
+                use_norm=2,
+                K=K
             )
 
         self.num_echos = num_echos
@@ -127,7 +135,7 @@ class MultiEchoDC(nn.Module):
         lambda_dll2 = self.lambda_dll2.to(device)
         gd_stepsize = self.gd_stepsize.to(device)
 
-        if self.flag_model == 1:
+        if self.flag_model > 0:
             for k in range(self.K):
                 R_2 = para[:, 0:1, ...]
                 f = para[:, 1:2, ...]
@@ -178,4 +186,64 @@ class MultiEchoDC(nn.Module):
             f_prior = outputs_cat[:, 1:2, ...] * self.norm_stds[3] + self.norm_means[3]
             para = torch.cat((R_2_prior, f_prior), dim=1)
             return para, para
+
+
+class MultiEchoPrg(nn.Module):
+    def __init__(
+        self,
+        filter_channels,
+        num_echos,
+        lambda_dll2,
+        norm_means,  # means for normalization
+        norm_stds,  # stds for normalization
+        K=1,
+        flag_model=-1  # -1: progressive resnet
+    ):
+        super(MultiEchoPrg, self).__init__()
+        self.flag_model = flag_model
+        if self.flag_model == -1:
+            self.resnet_prior_R_2 = multi_resnet(
+                input_dim=2, 
+                filter_dim=32,
+                output_dim=1, 
+                kernel_size=3,
+                stride=1,
+                padding=1, 
+                use_norm=2,
+                K=K
+            )
+            self.resnet_prior_f = multi_resnet(
+                input_dim=2, 
+                filter_dim=32,
+                output_dim=1, 
+                kernel_size=3,
+                stride=1,
+                padding=1, 
+                use_norm=2,
+                K=K
+            )
+        self.K = K
+        self.norm_means = torch.Tensor(norm_means).cuda()
+        self.norm_stds = torch.Tensor(norm_stds).cuda()
+
+    def forward(self, inputs, iField):
+        device = inputs.get_device()
+        paras = []
+        # norm
+        R_2_input = (inputs[:, 1:2, ...] - self.norm_means[1]) / self.norm_stds[1]
+        f_input = (inputs[:, 3:4, ...] - self.norm_means[3]) / self.norm_stds[3]
+        R_2, f = R_2_input, f_input
+        for k in range(self.K):
+            R_2_cat = torch.cat((R_2_input, R_2), dim=1)
+            R_2 = self.resnet_prior_R_2[k](R_2_cat)
+
+            f_cat = torch.cat((f_input, f), dim=1)
+            f = self.resnet_prior_f[k](f_cat)
+
+            R_2_para = R_2 * self.norm_stds[1] + self.norm_means[1]
+            f_para = f * self.norm_stds[3] + self.norm_means[3]
+            para = torch.cat((R_2_para, f_para), dim=1)
+            paras.append(para)
+        return paras, paras
+
 

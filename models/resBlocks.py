@@ -44,7 +44,8 @@ class ResBlock2(nn.Module):
     def __init__(
         self,
         input_dim, 
-        filter_dim, 
+        filter_dim,
+        output_dim, 
         kernel_size=3,
         stride=1,
         padding=1, 
@@ -54,6 +55,7 @@ class ResBlock2(nn.Module):
         super(ResBlock2, self).__init__()
         self.layers = []
         self.input_dim = input_dim
+        self.output_dim = output_dim
         self.filter_dim = filter_dim
         self.kernel_size = kernel_size
         self.stride = stride
@@ -67,7 +69,7 @@ class ResBlock2(nn.Module):
         self.basicBlock3 = self._basicBlock(self.filter_dim, self.filter_dim)
         self.basicBlock4 = self._basicBlock(self.filter_dim, self.filter_dim)
 
-        self.basicBlock5 = self._basicBlock(self.filter_dim, self.input_dim)
+        self.basicBlock5 = self._basicBlock(self.filter_dim, self.output_dim)
         # self.latent2img = self._conv2d(self.filter_dim, self.input_dim)
 
 
@@ -126,4 +128,27 @@ class ResBlock2(nn.Module):
         x = self.basicBlock5(x)
         # x = out + identity
         return x
+
+def multi_resnet(
+    input_dim, 
+    filter_dim,
+    output_dim, 
+    kernel_size=3,
+    stride=1,
+    padding=1, 
+    use_norm=1,  # 0 for no, 1 for batchnorm, 2 for instant norm
+    K=1,
+):
+    resnet_list = nn.ModuleList()
+    for i in range(K):
+        resnet_list.append(ResBlock2(
+            input_dim,
+            filter_dim,
+            output_dim,
+            kernel_size,
+            stride,
+            padding,
+            use_norm
+        ))
+    return resnet_list
 

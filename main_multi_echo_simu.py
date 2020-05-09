@@ -30,8 +30,9 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
-    parser.add_argument('--num_echos', type=int, default=3)
-    parser.add_argument('--model', type=int, default=1)  # 0: Unet, 1: unrolled net 
+    parser.add_argument('--num_echos', type=int, default=5)
+    # 0: Unet, 1: unrolled unet, 2: unrolled resnet, -1: progressive resnet 
+    parser.add_argument('--model', type=int, default=1)
     opt = {**vars(parser.parse_args())}
 
     num_echos = opt['num_echos']
@@ -50,6 +51,7 @@ if __name__ == '__main__':
 
     rootName = '/data/Jinwei/Multi_echo_kspace'
     subject_IDs_train = ['MS2', 'MS3', 'MS4', 'MS5', 'MS6']
+    # subject_IDs_train = ['MS2']
     subject_IDs_val = ['MS7']
 
     dataLoader = MultiEchoSimu(
@@ -61,8 +63,8 @@ if __name__ == '__main__':
     num_samples = dataLoader.num_samples
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
     para_means, para_stds = dataLoader.parameters_means, dataLoader.parameters_stds
-    np.save(rootName+'/weights/parameters_means_{0}.npy'.format(num_echos), para_means)
-    np.save(rootName+'/weights/parameters_stds_{0}.npy'.format(num_echos), para_stds)
+    # np.save(rootName+'/weights/parameters_means_{0}.npy'.format(num_echos), para_means)
+    # np.save(rootName+'/weights/parameters_stds_{0}.npy'.format(num_echos), para_stds)
 
     dataLoader = MultiEchoSimu(
         rootDir=rootName+'/dataset', 
@@ -73,15 +75,26 @@ if __name__ == '__main__':
     valLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False)
 
     # network
-    netG_dc = MultiEchoDC(
-        filter_channels=32,
-        num_echos=num_echos,
-        lambda_dll2=lambda_dll2,
-        norm_means=para_means,
-        norm_stds=para_stds,
-        K=K,
-        flag_model=opt['model']
-    )
+    if opt['model'] >= 0:
+        netG_dc = MultiEchoDC(
+            filter_channels=32,
+            num_echos=num_echos,
+            lambda_dll2=lambda_dll2,
+            norm_means=para_means,
+            norm_stds=para_stds,
+            K=K,
+            flag_model=opt['model']
+        )
+    else:
+        netG_dc = MultiEchoPrg(
+            filter_channels=32,
+            num_echos=num_echos,
+            lambda_dll2=lambda_dll2,
+            norm_means=para_means,
+            norm_stds=para_stds,
+            K=K,
+            flag_model=opt['model']
+        )
     print(netG_dc)
     netG_dc.to(device)
 
@@ -109,7 +122,7 @@ if __name__ == '__main__':
                 # stochastic gradient descent
                 optimizerG_dc.zero_grad()
                 loss_total = 0
-                if opt['model'] == 1:
+                if opt['model'] != 0:
                     for i in range(K):
                         loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
                 elif opt['model'] == 0:
@@ -138,7 +151,7 @@ if __name__ == '__main__':
                 # forward
                 paras, paras_prior = netG_dc(inputs, iField)
                 loss_total = 0
-                if opt['model'] == 1:
+                if opt['model'] != 0:
                     for i in range(K):
                         loss_total += lossl1(paras[i], targets) + lossl1(paras_prior[i], targets)
                 elif opt['model'] == 0:
@@ -147,7 +160,4 @@ if __name__ == '__main__':
             Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
         
         if Validation_loss[-1] == min(Validation_loss):
-            if opt['model'] == 1:
-                torch.save(netG_dc.state_dict(), rootName+'/weights/weight_{0}.pt'.format(num_echos))
-            elif opt['model'] == 0:
-                torch.save(netG_dc.state_dict(), rootName+'/weights/weight_unet_{0}.pt'.format(num_echos))
+            torch.save(netG_dc.state_dict(), rootName+'/weights/weight_{0}_model={1}.pt'.format(num_echos, opt['model']))
