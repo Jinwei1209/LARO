@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     t0 = time.time()
     epoch = 0
-    niter = 500
+    niter = 100
     batch_size = 1
     K = 9
     lambda_dll2 = np.array([1e-6, 5e-2, 1e-6, 5e-2])

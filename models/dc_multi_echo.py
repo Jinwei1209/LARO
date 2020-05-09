@@ -36,7 +36,7 @@ class MultiEchoDC(nn.Module):
                 output_channels=1, 
                 num_filters=[2**i for i in range(4, 8)],
                 use_bn=2,
-                use_deconv=1,
+                use_deconv=0,
                 K=K
             )
             self.resnet_prior_f = multi_unet(
@@ -44,7 +44,7 @@ class MultiEchoDC(nn.Module):
                 output_channels=1, 
                 num_filters=[2**i for i in range(4, 8)],
                 use_bn=2,
-                use_deconv=1,
+                use_deconv=0,
                 K=K
             )
             
@@ -54,7 +54,7 @@ class MultiEchoDC(nn.Module):
                 output_channels=2,
                 num_filters=[2**i for i in range(5, 10)],
                 use_bn=2,
-                use_deconv=1
+                use_deconv=0
             )
 
         elif self.flag_model == 2:
