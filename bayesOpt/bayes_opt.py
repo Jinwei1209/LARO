@@ -41,9 +41,13 @@ def expected_improvement(x, gaussian_process, evaluated_loss, greater_is_better=
     with np.errstate(divide='ignore'):
         Z = scaling_factor * (mu - loss_optimum) / sigma
         expected_improvement = scaling_factor * (mu - loss_optimum) * norm.cdf(Z) + sigma * norm.pdf(Z)
-        expected_improvement[sigma == 0.0] == 0.0
+        expected_improvement[sigma == 0.0] = 0.0
 
-    return expected_improvement
+        # Z = (mu - loss_optimum) / sigma
+        # expected_improvement = np.max(mu - loss_optimum, 0) + sigma * norm.pdf(Z) - np.abs(mu - loss_optimum) * norm.cdf(Z)
+        # expected_improvement[sigma == 0.0] = 0.0
+
+    return -1 * expected_improvement
 
 
 def sample_next_hyperparameter(acquisition_func, gaussian_process, evaluated_loss, greater_is_better=False,
@@ -142,12 +146,13 @@ def bayesian_optimisation(n_iters, sample_loss, bounds, x0=None, n_pre_samples=5
 
     for n in range(n_iters):
 
+        print('Iter: {0}'.format(n))
         model.fit(xp, yp)
 
         # Sample next hyperparameter
         if random_search:
             x_random = np.random.uniform(bounds[:, 0], bounds[:, 1], size=(random_search, n_params))
-            ei = expected_improvement(x_random, model, yp, greater_is_better=True, n_params=n_params)
+            ei = -1 * expected_improvement(x_random, model, yp, greater_is_better=True, n_params=n_params)
             next_sample = x_random[np.argmax(ei), :]
         else:
             next_sample = sample_next_hyperparameter(expected_improvement, model, yp, greater_is_better=True, bounds=bounds, n_restarts=100)

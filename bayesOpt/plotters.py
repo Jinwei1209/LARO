@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import sklearn.gaussian_process as gp
 
 from matplotlib import cm
-from utils import *
+from bayes_opt import *
 
 def plot_iteration(first_param_grid, sampled_params, sampled_loss, first_iter=0, alpha=1e-5,
                    greater_is_better=True, true_y=None, second_param_grid=None,

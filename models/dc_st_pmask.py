@@ -47,7 +47,8 @@ class DC_ST_Pmask(nn.Module):
         flag_fix=0,  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform,
         flag_precond=0,  # o not using preconditional, 1 use
         flag_print_precond=0,
-        contrast='T2'
+        contrast='T2',
+        pmask_BO=None  # flag
     ):
         super(DC_ST_Pmask, self).__init__()
         self.K = K
@@ -67,6 +68,7 @@ class DC_ST_Pmask(nn.Module):
         self.flag_precond = flag_precond
         self.flag_print_precond = flag_print_precond
         self.contrast = contrast
+        self.pmask_BO = pmask_BO
 
         # flag for sampling pattern designs
         if flag_ND == 0:
@@ -221,6 +223,9 @@ class DC_ST_Pmask(nn.Module):
             masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Adjoint
         elif self.flag_fix == 3:
             masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/Uniform.mat', 'Mask')  # LOUPE/VD/Adjoint
+        if self.pmask_BO is not None:
+            u = np.random.uniform(size=(256, 192))
+            masks = self.pmask_BO > u
         if self.flag_fix:
             masks = masks[np.newaxis, ..., np.newaxis]
             masks = torch.tensor(masks, device=device).float()
