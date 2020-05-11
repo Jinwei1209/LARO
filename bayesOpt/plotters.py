@@ -3,6 +3,10 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sklearn.gaussian_process as gp
+
+from matplotlib import cm
+from utils import *
 
 def plot_iteration(first_param_grid, sampled_params, sampled_loss, first_iter=0, alpha=1e-5,
                    greater_is_better=True, true_y=None, second_param_grid=None,
@@ -65,8 +69,8 @@ def plot_iteration(first_param_grid, sampled_params, sampled_loss, first_iter=0,
 
             fig, ax1, ax2 = _plot_loss_2d(first_param_grid, second_param_grid, sampled_params[:(i+1), param_dims_to_plot], sampled_loss, mu, ei, sampled_params[i + 1, param_dims_to_plot], optimum)
 
-        if file_path is not None:
-            plt.savefig('%s/bo_iteration_%d.png' % (filepath, i), bbox_inches='tight')
+        # if file_path is not None:
+        #     plt.savefig('%s/bo_iteration_%d.png' % (filepath, i), bbox_inches='tight')
 
 
 def _plot_loss_1d(x_grid, x_eval, y_eval, mu, std, ei, next_sample, yerr=0.0, true_y=None):
@@ -98,7 +102,7 @@ def _plot_loss_2d(first_param_grid, second_param_grid, sampled_params, sampled_l
     X, Y = np.meshgrid(first_param_grid, second_param_grid, indexing='ij')
 
     # EI contour plot
-    cp = ax1.contourf(X, Y, ei.reshape(X.shape))
+    cp = ax1.contourf(X, Y, ei.reshape(X.shape), cmap=cm.jet)
     plt.colorbar(cp, ax=ax1)
     ax1.set_title("Expected Improvement. Next sample will be (%.2f, %.2f)" % (next_sample[0], next_sample[1]))
     ax1.autoscale(False)
@@ -109,7 +113,7 @@ def _plot_loss_2d(first_param_grid, second_param_grid, sampled_params, sampled_l
     ax1.set_ylabel("gamma")
 
     # Loss contour plot
-    cp2 = ax2.contourf(X, Y, mu.reshape(X.shape))
+    cp2 = ax2.contourf(X, Y, mu.reshape(X.shape), cmap=cm.jet)
     plt.colorbar(cp2, ax=ax2)
     ax2.autoscale(False)
     ax2.scatter(sampled_params[:, 0], sampled_params[:, 1], zorder=1)
