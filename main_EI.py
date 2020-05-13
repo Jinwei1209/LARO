@@ -50,6 +50,7 @@ if __name__ == '__main__':
     y = np.array(y_list)
     print('Value of best point found: {}'.format(y.max()))
 
+    a_best, b_best = x[np.argmax(y)]
     best = [y.max()] # This will store the best value
 
     for i in range(n_iters):
@@ -92,13 +93,13 @@ if __name__ == '__main__':
     plt.savefig('EI.png')
     plt.close()
 
-    p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
+    p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
     u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
     masks = p_pattern > u
     masks[128-13:128+12, 96-13:96+12] = 1
     plt.figure()
     plt.imshow(masks)
-    plt.savefig('mask.png')
+    plt.savefig('mask_best.png')
     plt.close()
 
 
