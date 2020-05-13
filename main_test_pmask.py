@@ -55,12 +55,12 @@ if __name__ == '__main__':
     opt = {**vars(parser.parse_args())}
 
     if opt['flag_fix'] == 1:
-        # result_dir = '/results_test/results_loupe'
-        # opt['weight_dir'] = 'weights_loupe'
-        # mask_prosp = 'LOUPE_' + str(int(opt['samplingRatio']*100))
-        result_dir = '/results_test/results_precond'
-        opt['weight_dir'] = 'weights_precond'
+        result_dir = '/results_test/results_loupe'
+        opt['weight_dir'] = 'weights_loupe'
         mask_prosp = 'LOUPE_' + str(int(opt['samplingRatio']*100))
+        # result_dir = '/results_test/results_precond'
+        # opt['weight_dir'] = 'weights_precond'
+        # mask_prosp = 'LOUPE_' + str(int(opt['samplingRatio']*100))
     elif opt['flag_fix'] == 2:
         result_dir = '/results_test/results_vd'
         opt['weight_dir'] = 'weights_vd'
@@ -118,10 +118,10 @@ if __name__ == '__main__':
     )
     netG_dc.to(device)
     if opt['flag_precond'] == 0:
-        # weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
-        #                         opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
-                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
+        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
+                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+        # weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
+        #                         opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
     else:
         weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
                                 opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))

@@ -5,6 +5,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 import math
 
 from models.dc_blocks import *
@@ -218,14 +219,21 @@ class DC_ST_Pmask(nn.Module):
         # masks = torch.cat((masks[:, :, self.ncol//2:self.ncol, :], masks[:, :, 0:self.ncol//2, :]), dim=2)
         # load fixed mask
         if self.flag_fix == 1:
-            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/LOUPE.mat', 'Mask')  # LOUPE/VD/Adjoint
+            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/LOUPE.mat', 'Mask')  # LOUPE/VD/Uniform
         elif self.flag_fix == 2:
-            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Adjoint
+            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/VD.mat', 'Mask')  # LOUPE/VD/Uniform
         elif self.flag_fix == 3:
-            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/Uniform.mat', 'Mask')  # LOUPE/VD/Adjoint
+            masks = load_mat('/data/Jinwei/'+self.contrast+'_slice_recon_GE/Fixed_masks/Uniform.mat', 'Mask')  # LOUPE/VD/Uniform
         if self.pmask_BO is not None:
-            u = np.random.uniform(size=(256, 192))
+            u = np.random.uniform(0, np.mean(self.pmask_BO)/self.samplingRatio, size=(256, 192))
             masks = self.pmask_BO > u
+            masks[128-13:128+12, 96-13:96+12] = 1
+
+            plt.figure()
+            plt.imshow(masks)
+            plt.savefig('mask.png')
+            plt.close()
+
         if self.flag_fix:
             masks = masks[np.newaxis, ..., np.newaxis]
             masks = torch.tensor(masks, device=device).float()
@@ -258,7 +266,7 @@ class DC_ST_Pmask(nn.Module):
                     rhs = x_start - A.AtA(x, use_dll2=3)
                     dc_layer = DC_layer(A, rhs, flag_precond=self.flag_precond, precond=precond, use_dll2=3)
 
-                delta_x = dc_layer.CG_iter(max_iter=10)  # 20 for test
+                delta_x = dc_layer.CG_iter(max_iter=20)  # 20 for test
                 x = x + delta_x
                 Xs.append(x)
                 # if i % 10 == 0:

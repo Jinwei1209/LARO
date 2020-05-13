@@ -25,7 +25,7 @@ def expected_improvement(x, gaussian_process, evaluated_loss, greater_is_better=
         n_params: int.
             Dimension of the hyperparameter space.
     """
-
+    xi = 0.00
     x_to_predict = x.reshape(-1, n_params)
 
     mu, sigma = gaussian_process.predict(x_to_predict, return_std=True)
@@ -39,13 +39,11 @@ def expected_improvement(x, gaussian_process, evaluated_loss, greater_is_better=
 
     # In case sigma equals zero
     with np.errstate(divide='ignore'):
-        Z = scaling_factor * (mu - loss_optimum) / sigma
-        expected_improvement = scaling_factor * (mu - loss_optimum) * norm.cdf(Z) + sigma * norm.pdf(Z)
+        # Z = scaling_factor * (mu - loss_optimum) / sigma
+        Z = (mu - loss_optimum - xi) / sigma
+        # expected_improvement = scaling_factor * (mu - loss_optimum) * norm.cdf(Z) + sigma * norm.pdf(Z)
+        expected_improvement = (mu - loss_optimum - xi) * norm.cdf(Z) + sigma * norm.pdf(Z)
         expected_improvement[sigma == 0.0] = 0.0
-
-        # Z = (mu - loss_optimum) / sigma
-        # expected_improvement = np.max(mu - loss_optimum, 0) + sigma * norm.pdf(Z) - np.abs(mu - loss_optimum) * norm.cdf(Z)
-        # expected_improvement[sigma == 0.0] = 0.0
 
     return -1 * expected_improvement
 
