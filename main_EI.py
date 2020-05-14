@@ -20,7 +20,7 @@ if __name__ == '__main__':
     contrast = 'T1'
     sampling_ratio = 0.1
     n_pre_samples = 3
-    n_iters = 3
+    n_iters = 30
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
     print('Contrast is {0}, Sampling ratio is {1}'.format(contrast, sampling_ratio))
@@ -35,8 +35,8 @@ if __name__ == '__main__':
         )
     data_loader = data.DataLoader(data_loader, batch_size=4, shuffle=False)
 
-    bounds = np.array([[-1., -1.], [1., 1.]])  # for log uniform space
-    # bounds = np.array([[0., 0.], [10., 10.]])  # for uniform space
+    # bounds = np.array([[-1., -1.], [1., 1.]])  # for log uniform space
+    bounds = np.array([[0., 0.], [10., 10.]])  # for uniform space
 
     objective = lambda z: recon_loss(z, data_loader, device, sampling_ratio)
 
@@ -93,7 +93,8 @@ if __name__ == '__main__':
     plt.savefig('EI.png')
     plt.close()
 
-    p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
+    # p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
+    p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
     u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
     masks = p_pattern > u
     masks[128-13:128+12, 96-13:96+12] = 1
