@@ -40,6 +40,7 @@ kdata = c2r_kdata(kdata)
 ```
 
 New implementations:
+
 If you have new modules implemented, put them in 
 ```
 /bayesOpt
