@@ -17,7 +17,7 @@ from bayesOpt.sample_loss import *
 
 if __name__ == '__main__':
 
-    contrast = 'T2'
+    contrast = 'T1'
     sampling_ratio = 0.1
     n_pre_samples = 3
     n_iters = 30
