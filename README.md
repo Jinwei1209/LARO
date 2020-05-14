@@ -10,7 +10,7 @@ to check the result. You need to install 'gpytorch' to run the code.
 Please run the code in GPU server, since the data are located there.
 
 
-Recon solver:
+**Recon solver:**
 
 I implemented the iterative reconstruction solvers for under-sampled k-space recon. In 
 ```
@@ -29,7 +29,7 @@ K=20
 means the quasi-newton outer loop iteration numbers are 20. You can change this parameter to introduce 'reconstruction noise' as we discussed. 
 
 
-Kspace dataloader:
+**Kspace dataloader:**
 ```
 loader/kdata_loader_GE/kdata_loader_GE
 ```
@@ -39,7 +39,7 @@ kdata = np.transpose(kdata, (2, 0, 1))
 kdata = c2r_kdata(kdata)
 ```
 
-New implementations:
+**New implementations:**
 
 If you have new modules implemented, put them in 
 ```
