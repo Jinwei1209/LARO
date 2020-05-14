@@ -14,9 +14,9 @@ Recon solver:
 
 I implemented the iterative reconstruction solvers for under-sampled k-space recon. In 
 ```
-/bayesOpt/sample_loss/recon_loss function
+/bayesOpt/sample_loss/recon_loss
 ```
-the command
+function, the command
 ```
 model = DC_ST_Pmask(input_channels=2, filter_channels=32, lambda_dll2=1e-4, 
                         lambda_tv=1e-4, rho_penalty=1e-2, flag_ND=3, flag_solver=-3, 
