@@ -31,8 +31,8 @@ def gen_pattern(a, b, r_spacing=3):
 
 def recon_loss(params, data_loader, device, sampling_ratio=0.1):
     print('a = {0}, b = {1}'.format(params[0], params[1]))
-    # p_pattern = gen_pattern(a=10**params[0], b=10**params[1], r_spacing=3)
-    p_pattern = gen_pattern(a=params[0], b=params[1], r_spacing=3)
+    p_pattern = gen_pattern(a=10**params[0], b=10**params[1], r_spacing=3)
+    # p_pattern = gen_pattern(a=params[0], b=params[1], r_spacing=3)
     model = DC_ST_Pmask(input_channels=2, filter_channels=32, lambda_dll2=1e-4, 
                         lambda_tv=1e-4, rho_penalty=1e-2, flag_ND=3, flag_solver=-3, 
                         flag_TV=1, K=20, rescale=True, samplingRatio=sampling_ratio, flag_fix=1, pmask_BO=p_pattern)
