@@ -25,7 +25,8 @@ if __name__ == '__main__':
     data_loader = kdata_loader_GE(
             rootDir=rootName,
             contrast=contrast, 
-            split='test'
+            split='test',
+            noiseLevel = 1
         )
     data_loader = data.DataLoader(data_loader, batch_size=4, shuffle=False)
 
