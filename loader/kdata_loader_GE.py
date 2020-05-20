@@ -65,7 +65,7 @@ class kdata_loader_GE(data.Dataset):
         split = 'train',
         batchSize = 1,
         augmentations = [None],
-        noiseLevel = 0
+        SNR = 0
     ):
 
         self.rootDir = rootDir
@@ -93,7 +93,7 @@ class kdata_loader_GE(data.Dataset):
         self.batchIndex = 0
 
         # snr
-        self.noiseLevel = noiseLevel
+        self.SNR = SNR
 
 
 
@@ -122,9 +122,10 @@ class kdata_loader_GE(data.Dataset):
         kdata = load_mat(self.dataFD + 'kdata_slice_%d.mat' %(idx), 'kdata_slice')
         kdata = np.transpose(kdata, (2, 0, 1))
         kdata = c2r_kdata(kdata)
-        # add gaussian noise in kdata
-        if self.noiseLevel != 0:
-            kdata += np.random.normal(0, np.sqrt(self.noiseLevel/2), size=(kdata.shape(), 2)).view(np.complex)
+        # add gaussian noise in kdata, SNR = 0 for not adding noise, otherwise referring to desired linear SNR
+        if self.SNR != 0:
+            var_n = np.abs(np.mean(kdata.flatten())) / self.SNR
+            kdata += np.random.normal(0, np.sqrt(var_n/2), size=(kdata.shape(), 2)).view(np.complex)
 
 
         if self.contrast == 'T1':

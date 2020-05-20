@@ -43,6 +43,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast=contrast, 
             split='test'
+            SNR = 100
         )
     data_loader = data.DataLoader(data_loader, batch_size=4, shuffle=False)
 
