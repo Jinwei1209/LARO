@@ -125,7 +125,7 @@ class kdata_loader_GE(data.Dataset):
         # add gaussian noise in kdata, SNR = 0 for not adding noise, otherwise referring to desired linear SNR
         if self.SNR != 0:
             var_n = np.abs(np.mean(kdata.flatten())) / self.SNR
-            kdata += np.random.normal(0, np.sqrt(var_n/2), size=(kdata.shape, 2)).view(np.complex)
+            kdata += np.random.normal(0, np.sqrt(var_n/2), size=(len(kdata.flatten()), 2)).view(np.complex).reshape(kdata.shape)
 
 
         if self.contrast == 'T1':
