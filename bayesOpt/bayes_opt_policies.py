@@ -34,7 +34,7 @@ def EI_policy(train_x, train_y, bounds, objective):
 		fit_gpytorch_model(mll)
 
 		# Optimize EI
-		BoTorch_EI = ExpectedImprovement(model=model, best_f=y.max())
+		BoTorch_EI = ExpectedImprovement(model=model, best_f=train_y.max())
 		new_point, new_point_EI = optimize_acqf(
 		    acq_function=BoTorch_EI,
 		    bounds=torch.tensor(bounds),
