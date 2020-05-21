@@ -54,10 +54,11 @@ def KG_policy(train_x, train_y, bounds, objective):
 
 		# Fit the model by GP
 		# Take train_x and train_y as training data and producte a fitted "model" object
-		noises = torch.zeros(len(train_y))
-		model  = SingleTaskGP(torch.tensor(train_x), torch.tensor(train_y).unsqueeze(-1),
-							likelihood = FixedNoiseGaussianLikelihood(noise=noises))
+		# noises = torch.zeros(len(train_y))
+		# model  = SingleTaskGP(torch.tensor(train_x), torch.tensor(train_y).unsqueeze(-1),
+		# 					likelihood = FixedNoiseGaussianLikelihood(noise=noises))
 		# optimize the model hyperparam by maximizing the log marginal likelihood
+		model  = SingleTaskGP(torch.tensor(train_x), torch.tensor(train_y).unsqueeze(-1))
 		mll    = ExactMarginalLogLikelihood(model.likelihood, model)
 		fit_gpytorch_model(mll)
 
