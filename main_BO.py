@@ -89,7 +89,8 @@ if __name__ == '__main__':
     # Read in data from a file.
     filename = 'presample_data.csv'
     # If data doesn't exist, generate it
-    if ~os.path.exists(filename):
+    if not os.path.exists(filename):
+        print('Randomly generate some samples')
         np.random.seed(1)
         x_list, y_list = [], []
         # random initialization
@@ -103,8 +104,8 @@ if __name__ == '__main__':
 
     # Read in data from a file.  
     data = np.loadtxt(filename)
-    x = data[:,0:2] # First column of the data
-    y = data[:,-1] # Second column of the data
+    x = data[:,0:2] # First two column of the data
+    y = data[:,-1] # Last column of the data
 
     
     print('Value of best point found: {}'.format(y.max()))
