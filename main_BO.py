@@ -21,7 +21,7 @@ if __name__ == '__main__':
     q = 1  # number of lookahead
     contrast = 'T1'
     sampling_ratio = 0.1
-    n_pre_samples = 3
+    n_pre_samples = 10
     n_iters = 30
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -41,6 +41,8 @@ if __name__ == '__main__':
 
     bounds = np.array([[-1., -1.], [1., 1.]])  # for log uniform space
     # bounds = np.array([[0., 0.], [10., 10.]])  # for uniform space
+
+    print('device: {}'.format(device))
 
     objective = lambda z: recon_loss(z, data_loader, device, sampling_ratio)
 
