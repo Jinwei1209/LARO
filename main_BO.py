@@ -6,14 +6,6 @@ import argparse
 
 from torch.utils import data
 from loader.kdata_loader_GE import kdata_loader_GE
-from botorch.fit import fit_gpytorch_model
-from botorch.models import SingleTaskGP
-from botorch.acquisition import ExpectedImprovement
-from botorch.acquisition import qKnowledgeGradient
-from botorch.optim import optimize_acqf
-from botorch.utils.sampling import manual_seed
-from gpytorch.mlls import ExactMarginalLogLikelihood
-from gpytorch.likelihoods import FixedNoiseGaussianLikelihood
 from scipy.stats import norm
 from scipy.optimize import minimize
 from bayesOpt.sample_loss import *
@@ -66,112 +58,45 @@ if __name__ == '__main__':
     best = [y.max()] # This will store the best value
 
     if opt['flag_policy'] == 0:
-        # EI policy
-        for i in range(n_iters):
-            # Fit the model
-            noises = torch.zeros(len(y))
-            model = SingleTaskGP(torch.tensor(x), torch.tensor(y).unsqueeze(-1), likelihood = FixedNoiseGaussianLikelihood(noise=noises))
-            mll = ExactMarginalLogLikelihood(model.likelihood, model)
-            fit_gpytorch_model(mll)
-
-            # Optimize EI
-            BoTorch_EI = ExpectedImprovement(model=model, best_f=y.max())
-            new_point, new_point_EI = optimize_acqf(
-                acq_function=BoTorch_EI,
-                bounds=torch.tensor(bounds),
-                q=1,
-                num_restarts=50,
-                raw_samples=100,
-                options={},
-            )
-
-            # Evaluate the objective
-            new_value = objective(new_point.numpy()[0])
-            y_list.append(new_value)
-
-            # Add the new data
-            x = np.concatenate((x, new_point.numpy()))
-            y = np.array(y_list)
-            best.append(y.max())
-
-            if y[-1] == best[-1]:
-                a_best, b_best = new_point.numpy()[0]
-                print('Update best parameters')
-
-            print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
-            print()
-
-        plt.figure()
-        plt.plot(best,'o-')
-        plt.xlabel('Iteration')
-        plt.ylabel('Best value found')
-        plt.savefig('Values_EI.png')
-        plt.close()
-
-        p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
-        # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
-        u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
-        masks = p_pattern > u
-        masks[128-13:128+12, 96-13:96+12] = 1
-        plt.figure()
-        plt.imshow(masks)
-        plt.savefig('mask_best_EI.png')
-        plt.close()
-
+        policy = EI_policy()
+        value_fig_name = 'Values_EI.png'
+        mask_fig_name = 'mask_best_EI.png'
     else:
-        # KG policy
-        for i in range(n_iters):
-            # Fit the model
-            model = SingleTaskGP(torch.tensor(x), torch.tensor(y).unsqueeze(-1))
-            mll = ExactMarginalLogLikelihood(model.likelihood, model)
-            fit_gpytorch_model(mll)
+        policy = KG_policy()
+        value_fig_name = 'Values_KG.png'
+        mask_fig_name = 'mask_best_KG.png'
 
-            # Optimize gKG
-            qKG = qKnowledgeGradient(model=model, num_fantasies=128)
-            with manual_seed(1234):
-                candidates, acq_value = optimize_acqf(
-                    acq_function=qKG, 
-                    bounds=torch.tensor(bounds),
-                    q=q,
-                    num_restarts=10,
-                    raw_samples=512,
-                    options={},
-                )
+    for i in range(n_iters):
+        new_point, new_value = policy(train_x = x, train_y = y, bounds = bounds, objective = objective)
+        # Add the new data
+        x = np.concatenate((x, new_point.numpy()))
+        y = np.concatenate((y, new_value.numpy()))
+        best.append(y.max())
 
-            # Evaluate the objective
-            for j in range(q):
-                new_value = objective(candidates[j:j+1].numpy()[0])
-                y_list.append(new_value)
+        if best[-1] != best[-2]:
+            a_best, b_best = new_point[np.argmax(new_values)].numpy()[0]
+            print('Update best parameters')
 
-            # Add the new data
-            x = np.concatenate((x, candidates.numpy()))
-            y = np.array(y_list)
-            best.append(y.max())
+        print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
+        print()
 
-            for j in range(q):
-                if y[-1-j] == best[-1]:
-                    a_best, b_best = candidates[j:j+1].numpy()[0]
-                    print('Update best parameters')
+    plt.figure()
+    plt.plot(best,'o-')
+    plt.xlabel('Iteration')
+    plt.ylabel('Best value found')
+    plt.savefig(value_fig_name)
+    plt.close()
 
-            print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, np.max(y[-q:]), best[-1]))
-            print()
+    p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
+    # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
+    u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
+    masks = p_pattern > u
+    masks[128-13:128+12, 96-13:96+12] = 1
+    plt.figure()
+    plt.imshow(masks)
+    plt.savefig(mask_fig_name)
+    plt.close()
 
-        plt.figure()
-        plt.plot(best,'o-')
-        plt.xlabel('Iteration')
-        plt.ylabel('Best value found')
-        plt.savefig('values_KG.png')
-        plt.close()
-
-        p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
-        # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
-        u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
-        masks = p_pattern > u
-        masks[128-13:128+12, 96-13:96+12] = 1
-        plt.figure()
-        plt.imshow(masks)
-        plt.savefig('mask_best_KG.png')
-        plt.close()
 
 
 
