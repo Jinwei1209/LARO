@@ -97,11 +97,11 @@ if __name__ == '__main__':
     if opt['flag_policy'] == 0:
         value_fig_name = 'Values_EI.png'
         mask_fig_name = 'mask_best_EI.png'
-        policy_update(policy_func = EI_policy, value_fig_name, mask_fig_name)
+        policy_update(EI_policy, value_fig_name, mask_fig_name)
     else:
         value_fig_name = 'Values_KG.png'
         mask_fig_name = 'mask_best_KG.png'
-        policy_update(policy_func = KG_policy, value_fig_name, mask_fig_name)
+        policy_update(KG_policy, value_fig_name, mask_fig_name)
 
     # for i in range(n_iters):
     #     new_point, new_value = policy(train_x = x, train_y = y, bounds = bounds, objective = objective)
