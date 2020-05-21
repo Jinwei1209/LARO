@@ -15,9 +15,7 @@ from bayesOpt.bayes_opt_policies import *
 
 def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                 policy_func, value_fig_name, mask_fig_name, Plot = False):
-''' 
-using specific policy for GP model bayesian optimization, specified by policy_func
-'''
+    
     for i in range(n_iters):
         new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective)
         # Add the new data
@@ -53,10 +51,6 @@ using specific policy for GP model bayesian optimization, specified by policy_fu
 
 
 
-def cross_validation():
-
-
-
 if __name__ == '__main__':
 
     # typein parameters
@@ -69,7 +63,7 @@ if __name__ == '__main__':
     q = 1  # number of step lookahead
     contrast = 'T1'
     sampling_ratio = 0.1
-    n_pre_samples = 15
+    n_pre_samples = 2
     n_iters = 30
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
