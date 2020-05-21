@@ -65,7 +65,9 @@ class kdata_loader_GE(data.Dataset):
         split = 'train',
         batchSize = 1,
         augmentations = [None],
-        SNR = 0
+        SNR = 0,  # used for BO project
+        flag_BO = 0,  # used for BO project
+        slice_spacing = 25  # used for BO project
     ):
 
         self.rootDir = rootDir
@@ -91,10 +93,14 @@ class kdata_loader_GE(data.Dataset):
         self.augIndex = 0
         self.batchSize = batchSize
         self.batchIndex = 0
-
-        # snr
         self.SNR = SNR
+        self.flag_BO = flag_BO
+        self.slice_spacing = slice_spacing
 
+        if self.flag_BO:
+            self.startIdx = 400
+            self.endIdx = 600
+            self.nsamples = (self.endIdx - self.startIdx) // self.slice_spacing
 
 
     def __len__(self):
@@ -103,8 +109,10 @@ class kdata_loader_GE(data.Dataset):
 
 
     def __getitem__(self, idx):
-
-        idx = int(idx / self.augSize) + self.startIdx
+        if self.flag_BO:
+            idx = int(idx / self.augSize) * self.slice_spacing + self.startIdx
+        else:
+            idx = int(idx / self.augSize) + self.startIdx
 
         if (self.batchIndex == self.batchSize):
 
@@ -126,7 +134,6 @@ class kdata_loader_GE(data.Dataset):
         if self.SNR != 0:
             var_n = np.abs(np.mean(kdata.flatten())) / self.SNR
             kdata += np.random.normal(0, np.sqrt(var_n/2), size=len(kdata.flatten())).reshape(kdata.shape)
-
 
         if self.contrast == 'T1':
             # tmp = load_mat(self.dataFD + 'brain_mask_slice_%d.mat' %(idx), 'brain_mask_slice')

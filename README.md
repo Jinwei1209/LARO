@@ -3,9 +3,9 @@
 For Bayesian Optimization project, use:
 
 ```
-python main_EI.py 
+python main_EI.py --flag_policy=0
 ```
-to check the result. You need to install 'gpytorch' to run the code. 
+to check the result (0: EI policy, 1: KG policy). You need to install 'gpytorch' to run the code. 
 
 Please run the code in GPU server, since the data are located there.
 
