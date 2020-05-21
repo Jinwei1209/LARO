@@ -15,7 +15,9 @@ from bayesOpt.bayes_opt_policies import *
 
 def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                 policy_func, value_fig_name, mask_fig_name, Plot = False):
-
+''' 
+using specific policy for GP model bayesian optimization, specified by policy_func
+'''
     for i in range(n_iters):
         new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective)
         # Add the new data
@@ -48,6 +50,10 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
         plt.imshow(masks)
         plt.savefig(mask_fig_name)
         plt.close()
+
+
+
+def cross_validation():
 
 
 
@@ -98,13 +104,13 @@ if __name__ == '__main__':
                 y_list.append(objective(params))
         x = np.array(x_list)
         y = np.array(y_list)
-        data = np.transpose([x,y])
+        data = np.concatenate((x,y.reshape(len(y),1)), axis = 1)
         np.savetxt(filename,data)
 
     # Read in data from a file.  
     data = np.loadtxt(filename)
-    x = data[:,0] # First column of the data
-    y = data[:,1] # Second column of the data
+    x = data[:,0:2] # First column of the data
+    y = data[:,-1] # Second column of the data
 
     
     print('Value of best point found: {}'.format(y.max()))
@@ -116,13 +122,15 @@ if __name__ == '__main__':
         mask_fig_name = 'mask_best_EI.png'
         policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                         EI_policy, value_fig_name, mask_fig_name, True)
-        cross_validation()
     else:
         value_fig_name = 'Values_KG.png'
         mask_fig_name = 'mask_best_KG.png'
         policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                         KG_policy, value_fig_name, mask_fig_name, True)
 
+
+    if opt['cross_val'] == 1:
+        cross_validation()
 
 
 
