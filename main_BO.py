@@ -11,7 +11,10 @@ from scipy.optimize import minimize
 from bayesOpt.sample_loss import *
 from bayesOpt.bayes_opt_policies import *
 
-def policy_update(policy_func, value_fig_name, mask_fig_name):
+
+
+def policy_update(x, y, bounds, objective, n_inters, best, a_best, b_best,
+                policy_func, value_fig_name, mask_fig_name):
 
     for i in range(n_iters):
         new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective)
@@ -98,11 +101,13 @@ if __name__ == '__main__':
     if opt['flag_policy'] == 0:
         value_fig_name = 'Values_EI.png'
         mask_fig_name = 'mask_best_EI.png'
-        policy_update(EI_policy, value_fig_name, mask_fig_name)
+        policy_update(x, y, bounds, objective, n_inters, best, a_best, b_best,
+                        EI_policy, value_fig_name, mask_fig_name)
     else:
         value_fig_name = 'Values_KG.png'
         mask_fig_name = 'mask_best_KG.png'
-        policy_update(KG_policy, value_fig_name, mask_fig_name)
+        policy_update(x, y, bounds, objective, n_inters, best, a_best, b_best,
+                        KG_policy, value_fig_name, mask_fig_name)
 
     # for i in range(n_iters):
     #     new_point, new_value = policy(train_x = x, train_y = y, bounds = bounds, objective = objective)
