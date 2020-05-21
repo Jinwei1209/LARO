@@ -91,7 +91,7 @@ def KG_policy(train_x, train_y, bounds, objective):
 			)
 
 		# Evaluate the objective
-		new_values = np.array([objective(candidates[i].numpy()) for i in range(q)])
+		new_values = np.array([objective(candidates[i].numpy()) for i in range(len(candidates))])
 
 		return candidates, new_values
 
