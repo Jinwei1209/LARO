@@ -64,7 +64,8 @@ class kdata_loader_GE(data.Dataset):
         contrast = 'T2',
         split = 'train',
         batchSize = 1,
-        augmentations = [None]
+        augmentations = [None],
+        SNR = 0
     ):
 
         self.rootDir = rootDir
@@ -90,6 +91,10 @@ class kdata_loader_GE(data.Dataset):
         self.augIndex = 0
         self.batchSize = batchSize
         self.batchIndex = 0
+
+        # snr
+        self.SNR = SNR
+
 
 
     def __len__(self):
@@ -117,6 +122,12 @@ class kdata_loader_GE(data.Dataset):
         kdata = load_mat(self.dataFD + 'kdata_slice_%d.mat' %(idx), 'kdata_slice')
         kdata = np.transpose(kdata, (2, 0, 1))
         kdata = c2r_kdata(kdata)
+        # add gaussian noise in kdata, SNR = 0 for not adding noise, otherwise referring to desired linear SNR
+        if self.SNR != 0:
+            var_n = np.abs(np.mean(kdata.flatten())) / self.SNR
+            kdata += np.random.normal(0, np.sqrt(var_n/2), size=len(kdata.flatten())).reshape(kdata.shape)
+
+
         if self.contrast == 'T1':
             # tmp = load_mat(self.dataFD + 'brain_mask_slice_%d.mat' %(idx), 'brain_mask_slice')
             # brain_mask = np.zeros(org.shape, dtype=np.float32)
@@ -126,6 +137,9 @@ class kdata_loader_GE(data.Dataset):
         else:
             brain_mask = np.ones(org.shape, dtype=np.float32)
         return kdata, org, csm, brain_mask
+
+
+
 
         
 
