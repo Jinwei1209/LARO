@@ -43,9 +43,11 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast=contrast, 
             split='test',
-            SNR = 100
+            SNR=100,
+            flag_BO=1,
+            slice_spacing=25
         )
-    data_loader = data.DataLoader(data_loader, batch_size=4, shuffle=False)
+    data_loader = data.DataLoader(data_loader, batch_size=8, shuffle=False)
 
     bounds = np.array([[-1., -1.], [1., 1.]])  # for log uniform space
     # bounds = np.array([[0., 0.], [10., 10.]])  # for uniform space
