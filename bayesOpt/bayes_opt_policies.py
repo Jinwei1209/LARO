@@ -70,10 +70,12 @@ def KG_policy(train_x, train_y, bounds, objective):
 			raw_samples=2048,
 		)
 
+		qKG_offset = qKnowledgeGradient(model, num_fantasies=128)
+
 		qKG = qKnowledgeGradient(
 			model,
 			num_fantasies=128,
-			sampler=qKG.sampler,
+			sampler=qKG_offset.sampler,
 			current_value=max_pmean,
 		)
 
