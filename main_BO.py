@@ -10,6 +10,41 @@ from scipy.stats import norm
 from scipy.optimize import minimize
 from bayesOpt.sample_loss import *
 
+def policy_update(policy_func, value_fig_name, mask_fig_name):
+
+    for i in range(n_iters):
+        new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective)
+        # Add the new data
+        x = np.concatenate((x, new_point.numpy()))
+        y = np.concatenate((y, new_value.numpy()))
+        best.append(y.max())
+
+        if best[-1] != best[-2]:
+            a_best, b_best = new_point[np.argmax(new_values)].numpy()[0]
+            print('Update best parameters')
+
+        print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
+        print()
+
+    plt.figure()
+    plt.plot(best,'o-')
+    plt.xlabel('Iteration')
+    plt.ylabel('Best value found')
+    plt.savefig(value_fig_name)
+    plt.close()
+
+    p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
+    # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
+    u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
+    masks = p_pattern > u
+    masks[128-13:128+12, 96-13:96+12] = 1
+    plt.figure()
+    plt.imshow(masks)
+    plt.savefig(mask_fig_name)
+    plt.close()
+
+
+
 if __name__ == '__main__':
 
     # typein parameters
@@ -60,44 +95,44 @@ if __name__ == '__main__':
     best = [y.max()] # This will store the best value
 
     if opt['flag_policy'] == 0:
-        policy = EI_policy()
         value_fig_name = 'Values_EI.png'
         mask_fig_name = 'mask_best_EI.png'
+        policy_update(policy_func = EI_policy, value_fig_name, mask_fig_name)
     else:
-        policy = KG_policy()
         value_fig_name = 'Values_KG.png'
         mask_fig_name = 'mask_best_KG.png'
+        policy_update(policy_func = KG_policy, value_fig_name, mask_fig_name)
 
-    for i in range(n_iters):
-        new_point, new_value = policy(train_x = x, train_y = y, bounds = bounds, objective = objective)
-        # Add the new data
-        x = np.concatenate((x, new_point.numpy()))
-        y = np.concatenate((y, new_value.numpy()))
-        best.append(y.max())
+    # for i in range(n_iters):
+    #     new_point, new_value = policy(train_x = x, train_y = y, bounds = bounds, objective = objective)
+    #     # Add the new data
+    #     x = np.concatenate((x, new_point.numpy()))
+    #     y = np.concatenate((y, new_value.numpy()))
+    #     best.append(y.max())
 
-        if best[-1] != best[-2]:
-            a_best, b_best = new_point[np.argmax(new_values)].numpy()[0]
-            print('Update best parameters')
+    #     if best[-1] != best[-2]:
+    #         a_best, b_best = new_point[np.argmax(new_values)].numpy()[0]
+    #         print('Update best parameters')
 
-        print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
-        print()
+    #     print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
+    #     print()
 
-    plt.figure()
-    plt.plot(best,'o-')
-    plt.xlabel('Iteration')
-    plt.ylabel('Best value found')
-    plt.savefig(value_fig_name)
-    plt.close()
+    # plt.figure()
+    # plt.plot(best,'o-')
+    # plt.xlabel('Iteration')
+    # plt.ylabel('Best value found')
+    # plt.savefig(value_fig_name)
+    # plt.close()
 
-    p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
-    # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
-    u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
-    masks = p_pattern > u
-    masks[128-13:128+12, 96-13:96+12] = 1
-    plt.figure()
-    plt.imshow(masks)
-    plt.savefig(mask_fig_name)
-    plt.close()
+    # p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
+    # # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
+    # u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
+    # masks = p_pattern > u
+    # masks[128-13:128+12, 96-13:96+12] = 1
+    # plt.figure()
+    # plt.imshow(masks)
+    # plt.savefig(mask_fig_name)
+    # plt.close()
 
 
 
