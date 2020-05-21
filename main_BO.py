@@ -13,7 +13,7 @@ from bayesOpt.bayes_opt_policies import *
 
 
 
-def policy_update(x, y, bounds, objective, n_inters, best, a_best, b_best,
+def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                 policy_func, value_fig_name, mask_fig_name):
 
     for i in range(n_iters):
@@ -101,12 +101,12 @@ if __name__ == '__main__':
     if opt['flag_policy'] == 0:
         value_fig_name = 'Values_EI.png'
         mask_fig_name = 'mask_best_EI.png'
-        policy_update(x, y, bounds, objective, n_inters, best, a_best, b_best,
+        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                         EI_policy, value_fig_name, mask_fig_name)
     else:
         value_fig_name = 'Values_KG.png'
         mask_fig_name = 'mask_best_KG.png'
-        policy_update(x, y, bounds, objective, n_inters, best, a_best, b_best,
+        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                         KG_policy, value_fig_name, mask_fig_name)
 
     # for i in range(n_iters):
