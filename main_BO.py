@@ -63,7 +63,7 @@ if __name__ == '__main__':
     q = 1  # number of step lookahead
     contrast = 'T1'
     sampling_ratio = 0.1
-    n_pre_samples = 15
+    n_pre_samples = 8
     n_iters = 30
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
