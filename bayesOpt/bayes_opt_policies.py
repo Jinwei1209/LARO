@@ -45,7 +45,7 @@ def EI_policy(train_x, train_y, bounds, objective):
 		)
 
 		# Evaluate the objective
-		new_value = objective(new_point.numpy()[0])
+		new_value = np.array([objective(new_point.numpy()[0])])
 
 		return new_point, new_value
 
@@ -88,7 +88,7 @@ def KG_policy(train_x, train_y, bounds, objective):
 			)
 
 		# Evaluate the objective
-		new_values = [objective(candidates[i].numpy()) for i in range(q)]
+		new_values = np.array([objective(candidates[i].numpy()) for i in range(q)])
 
 		return candidates, new_values
 
