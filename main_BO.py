@@ -89,7 +89,7 @@ if __name__ == '__main__':
     # Read in data from a file.
     filename = 'presample_data.csv'
     # If data doesn't exist, generate it
-    if ~os.path.exists(filename):
+    if not os.path.exists(filename):
         print('Randomly generate some samples')
         np.random.seed(1)
         x_list, y_list = [], []
