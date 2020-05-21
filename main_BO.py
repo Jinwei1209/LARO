@@ -27,7 +27,8 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
             a_best, b_best = new_point[np.argmax(new_value)]
             print('Update best parameters')
 
-        print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
+        # print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
+        print('Iteration {:2d}, best value={:0.3f}'.format(i, best[-1]))
         print()
 
     plt.figure()
