@@ -9,6 +9,7 @@ from loader.kdata_loader_GE import kdata_loader_GE
 from scipy.stats import norm
 from scipy.optimize import minimize
 from bayesOpt.sample_loss import *
+from bayesOpt.bayes_opt_policies import *
 
 def policy_update(policy_func, value_fig_name, mask_fig_name):
 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     q = 1  # number of lookahead
     contrast = 'T1'
     sampling_ratio = 0.1
-    n_pre_samples = 10
+    n_pre_samples = 3
     n_iters = 30
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -70,7 +71,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast=contrast, 
             split='test',
-            SNR = 100
+            SNR = 10
         )
     data_loader = data.DataLoader(data_loader, batch_size=4, shuffle=False)
 
