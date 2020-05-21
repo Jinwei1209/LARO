@@ -20,7 +20,7 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
         new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective)
         # Add the new data
         x = np.concatenate((x, new_point.numpy()))
-        y = np.concatenate((y, new_value.numpy()))
+        y = np.concatenate((y, new_value))
         best.append(y.max())
 
         if best[-1] != best[-2]:
