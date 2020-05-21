@@ -24,7 +24,7 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
         best.append(y.max())
 
         if best[-1] != best[-2]:
-            a_best, b_best = new_point[np.argmax(new_values)].numpy()[0]
+            a_best, b_best = new_point[np.argmax(new_value)].numpy()[0]
             print('Update best parameters')
 
         print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
