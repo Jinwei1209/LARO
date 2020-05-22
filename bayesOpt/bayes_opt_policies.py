@@ -60,7 +60,7 @@ def qEI_policy(train_x, train_y, bounds, objective, q=1):
 		fit_gpytorch_model(mll)
 		# construct MC EI 
 		sampler = SobolQMCNormalSampler(num_samples=500, seed=0, resample=False)
-		MC_EI = qExpectedImprovement(model, best_f=best_value, sampler=sampler)
+		MC_EI = qExpectedImprovement(model, best_f=train_y.max(), sampler=sampler)
 		# optimize qEI for q-batch
 		torch.manual_seed(seed=0) # to keep the restart conditions the same
 		candidates, acq_value = optimize_acqf(
