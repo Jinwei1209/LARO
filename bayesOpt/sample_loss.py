@@ -47,19 +47,19 @@ def gen_pattern(a, b, num_row=256, num_col=192, r_spacing=3):
     p_pattern[M_c-13:M_c+12, N_c-13:N_c+12] = 1
     return p_pattern
 
-def recon_loss(params, data_loader, device, sampling_ratio=0.1):
+def recon_loss(params, data_loader, sampling_ratio=0.1, K=5, save_name=None):
     print('a = {0}, b = {1}'.format(params[0], params[1]))
     p_pattern = gen_pattern(a=10**params[0], b=10**params[1], r_spacing=3)
     # p_pattern = gen_pattern(a=params[0], b=params[1], r_spacing=3)
     model = DC_ST_Pmask(input_channels=2, filter_channels=32, lambda_dll2=1e-4, 
                         lambda_tv=1e-4, rho_penalty=1e-2, flag_ND=3, flag_solver=-3, 
-                        flag_TV=1, K=5, rescale=True, samplingRatio=sampling_ratio, flag_fix=1, pmask_BO=p_pattern)
+                        flag_TV=1, K=K, rescale=True, samplingRatio=sampling_ratio, flag_fix=1, pmask_BO=p_pattern)
     if torch.cuda.device_count() > 1:
         model = torch.nn.DataParallel(model)
     metrices_test = Metrices()
-    # model.to(device)
     model.cuda()
     t0 = time.time()
+    recons = []
     with torch.no_grad(): 
         for idx, (inputs, targets, csms, brain_masks) in enumerate(data_loader):
             # if idx % 10 == 0:
@@ -69,9 +69,17 @@ def recon_loss(params, data_loader, device, sampling_ratio=0.1):
             csms = csms.cuda()
             # calculating metrices
             Xs = model(inputs, csms)
+            recons.append(Xs[-1].cpu().detach())
             metrices_test.get_metrices(Xs[-1], targets)
     ave_psnr = np.mean(np.asarray(metrices_test.PSNRs))
     print('Total Time to evaluate objective function once is: %.2f s' % (time.time()-t0))
+    if save_name is not None:
+        recons = np.concatenate(recons, axis=0)
+        recons = np.transpose(recons, [2,3,0,1])
+        recons = np.squeeze(np.sqrt(recons[..., 0]**2 + recons[..., 1]**2))
+        adict = {}
+        adict['recons'] = recons
+        sio.savemat('./bo_results/{0}.mat'.format(save_name), adict)
     return 10**(ave_psnr-39)
 
 

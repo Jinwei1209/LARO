@@ -125,7 +125,7 @@ def KG_policy(train_x, train_y, bounds, objective, q=1):
 
 
 def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                policy_func, q, value_fig_name, mask_fig_name, sampling_ratio, Plot = False):
+                policy_func, q, value_fig_name, mask_fig_name, sampling_ratio, plot=False):
     
     for i in range(n_iters):
         new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q=q)
@@ -142,7 +142,7 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
         print('Iteration {:2d}, best value={:0.3f}'.format(i, best[-1]))
         print()
 
-    if Plot:
+    if plot:
         plt.figure()
         plt.plot(best,'o-')
         plt.xlabel('Iteration')
