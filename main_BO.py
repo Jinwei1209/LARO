@@ -90,12 +90,14 @@ if __name__ == '__main__':
     #     best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
     #                     KG_policy, q, value_fig_name, mask_fig_name, True)
 
-    value_fig_name = './bo_results/Values_EI.png'
-    mask_fig_name = './bo_results/mask_best_EI.png'
-    best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
-                    EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
-    params_best_EI = x_EI[np.argmax(y_EI)]
-    recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI')
+
+    if q == 1:
+        value_fig_name = './bo_results/Values_EI.png'
+        mask_fig_name = './bo_results/mask_best_EI.png'
+        best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
+                        EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+        params_best_EI = x_EI[np.argmax(y_EI)]
+        recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI')
 
     value_fig_name = './bo_results/Values_qEI.png'
     mask_fig_name = './bo_results/mask_best_qEI.png'
