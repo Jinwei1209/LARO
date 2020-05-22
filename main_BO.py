@@ -80,31 +80,31 @@ if __name__ == '__main__':
     # if opt['flag_policy'] == 0:
     #     value_fig_name = 'Values_EI.png'
     #     mask_fig_name = 'mask_best_EI.png'
-    #     policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #     best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
     #                     EI_policy, q, value_fig_name, mask_fig_name, True)
     # elif opt['flag_policy'] == 1:
     #     value_fig_name = 'Values_qEI.png'
     #     mask_fig_name = 'mask_best_qEI.png'
-    #     policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #     best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
     #                     qEI_policy, q, value_fig_name, mask_fig_name, True)
 
     # else:
     #     value_fig_name = 'Values_qKG.png'
     #     mask_fig_name = 'mask_best_qKG.png'
-    #     policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #     best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
     #                     KG_policy, q, value_fig_name, mask_fig_name, True)
 
     value_fig_name = 'Values_EI.png'
     mask_fig_name = 'mask_best_EI.png'
-    best_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                     EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     value_fig_name = 'Values_qEI.png'
     mask_fig_name = 'mask_best_qEI.png'
-    best_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                     qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     value_fig_name = 'Values_qKG.png'
     mask_fig_name = 'mask_best_qKG.png'
-    best_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                     KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
 
     fig, ax = plt.subplots()
