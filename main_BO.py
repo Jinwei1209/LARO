@@ -115,7 +115,10 @@ if __name__ == '__main__':
 
     plt.xlabel('number of iteration')
     plt.ylabel('Best value found')
-    plt.savefig('policy_comparison.png')
+    plt.savefig('policy_comparison_best_results.png')
+    plt.close()
+
+
 
 
 
