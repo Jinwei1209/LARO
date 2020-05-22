@@ -24,7 +24,7 @@ from scipy.optimize import minimize
 from bayesOpt.sample_loss import *
 
 
-def EI_policy(train_x, train_y, bounds, objective):
+def EI_policy(train_x, train_y, bounds, objective, q=1):
 
 		# Fit the model by GP
 		# Take train_x and train_y as training data and producte a fitted "model" object
@@ -72,7 +72,7 @@ def qEI_policy(train_x, train_y, bounds, objective, q=1):
 		    options={},
 		)
 		# Evaluate the objective
-		new_values = np.array([objective(candidates[i].numpy()) for i in range(len(candidates))])
+		new_values = np.array([objective(candidates[i].numpy()) for i in range(q)])
 
 		return candidates, new_values
 
@@ -94,7 +94,7 @@ def KG_policy(train_x, train_y, bounds, objective, q=1):
 		argmax_pmean, max_pmean = optimize_acqf(
 			acq_function=PosteriorMean(model), 
 			bounds=torch.tensor(bounds),
-			q=1,
+			q=q,
 			num_restarts=50,
 			raw_samples=2048,
 		)
@@ -119,16 +119,16 @@ def KG_policy(train_x, train_y, bounds, objective, q=1):
 			)
 
 		# Evaluate the objective
-		new_values = np.array([objective(candidates[i].numpy()) for i in range(len(candidates))])
+		new_values = np.array([objective(candidates[i].numpy()) for i in range(q)])
 
 		return candidates, new_values
 
 
 def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                policy_func, value_fig_name, mask_fig_name, Plot = False):
+                policy_func, q, value_fig_name, mask_fig_name, Plot = False):
     
     for i in range(n_iters):
-        new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective)
+        new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q)
         # Add the new data
         x = np.concatenate((x, new_point.numpy()))
         y = np.concatenate((y, new_value))

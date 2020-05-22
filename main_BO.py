@@ -76,23 +76,35 @@ if __name__ == '__main__':
     if opt['cv'] == 1:
         cross_validation(train_x = x, train_y = y)
 
-    if opt['flag_policy'] == 0:
-        value_fig_name = 'Values_EI.png'
-        mask_fig_name = 'mask_best_EI.png'
-        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                        EI_policy, value_fig_name, mask_fig_name, True)
-    elif opt['flag_policy'] == 1:
-        value_fig_name = 'Values_qEI.png'
-        mask_fig_name = 'mask_best_qEI.png'
-        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                        qEI_policy, value_fig_name, mask_fig_name, True)
+    # if opt['flag_policy'] == 0:
+    #     value_fig_name = 'Values_EI.png'
+    #     mask_fig_name = 'mask_best_EI.png'
+    #     policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #                     EI_policy, q, value_fig_name, mask_fig_name, True)
+    # elif opt['flag_policy'] == 1:
+    #     value_fig_name = 'Values_qEI.png'
+    #     mask_fig_name = 'mask_best_qEI.png'
+    #     policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #                     qEI_policy, q, value_fig_name, mask_fig_name, True)
 
-    else:
-        value_fig_name = 'Values_qKG.png'
-        mask_fig_name = 'mask_best_qKG.png'
-        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                        KG_policy, value_fig_name, mask_fig_name, True)
+    # else:
+    #     value_fig_name = 'Values_qKG.png'
+    #     mask_fig_name = 'mask_best_qKG.png'
+    #     policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #                     KG_policy, q, value_fig_name, mask_fig_name, True)
 
+    value_fig_name = 'Values_EI.png'
+    mask_fig_name = 'mask_best_EI.png'
+    policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                    EI_policy, q, value_fig_name, mask_fig_name, True)
+    value_fig_name = 'Values_qEI.png'
+    mask_fig_name = 'mask_best_qEI.png'
+    policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                    qEI_policy, q, value_fig_name, mask_fig_name, True)
+    value_fig_name = 'Values_qKG.png'
+    mask_fig_name = 'mask_best_qKG.png'
+    policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                    KG_policy, q, value_fig_name, mask_fig_name, True)
 
 
 
