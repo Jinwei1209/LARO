@@ -90,7 +90,6 @@ if __name__ == '__main__':
     #     best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
     #                     KG_policy, q, value_fig_name, mask_fig_name, True)
 
-<<<<<<< HEAD
     value_fig_name = './bo_results/Values_EI.png'
     mask_fig_name = './bo_results/mask_best_EI.png'
     best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
@@ -111,20 +110,6 @@ if __name__ == '__main__':
                     KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, plot=True)
     params_best_qKG = x_qKG[np.argmax(y_qKG)]
     recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
-=======
-    value_fig_name = 'Values_EI.png'
-    mask_fig_name = 'mask_best_EI.png'
-    best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
-                    EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
-    value_fig_name = 'Values_qEI.png'
-    mask_fig_name = 'mask_best_qEI.png'
-    best_qEI, x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
-                    qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
-    value_fig_name = 'Values_qKG.png'
-    mask_fig_name = 'mask_best_qKG.png'
-    best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
-                    KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
->>>>>>> 8157f870d4461302b5731e43c3400621ca356727
 
     if q == 1:
 
@@ -151,13 +136,10 @@ if __name__ == '__main__':
         plt.savefig('policy_comparison_best_results.png')
         plt.close()
 
-<<<<<<< HEAD
     plt.xlabel('number of iteration')
     plt.ylabel('Best value found')
     plt.savefig('./bo_results/policy_comparison_best_results.png')
     plt.close()
-=======
->>>>>>> 8157f870d4461302b5731e43c3400621ca356727
 
 
 
