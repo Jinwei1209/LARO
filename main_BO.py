@@ -25,7 +25,7 @@ if __name__ == '__main__':
     contrast = 'T1'
     sampling_ratio = 0.1
     n_pre_samples = 8
-    n_iters = 2
+    n_iters = 30
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
 
@@ -92,22 +92,22 @@ if __name__ == '__main__':
 
     value_fig_name = './bo_results/Values_EI.png'
     mask_fig_name = './bo_results/mask_best_EI.png'
-    best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                    EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, plot=True)
+    best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
+                    EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     params_best_EI = x_EI[np.argmax(y_EI)]
     recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI')
 
     value_fig_name = './bo_results/Values_qEI.png'
     mask_fig_name = './bo_results/mask_best_qEI.png'
-    best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                    qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, plot=True)
+    best_qEI, x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
+                    qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     params_best_qEI = x_qEI[np.argmax(y_qEI)]
     recon_loss(params_best_qEI, data_loader, sampling_ratio, K=20, save_name='Recons_qEI')
 
     value_fig_name = './bo_results/Values_qKG.png'
     mask_fig_name = './bo_results/mask_best_qKG.png'
-    best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                    KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, plot=True)
+    best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
+                    KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)  
     params_best_qKG = x_qKG[np.argmax(y_qKG)]
     recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
 
