@@ -16,6 +16,8 @@ from botorch.acquisition import PosteriorMean
 from botorch.optim import optimize_acqf
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.likelihoods import FixedNoiseGaussianLikelihood
+from botorch.acquisition import qExpectedImprovement
+from botorch.sampling import SobolQMCNormalSampler
 from botorch.utils.sampling import manual_seed
 from scipy.stats import norm
 from scipy.optimize import minimize
@@ -50,7 +52,33 @@ def EI_policy(train_x, train_y, bounds, objective):
 		return new_point, new_value
 
 
-def KG_policy(train_x, train_y, bounds, objective):
+def qEI_policy(train_x, train_y, bounds, objective, q=1):
+
+		# Take train_x and train_y and fit the model by GP
+		model  = SingleTaskGP(torch.tensor(train_x), torch.tensor(train_y).unsqueeze(-1))
+		mll    = ExactMarginalLogLikelihood(model.likelihood, model)
+		fit_gpytorch_model(mll)
+		# construct MC EI 
+		sampler = SobolQMCNormalSampler(num_samples=500, seed=0, resample=False)
+		MC_EI = qExpectedImprovement(model, best_f=best_value, sampler=sampler)
+		# optimize qEI for q-batch
+		torch.manual_seed(seed=0) # to keep the restart conditions the same
+		candidates, acq_value = optimize_acqf(
+		    acq_function=MC_EI,
+		    bounds=bounds,
+		    q=q,
+		    num_restarts=20,
+		    raw_samples=100,
+		    options={},
+		)
+		# Evaluate the objective
+		new_values = np.array([objective(candidates[i].numpy()) for i in range(len(candidates))])
+
+		return candidates, new_values
+
+
+
+def KG_policy(train_x, train_y, bounds, objective, q=1):
 
 		# Fit the model by GP
 		# Take train_x and train_y as training data and producte a fitted "model" object
@@ -85,7 +113,7 @@ def KG_policy(train_x, train_y, bounds, objective):
 			candidates, acq_value = optimize_acqf(
 				acq_function=qKG, 
 				bounds=torch.tensor(bounds),
-				q=2,
+				q=q,
 				num_restarts=10,
 				raw_samples=512,
 			)

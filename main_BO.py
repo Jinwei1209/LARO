@@ -16,7 +16,7 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='BO-LOUPE')
     parser.add_argument('--gpu_id', type=str, default='0, 1')
-    parser.add_argument('--flag_policy', type=int, default=0)  # 0 for EI, 1 for KG
+    parser.add_argument('--flag_policy', type=int, default=0)  # 0 for EI, 1 for qEI, 2 for qKG
     parser.add_argument('--cv', type=int, default=0)    # 0 for not doing cross-validation, 1 for doing cross-validation
     opt = {**vars(parser.parse_args())}
     # fixed parameters
@@ -81,9 +81,15 @@ if __name__ == '__main__':
         mask_fig_name = 'mask_best_EI.png'
         policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                         EI_policy, value_fig_name, mask_fig_name, True)
+    elif opt['flag_policy'] == 1:
+        value_fig_name = 'Values_qEI.png'
+        mask_fig_name = 'mask_best_qEI.png'
+        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                        qEI_policy, value_fig_name, mask_fig_name, True)
+
     else:
-        value_fig_name = 'Values_KG.png'
-        mask_fig_name = 'mask_best_KG.png'
+        value_fig_name = 'Values_qKG.png'
+        mask_fig_name = 'mask_best_qKG.png'
         policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                         KG_policy, value_fig_name, mask_fig_name, True)
 
