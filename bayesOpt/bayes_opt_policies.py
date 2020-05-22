@@ -127,30 +127,29 @@ def KG_policy(train_x, train_y, bounds, objective, q=1):
 def policy_update(data, bounds, objective, n_iters,
                 policy_func, q, value_fig_name, mask_fig_name, sampling_ratio, Plot = False):
     
+	x = data[:,0:2] # First two column of the data
+	y = data[:,-1] # Last column of the data
 
-    x = data[:,0:2] # First two column of the data
-    y = data[:,-1] # Last column of the data
-    
-    print('Value of best point found: {}'.format(y.max()))
-    a_best, b_best = x[np.argmax(y)]
-    best = [y.max()] # This will store the best value
+	print('Value of best point found: {}'.format(y.max()))
+	a_best, b_best = x[np.argmax(y)]
+	best = [y.max()] # This will store the best value
 
-    for i in range(n_iters):
-        new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q=q)
-        # Add the new data
-        x = np.concatenate((x, new_point.numpy()))
-        y = np.concatenate((y, new_value))
-        best.append(y.max())
+	for i in range(n_iters):
+		new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q=q)
+		# Add the new data
+		x = np.concatenate((x, new_point.numpy()))
+		y = np.concatenate((y, new_value))
+		best.append(y.max())
 
-        if best[-1] != best[-2]:
-            a_best, b_best = new_point[np.argmax(new_value)]
-            print('Update best parameters')
+		if best[-1] != best[-2]:
+		    a_best, b_best = new_point[np.argmax(new_value)]
+		    print('Update best parameters')
 
-        # print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
-        print('Iteration {:2d}, best value={:0.3f}'.format(i, best[-1]))
-        print()
+		# print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
+		print('Iteration {:2d}, best value={:0.3f}'.format(i, best[-1]))
+		print()
 
-    if Plot:
+	if Plot:
 		print(best)
 		plt.figure()
 		plt.plot(best,'o-')
@@ -169,5 +168,5 @@ def policy_update(data, bounds, objective, n_iters,
 		plt.savefig(mask_fig_name)
 		plt.close()
 
-    return best, x, y
+	return best, x, y
 
