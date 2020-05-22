@@ -25,7 +25,7 @@ if __name__ == '__main__':
     contrast = 'T1'
     sampling_ratio = 0.1
     n_pre_samples = 8
-    n_iters = 3
+    n_iters = 1
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
 
@@ -66,45 +66,38 @@ if __name__ == '__main__':
 
     # Read in data from a file.  
     data = np.loadtxt(filename)
-    x = data[:,0:2] # First two column of the data
-    y = data[:,-1] # Last column of the data
-
-    
-    print('Value of best point found: {}'.format(y.max()))
-    a_best, b_best = x[np.argmax(y)]
-    best = [y.max()] # This will store the best value
 
     if opt['cv'] == 1:
-        cross_validation(train_x = x, train_y = y)
+        cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
 
     if opt['flag_policy'] == 0:
         value_fig_name = 'Values_EI.png'
         mask_fig_name = 'mask_best_EI.png'
-        best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+        best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
                         EI_policy, q, value_fig_name, mask_fig_name, True)
     elif opt['flag_policy'] == 1:
         value_fig_name = 'Values_qEI.png'
         mask_fig_name = 'mask_best_qEI.png'
-        best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+        best_qEI, x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
                         qEI_policy, q, value_fig_name, mask_fig_name, True)
 
     else:
         value_fig_name = 'Values_qKG.png'
         mask_fig_name = 'mask_best_qKG.png'
-        best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+        best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
                         KG_policy, q, value_fig_name, mask_fig_name, True)
 
     value_fig_name = 'Values_EI.png'
     mask_fig_name = 'mask_best_EI.png'
-    best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
                     EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     value_fig_name = 'Values_qEI.png'
     mask_fig_name = 'mask_best_qEI.png'
-    best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_qEI, x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
                     qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     value_fig_name = 'Values_qKG.png'
     mask_fig_name = 'mask_best_qKG.png'
-    best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
                     KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
 
     if q == 1:

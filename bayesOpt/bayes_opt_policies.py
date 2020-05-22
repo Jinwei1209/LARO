@@ -124,9 +124,17 @@ def KG_policy(train_x, train_y, bounds, objective, q=1):
 		return candidates, new_values
 
 
-def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+def policy_update(data, bounds, objective, n_iters,
                 policy_func, q, value_fig_name, mask_fig_name, sampling_ratio, Plot = False):
     
+
+    x = data[:,0:2] # First two column of the data
+    y = data[:,-1] # Last column of the data
+    
+    print('Value of best point found: {}'.format(y.max()))
+    a_best, b_best = x[np.argmax(y)]
+    best = [y.max()] # This will store the best value
+
     for i in range(n_iters):
         new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q=q)
         # Add the new data
@@ -143,6 +151,7 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
         print()
 
     if Plot:
+    	print(best)
         plt.figure()
         plt.plot(best,'o-')
         plt.xlabel('Iteration')
