@@ -151,23 +151,24 @@ def policy_update(data, bounds, objective, n_iters,
         print()
 
     if Plot:
-    	print(best)
-        plt.figure()
-        plt.plot(best,'o-')
-        plt.xlabel('Iteration')
-        plt.ylabel('Best value found')
-        plt.savefig(value_fig_name)
-        plt.close()
+		print(best)
 
-        p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
-        # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
-        u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
-        masks = p_pattern > u
-        masks[128-13:128+12, 96-13:96+12] = 1
-        plt.figure()
-        plt.imshow(masks)
-        plt.savefig(mask_fig_name)
-        plt.close()
+		plt.figure()
+		plt.plot(best,'o-')
+		plt.xlabel('Iteration')
+		plt.ylabel('Best value found')
+		plt.savefig(value_fig_name)
+		plt.close()
+
+		p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
+		# p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
+		u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
+		masks = p_pattern > u
+		masks[128-13:128+12, 96-13:96+12] = 1
+		plt.figure()
+		plt.imshow(masks)
+		plt.savefig(mask_fig_name)
+		plt.close()
 
     return best, x, y
 
