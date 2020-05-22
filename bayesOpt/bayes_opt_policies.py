@@ -125,7 +125,7 @@ def KG_policy(train_x, train_y, bounds, objective, q=1):
 
 
 def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                policy_func, q, value_fig_name, mask_fig_name, Plot = False):
+                policy_func, q, value_fig_name, mask_fig_name, sampling_ratio, Plot = False):
     
     for i in range(n_iters):
         new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q=q)
