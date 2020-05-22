@@ -150,7 +150,7 @@ def policy_update(data, bounds, objective, n_iters,
 		print()
 
 	if Plot:
-		print(best)
+		# print(best)
 		plt.figure()
 		plt.plot(best,'o-')
 		plt.xlabel('Iteration')
