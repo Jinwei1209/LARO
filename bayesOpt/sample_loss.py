@@ -3,6 +3,8 @@
 
 import numpy as np
 import math
+import torch
+import time
 
 from models.dc_st_pmask import *
 from utils.test import *
@@ -52,18 +54,24 @@ def recon_loss(params, data_loader, device, sampling_ratio=0.1):
     model = DC_ST_Pmask(input_channels=2, filter_channels=32, lambda_dll2=1e-4, 
                         lambda_tv=1e-4, rho_penalty=1e-2, flag_ND=3, flag_solver=-3, 
                         flag_TV=1, K=5, rescale=True, samplingRatio=sampling_ratio, flag_fix=1, pmask_BO=p_pattern)
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
     metrices_test = Metrices()
-    model.to(device)
-    for idx, (inputs, targets, csms, brain_masks) in enumerate(data_loader):
-        # if idx % 10 == 0:
-            # print('Reconstructing slice #{0}'.format(idx))
-        inputs = inputs.to(device)
-        targets = targets.to(device)
-        csms = csms.to(device)
-        # calculating metrices
-        Xs = model(inputs, csms)
-        metrices_test.get_metrices(Xs[-1], targets)
+    # model.to(device)
+    model.cuda()
+    t0 = time.time()
+    with torch.no_grad(): 
+        for idx, (inputs, targets, csms, brain_masks) in enumerate(data_loader):
+            # if idx % 10 == 0:
+                # print('Reconstructing slice #{0}'.format(idx))
+            inputs = inputs.cuda()
+            targets = targets.cuda()
+            csms = csms.cuda()
+            # calculating metrices
+            Xs = model(inputs, csms)
+            metrices_test.get_metrices(Xs[-1], targets)
     ave_psnr = np.mean(np.asarray(metrices_test.PSNRs))
+    print('Total Time to evaluate objective function once is: %.2f' % (time.time()-t0))
     return 10**(ave_psnr-39)
 
 

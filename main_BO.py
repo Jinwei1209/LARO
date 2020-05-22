@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     # typein parameters
     parser = argparse.ArgumentParser(description='BO-LOUPE')
-    parser.add_argument('--gpu_id', type=str, default='0')
+    parser.add_argument('--gpu_id', type=str, default='0, 1')
     parser.add_argument('--flag_policy', type=int, default=0)  # 0 for EI, 1 for KG
     parser.add_argument('--cross_val', type=int, default=0)    # 0 for not doing cross-validation, 1 for doing cross-validation
     opt = {**vars(parser.parse_args())}
@@ -68,7 +68,8 @@ if __name__ == '__main__':
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
 
-    print('Contrast is {0}, Sampling ratio is {1}'.format(contrast, sampling_ratio))
+    print('Contrast is {0}, sampling ratio is {1}, use {2} GPU(s)!'.format(
+        contrast, sampling_ratio, torch.cuda.device_count()))
 
     rootName = '/data/Jinwei/{0}_slice_recon_GE'.format(contrast)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

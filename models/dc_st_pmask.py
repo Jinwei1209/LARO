@@ -87,14 +87,15 @@ class DC_ST_Pmask(nn.Module):
             temp = (torch.rand(nrow, ncol)-0.5)*30
             temp[nrow//2-13 : nrow//2+12, ncol//2-13 : ncol//2+12] = 15
         if flag_ND != 2:
-            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+            self.weight_parameters = nn.Parameter(temp, requires_grad=True).to('cuda')
         else:
             self.weight_parameters1 = nn.Parameter(temp1, requires_grad=True)
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
 
         # flag for all the solvers
         if flag_solver == -3:
-            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False).to('cuda')
+            # self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
         elif flag_solver == -2:
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         elif -2 < flag_solver < 1:
@@ -204,11 +205,11 @@ class DC_ST_Pmask(nn.Module):
 
     def forward(self, kdata, csms):
         device = kdata.get_device()
-        if self.flag_ND != 2:
-            self.weight_parameters = self.weight_parameters.to(device)
-        else:
-            self.weight_parameters1 = self.weight_parameters1.to(device)
-            self.weight_parameters2 = self.weight_parameters2.to(device)
+        # if self.flag_ND != 2:
+        #     self.weight_parameters = self.weight_parameters.to(device)
+        # else:
+        #     self.weight_parameters1 = self.weight_parameters1.to(device)
+        #     self.weight_parameters2 = self.weight_parameters2.to(device)
         masks = self.generateMask()[None, :, :, None]
         self.Pmask = self.Pmask
         self.masks = self.Mask
@@ -229,10 +230,10 @@ class DC_ST_Pmask(nn.Module):
             masks = self.pmask_BO > u
             masks[128-13:128+12, 96-13:96+12] = 1
 
-            plt.figure()
-            plt.imshow(masks)
-            plt.savefig('mask.png')
-            plt.close()
+            # plt.figure()
+            # plt.imshow(masks)
+            # plt.savefig('mask.png')
+            # plt.close()
 
         if self.flag_fix:
             masks = masks[np.newaxis, ..., np.newaxis]
