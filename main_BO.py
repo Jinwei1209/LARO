@@ -10,6 +10,7 @@ from scipy.stats import norm
 from scipy.optimize import minimize
 from bayesOpt.sample_loss import *
 from bayesOpt.bayes_opt_policies import *
+from bayesOpt.cross_validation import *
 
 
 
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BO-LOUPE')
     parser.add_argument('--gpu_id', type=str, default='0, 1')
     parser.add_argument('--flag_policy', type=int, default=0)  # 0 for EI, 1 for KG
-    parser.add_argument('--cross_val', type=int, default=0)    # 0 for not doing cross-validation, 1 for doing cross-validation
+    parser.add_argument('--cv', type=int, default=0)    # 0 for not doing cross-validation, 1 for doing cross-validation
     opt = {**vars(parser.parse_args())}
     # fixed parameters
     q = 1  # number of step lookahead
@@ -90,7 +91,8 @@ if __name__ == '__main__':
     # Read in data from a file.
     filename = 'presample_data.csv'
     # If data doesn't exist, generate it
-    if ~os.path.exists(filename):
+    if not os.path.exists(filename):
+        print('Randomly generate some samples')
         np.random.seed(1)
         x_list, y_list = [], []
         # random initialization
@@ -104,13 +106,16 @@ if __name__ == '__main__':
 
     # Read in data from a file.  
     data = np.loadtxt(filename)
-    x = data[:,0:2] # First column of the data
-    y = data[:,-1] # Second column of the data
+    x = data[:,0:2] # First two column of the data
+    y = data[:,-1] # Last column of the data
 
     
     print('Value of best point found: {}'.format(y.max()))
     a_best, b_best = x[np.argmax(y)]
     best = [y.max()] # This will store the best value
+
+    if opt['cv'] == 1:
+        cross_validation(train_x = x, train_y = y)
 
     if opt['flag_policy'] == 0:
         value_fig_name = 'Values_EI.png'
@@ -123,9 +128,6 @@ if __name__ == '__main__':
         policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                         KG_policy, value_fig_name, mask_fig_name, True)
 
-
-    if opt['cross_val'] == 1:
-        cross_validation()
 
 
 
