@@ -110,8 +110,22 @@ if __name__ == '__main__':
 
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
+        plt.legend()
         plt.savefig('policy_comparison_best_results.png')
+
         plt.close()
+
+        fig, ax = plt.subplots()
+        ax.plot(y_EI, 'b+-', label = 'EI')
+        ax.plot(y_qEI,'k*-', label = 'qEI')
+        ax.plot(y_qKG, 'ro-', label = 'qKG')
+        plt.xlabel('number of iteration')
+        plt.ylabel('sample value')
+        plt.legend()
+        plt.savefig('policy_comparison_samples.png')
+        plt.close()
+
+
 
     else:
 
@@ -122,6 +136,7 @@ if __name__ == '__main__':
 
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
+        plt.legend()
         plt.savefig('policy_comparison_best_results.png')
         plt.close()
 
