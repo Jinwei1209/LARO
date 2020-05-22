@@ -128,7 +128,7 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                 policy_func, q, value_fig_name, mask_fig_name, Plot = False):
     
     for i in range(n_iters):
-        new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q)
+        new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective, q=q)
         # Add the new data
         x = np.concatenate((x, new_point.numpy()))
         y = np.concatenate((y, new_value))
