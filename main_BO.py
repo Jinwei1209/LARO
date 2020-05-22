@@ -112,34 +112,22 @@ if __name__ == '__main__':
     recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
 
     if q == 1:
-
         fig, ax = plt.subplots()
-
         ax.plot(best_EI, 'b+-', label = 'EI')
         ax.plot(best_qEI,'k*-', label = 'qEI')
         ax.plot(best_qKG, 'ro-', label = 'qKG')
-
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
-        plt.savefig('policy_comparison_best_results.png')
+        plt.savefig('./bo_results/policy_comparison_best_results.png')
         plt.close()
-
     else:
-
         fig, ax = plt.subplots()
-
         ax.plot(best_qEI,'k*-', label = 'qEI')
         ax.plot(best_qKG, 'ro-', label = 'qKG')
-
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
-        plt.savefig('policy_comparison_best_results.png')
+        plt.savefig('./bo_results/policy_comparison_best_results.png')
         plt.close()
-
-    plt.xlabel('number of iteration')
-    plt.ylabel('Best value found')
-    plt.savefig('./bo_results/policy_comparison_best_results.png')
-    plt.close()
 
 
 
