@@ -96,16 +96,26 @@ if __name__ == '__main__':
 
     value_fig_name = 'Values_EI.png'
     mask_fig_name = 'mask_best_EI.png'
-    policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                     EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     value_fig_name = 'Values_qEI.png'
     mask_fig_name = 'mask_best_qEI.png'
-    policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                     qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
     value_fig_name = 'Values_qKG.png'
     mask_fig_name = 'mask_best_qKG.png'
-    policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    best_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                     KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+
+    fig, ax = plt.subplots()
+
+    ax.plot(best_EI, 'b+-', label = 'EI')
+    ax.plot(best_qEI,'k*-', label = 'qEI')
+    ax.plot(best_qKG, 'ro-', label = 'qKG')
+
+    plt.xlabel('number of iteration')
+    plt.ylabel('Best value found')
+    plt.savefig('policy_comparison.png')
 
 
 

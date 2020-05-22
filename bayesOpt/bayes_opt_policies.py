@@ -94,7 +94,7 @@ def KG_policy(train_x, train_y, bounds, objective, q=1):
 		argmax_pmean, max_pmean = optimize_acqf(
 			acq_function=PosteriorMean(model), 
 			bounds=torch.tensor(bounds),
-			q=q,
+			q=1,
 			num_restarts=50,
 			raw_samples=2048,
 		)
@@ -159,4 +159,6 @@ def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
         plt.imshow(masks)
         plt.savefig(mask_fig_name)
         plt.close()
+
+    return best, x, y
 
