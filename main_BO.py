@@ -25,7 +25,7 @@ if __name__ == '__main__':
     contrast = 'T1'
     sampling_ratio = 0.1
     n_pre_samples = 8
-    n_iters = 30
+    n_iters = 3
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
 
@@ -77,22 +77,22 @@ if __name__ == '__main__':
     if opt['cv'] == 1:
         cross_validation(train_x = x, train_y = y)
 
-    # if opt['flag_policy'] == 0:
-    #     value_fig_name = 'Values_EI.png'
-    #     mask_fig_name = 'mask_best_EI.png'
-    #     best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-    #                     EI_policy, q, value_fig_name, mask_fig_name, True)
-    # elif opt['flag_policy'] == 1:
-    #     value_fig_name = 'Values_qEI.png'
-    #     mask_fig_name = 'mask_best_qEI.png'
-    #     best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-    #                     qEI_policy, q, value_fig_name, mask_fig_name, True)
+    if opt['flag_policy'] == 0:
+        value_fig_name = 'Values_EI.png'
+        mask_fig_name = 'mask_best_EI.png'
+        best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                        EI_policy, q, value_fig_name, mask_fig_name, True)
+    elif opt['flag_policy'] == 1:
+        value_fig_name = 'Values_qEI.png'
+        mask_fig_name = 'mask_best_qEI.png'
+        best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                        qEI_policy, q, value_fig_name, mask_fig_name, True)
 
-    # else:
-    #     value_fig_name = 'Values_qKG.png'
-    #     mask_fig_name = 'mask_best_qKG.png'
-    #     best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-    #                     KG_policy, q, value_fig_name, mask_fig_name, True)
+    else:
+        value_fig_name = 'Values_qKG.png'
+        mask_fig_name = 'mask_best_qKG.png'
+        best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                        KG_policy, q, value_fig_name, mask_fig_name, True)
 
     value_fig_name = 'Values_EI.png'
     mask_fig_name = 'mask_best_EI.png'
