@@ -16,11 +16,12 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='BO-LOUPE')
     parser.add_argument('--gpu_id', type=str, default='0, 1')
-    parser.add_argument('--flag_policy', type=int, default=0)  # 0 for EI, 1 for KG
+    parser.add_argument('--flag_policy', type=int, default=0)  # 0 for EI, 1 for qEI, 2 for qKG
     parser.add_argument('--cv', type=int, default=0)    # 0 for not doing cross-validation, 1 for doing cross-validation
+    parser.add_argument('--q', type=int, default=1) 
     opt = {**vars(parser.parse_args())}
     # fixed parameters
-    q = 1  # number of step lookahead
+    q = opt['q']  # number of step lookahead
     contrast = 'T1'
     sampling_ratio = 0.1
     n_pre_samples = 8
@@ -76,16 +77,47 @@ if __name__ == '__main__':
     if opt['cv'] == 1:
         cross_validation(train_x = x, train_y = y)
 
-    if opt['flag_policy'] == 0:
-        value_fig_name = 'Values_EI.png'
-        mask_fig_name = 'mask_best_EI.png'
-        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                        EI_policy, value_fig_name, mask_fig_name, True)
-    else:
-        value_fig_name = 'Values_KG.png'
-        mask_fig_name = 'mask_best_KG.png'
-        policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                        KG_policy, value_fig_name, mask_fig_name, True)
+    # if opt['flag_policy'] == 0:
+    #     value_fig_name = 'Values_EI.png'
+    #     mask_fig_name = 'mask_best_EI.png'
+    #     best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #                     EI_policy, q, value_fig_name, mask_fig_name, True)
+    # elif opt['flag_policy'] == 1:
+    #     value_fig_name = 'Values_qEI.png'
+    #     mask_fig_name = 'mask_best_qEI.png'
+    #     best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #                     qEI_policy, q, value_fig_name, mask_fig_name, True)
+
+    # else:
+    #     value_fig_name = 'Values_qKG.png'
+    #     mask_fig_name = 'mask_best_qKG.png'
+    #     best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+    #                     KG_policy, q, value_fig_name, mask_fig_name, True)
+
+    value_fig_name = 'Values_EI.png'
+    mask_fig_name = 'mask_best_EI.png'
+    best_EI, x_EI, y_EI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                    EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+    value_fig_name = 'Values_qEI.png'
+    mask_fig_name = 'mask_best_qEI.png'
+    best_qEI, x_qEI, y_qEI = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                    qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+    value_fig_name = 'Values_qKG.png'
+    mask_fig_name = 'mask_best_qKG.png'
+    best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
+                    KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+
+    fig, ax = plt.subplots()
+
+    ax.plot(best_EI, 'b+-', label = 'EI')
+    ax.plot(best_qEI,'k*-', label = 'qEI')
+    ax.plot(best_qKG, 'ro-', label = 'qKG')
+
+    plt.xlabel('number of iteration')
+    plt.ylabel('Best value found')
+    plt.savefig('policy_comparison_best_results.png')
+    plt.close()
+
 
 
 
