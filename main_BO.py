@@ -18,9 +18,10 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0, 1')
     parser.add_argument('--flag_policy', type=int, default=0)  # 0 for EI, 1 for qEI, 2 for qKG
     parser.add_argument('--cv', type=int, default=0)    # 0 for not doing cross-validation, 1 for doing cross-validation
+    parser.add_argument('--q', type=int, default=1) 
     opt = {**vars(parser.parse_args())}
     # fixed parameters
-    q = 1  # number of step lookahead
+    q = opt['q']  # number of step lookahead
     contrast = 'T1'
     sampling_ratio = 0.1
     n_pre_samples = 8
