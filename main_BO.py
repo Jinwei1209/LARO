@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     bounds = np.array([[-1., -1.], [1., 1.]])  # for log uniform space
     # bounds = np.array([[0., 0.], [10., 10.]])  # for uniform space
-    objective = lambda z: recon_loss(z, data_loader, device, sampling_ratio)
+    objective = lambda z: recon_loss(z, data_loader, sampling_ratio)
 
     # Read in data from a file.
     filename = 'presample_data.csv'
@@ -63,6 +63,9 @@ if __name__ == '__main__':
         y = np.array(y_list)
         data = np.concatenate((x,y.reshape(len(y),1)), axis = 1)
         np.savetxt(filename,data)
+    # if save_dir doesn't exist, generate it
+    if not os.path.exists('bo_results'):
+        os.makedirs('bo_results')
 
     # Read in data from a file.  
     data = np.loadtxt(filename)
@@ -87,31 +90,36 @@ if __name__ == '__main__':
     #     best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
     #                     KG_policy, q, value_fig_name, mask_fig_name, True)
 
-    value_fig_name = 'Values_EI.png'
-    mask_fig_name = 'mask_best_EI.png'
+    value_fig_name = './bo_results/Values_EI.png'
+    mask_fig_name = './bo_results/mask_best_EI.png'
     best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
                     EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
-    value_fig_name = 'Values_qEI.png'
-    mask_fig_name = 'mask_best_qEI.png'
+    params_best_EI = x_EI[np.argmax(y_EI)]
+    recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI')
+
+    value_fig_name = './bo_results/Values_qEI.png'
+    mask_fig_name = './bo_results/mask_best_qEI.png'
     best_qEI, x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
                     qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
-    value_fig_name = 'Values_qKG.png'
-    mask_fig_name = 'mask_best_qKG.png'
+    params_best_qEI = x_qEI[np.argmax(y_qEI)]
+    recon_loss(params_best_qEI, data_loader, sampling_ratio, K=20, save_name='Recons_qEI')
+
+    value_fig_name = './bo_results/Values_qKG.png'
+    mask_fig_name = './bo_results/mask_best_qKG.png'
     best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
-                    KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+                    KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)  
+    params_best_qKG = x_qKG[np.argmax(y_qKG)]
+    recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
 
     if q == 1:
-
         fig, ax = plt.subplots()
-
         ax.plot(best_EI, 'b+-', label = 'EI')
         ax.plot(best_qEI,'k*-', label = 'qEI')
         ax.plot(best_qKG, 'ro-', label = 'qKG')
-
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
         plt.legend()
-        plt.savefig('policy_comparison_best_results.png')
+        plt.savefig('./bo_results/policy_comparison_best_results.png')
 
         plt.close()
 
@@ -122,24 +130,18 @@ if __name__ == '__main__':
         plt.xlabel('number of iteration')
         plt.ylabel('sample value')
         plt.legend()
-        plt.savefig('policy_comparison_samples.png')
+        plt.savefig('./bo_results/policy_comparison_samples.png')
         plt.close()
 
-
-
     else:
-
         fig, ax = plt.subplots()
-
         ax.plot(best_qEI,'k*-', label = 'qEI')
         ax.plot(best_qKG, 'ro-', label = 'qKG')
-
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
         plt.legend()
-        plt.savefig('policy_comparison_best_results.png')
+        plt.savefig('./bo_results/policy_comparison_best_results.png')
         plt.close()
-
 
 
 
