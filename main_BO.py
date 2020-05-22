@@ -107,16 +107,31 @@ if __name__ == '__main__':
     best_qKG, x_qKG, y_qKG = policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
                     KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
 
-    fig, ax = plt.subplots()
+    if q == 1:
 
-    ax.plot(best_EI, 'b+-', label = 'EI')
-    ax.plot(best_qEI,'k*-', label = 'qEI')
-    ax.plot(best_qKG, 'ro-', label = 'qKG')
+        fig, ax = plt.subplots()
 
-    plt.xlabel('number of iteration')
-    plt.ylabel('Best value found')
-    plt.savefig('policy_comparison_best_results.png')
-    plt.close()
+        ax.plot(best_EI, 'b+-', label = 'EI')
+        ax.plot(best_qEI,'k*-', label = 'qEI')
+        ax.plot(best_qKG, 'ro-', label = 'qKG')
+
+        plt.xlabel('number of iteration')
+        plt.ylabel('Best value found')
+        plt.savefig('policy_comparison_best_results.png')
+        plt.close()
+
+    else:
+
+        fig, ax = plt.subplots()
+
+        ax.plot(best_qEI,'k*-', label = 'qEI')
+        ax.plot(best_qKG, 'ro-', label = 'qKG')
+
+        plt.xlabel('number of iteration')
+        plt.ylabel('Best value found')
+        plt.savefig('policy_comparison_best_results.png')
+        plt.close()
+
 
 
 
