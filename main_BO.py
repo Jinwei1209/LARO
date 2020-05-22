@@ -12,48 +12,7 @@ from bayesOpt.sample_loss import *
 from bayesOpt.bayes_opt_policies import *
 from bayesOpt.cross_validation import *
 
-
-
-def policy_update(x, y, bounds, objective, n_iters, best, a_best, b_best,
-                policy_func, value_fig_name, mask_fig_name, Plot = False):
-    
-    for i in range(n_iters):
-        new_point, new_value = policy_func(train_x = x, train_y = y, bounds = bounds, objective = objective)
-        # Add the new data
-        x = np.concatenate((x, new_point.numpy()))
-        y = np.concatenate((y, new_value))
-        best.append(y.max())
-
-        if best[-1] != best[-2]:
-            a_best, b_best = new_point[np.argmax(new_value)]
-            print('Update best parameters')
-
-        # print('Iteration {:2d}, value={:0.3f}, best value={:0.3f}'.format(i, new_value, best[-1]))
-        print('Iteration {:2d}, best value={:0.3f}'.format(i, best[-1]))
-        print()
-
-    if Plot:
-        plt.figure()
-        plt.plot(best,'o-')
-        plt.xlabel('Iteration')
-        plt.ylabel('Best value found')
-        plt.savefig(value_fig_name)
-        plt.close()
-
-        p_pattern = gen_pattern(10**a_best, 10**b_best, r_spacing=3)
-        # p_pattern = gen_pattern(a_best, b_best, r_spacing=3)
-        u = np.random.uniform(0, np.mean(p_pattern)/sampling_ratio, size=(256, 192))
-        masks = p_pattern > u
-        masks[128-13:128+12, 96-13:96+12] = 1
-        plt.figure()
-        plt.imshow(masks)
-        plt.savefig(mask_fig_name)
-        plt.close()
-
-
-
 if __name__ == '__main__':
-
     # typein parameters
     parser = argparse.ArgumentParser(description='BO-LOUPE')
     parser.add_argument('--gpu_id', type=str, default='0, 1')

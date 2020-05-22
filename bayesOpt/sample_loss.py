@@ -71,7 +71,7 @@ def recon_loss(params, data_loader, device, sampling_ratio=0.1):
             Xs = model(inputs, csms)
             metrices_test.get_metrices(Xs[-1], targets)
     ave_psnr = np.mean(np.asarray(metrices_test.PSNRs))
-    print('Total Time to evaluate objective function once is: %.2f' % (time.time()-t0))
+    print('Total Time to evaluate objective function once is: %.2f s' % (time.time()-t0))
     return 10**(ave_psnr-39)
 
 
