@@ -27,6 +27,8 @@ if __name__ == '__main__':
     n_pre_samples = 8
     n_iters = 30
 
+    # save_dir = './result/'
+
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
 
     print('Contrast is {0}, sampling ratio is {1}, use {2} GPU(s)!'.format(
@@ -48,8 +50,9 @@ if __name__ == '__main__':
     # bounds = np.array([[0., 0.], [10., 10.]])  # for uniform space
     objective = lambda z: recon_loss(z, data_loader, sampling_ratio)
 
-    # Read in data from a file.
+    # Read in data from a file
     filename = 'presample_data.csv'
+    # filename = 'presample_data.csv'
     # If data doesn't exist, generate it
     if not os.path.exists(filename):
         print('Randomly generate some samples')
@@ -64,12 +67,13 @@ if __name__ == '__main__':
         data = np.concatenate((x,y.reshape(len(y),1)), axis = 1)
         np.savetxt(filename,data)
     # if save_dir doesn't exist, generate it
-    if not os.path.exists('bo_results'):
-        os.makedirs('bo_results')
+    if not os.path.exists('result'):
+        os.makedirs('result')
 
     # Read in data from a file.  
     data = np.loadtxt(filename)
-    data[:,-1] = np.array([objective(data[i, 0:2]) for i in range(len(data))])
+    # data[:,-1] = np.array([objective(data[i, 0:2]) for i in range(len(data))])
+    # np.savetxt('./result/'+filename, data)
 
     if opt['cv'] == 1:
         cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
