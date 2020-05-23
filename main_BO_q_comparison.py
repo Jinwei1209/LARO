@@ -72,8 +72,8 @@ if __name__ == '__main__':
     if opt['cv'] == 1:
         cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
 
-    best_qEI = np.zeros([len(q), n_iters])
-    best_qKG = np.zeros([len(q), n_iters])
+    best_qEI = np.zeros([len(q), n_iters+1])
+    best_qKG = np.zeros([len(q), n_iters+1])
     q_ind = 0
     for step in q:
         value_fig_name = ''
