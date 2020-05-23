@@ -76,12 +76,14 @@ if __name__ == '__main__':
     best_qKG = np.zeros([len(q), n_iters])
     q_ind = 0
     for step in q:
+        value_fig_name = ''
+        mask_fig_name = ''
         best_qEI[q_ind, :], x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
                         qEI_policy, step, value_fig_name, mask_fig_name, sampling_ratio)
         # params_best_qEI = x_qEI[np.argmax(y_qEI)]
         # recon_loss(params_best_qEI, data_loader, sampling_ratio, K=20, save_name='Recons_qEI')
         best_qKG[q_ind, :], x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
-                        KG_policy, step, value_fig_name, mask_fig_name, sampling_ratio, True)  
+                        KG_policy, step, value_fig_name, mask_fig_name, sampling_ratio)  
         # params_best_qKG = x_qKG[np.argmax(y_qKG)]
         # recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
         q_ind += 1
