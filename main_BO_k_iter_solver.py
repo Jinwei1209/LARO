@@ -70,13 +70,13 @@ if __name__ == '__main__':
 
     # # Read in data from file
     data_k5 = np.loadtxt(filename)
-    data_k5[:,-1] = np.array([objective_k5(data_k5[i, 0:2]) for i in range(len(data))])
+    data_k5[:,-1] = np.array([objective_k5(data_k5[i, 0:2]) for i in range(len(data_k5))])
 
     data_k10 = np.loadtxt(filename)
-    data_k10[:,-1] = np.array([objective_k10(data_k10[i, 0:2]) for i in range(len(data))])
+    data_k10[:,-1] = np.array([objective_k10(data_k10[i, 0:2]) for i in range(len(data_k10))])
 
-    if opt['cv'] == 1:
-        cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
+    # if opt['cv'] == 1:
+    #     cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
 
 
     # EI
