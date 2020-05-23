@@ -133,7 +133,7 @@ class kdata_loader_GE(data.Dataset):
         # add gaussian noise in kdata, SNR = 0 for not adding noise, otherwise referring to desired linear SNR
         if self.SNR != 0:
             var_n = np.mean(np.sqrt(kdata[..., 0]**2 + kdata[..., 1]**2).flatten()) / self.SNR
-            kdata += np.random.normal(0, np.sqrt(var_n/2), size=len(kdata[...,0].flatten())).reshape(kdata.shape)
+            kdata += np.random.normal(0, np.sqrt(var_n/2), size=len(kdata.flatten())).reshape(kdata.shape)
 
         if self.contrast == 'T1':
             # tmp = load_mat(self.dataFD + 'brain_mask_slice_%d.mat' %(idx), 'brain_mask_slice')
