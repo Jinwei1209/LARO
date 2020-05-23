@@ -70,7 +70,7 @@ if __name__ == '__main__':
     # Read in data from a file.  
     data = np.loadtxt(filename)
     data_y = []
-    data[:,-1] = np.array(data_y.append(objective(data[i, 0:2])) for i in range(len(data)))
+    data[:,-1] = np.array([data_y.append(objective(data[i, 0:2])) for i in range(len(data))])
 
     if opt['cv'] == 1:
         cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
