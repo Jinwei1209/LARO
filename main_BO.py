@@ -27,7 +27,7 @@ if __name__ == '__main__':
     n_pre_samples = 8
     n_iters = 30
 
-    save_dir = './result/'
+    # save_dir = './result/'
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
 
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     objective = lambda z: recon_loss(z, data_loader, sampling_ratio)
 
     # Read in data from a file
-    filename = './result/presample_data.csv'
+    filename = 'presample_data.csv'
     # filename = 'presample_data.csv'
     # If data doesn't exist, generate it
     if not os.path.exists(filename):
