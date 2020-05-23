@@ -38,7 +38,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast=contrast, 
             split='test',
-            SNR=10,
+            SNR=100,
             flag_BO=1,
             slice_spacing=25
         )
@@ -67,29 +67,12 @@ if __name__ == '__main__':
     if not os.path.exists('bo_results'):
         os.makedirs('bo_results')
 
-    # Read in data from a file.  
+    # Read in data from file  
     data = np.loadtxt(filename)
     data[:,-1] = np.array([objective(data[i, 0:2]) for i in range(len(data))])
 
     if opt['cv'] == 1:
         cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
-
-    # if opt['flag_policy'] == 0:
-    #     value_fig_name = 'Values_EI.png'
-    #     mask_fig_name = 'mask_best_EI.png'
-    #     best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
-    #                     EI_policy, q, value_fig_name, mask_fig_name, True)
-    # elif opt['flag_policy'] == 1:
-    #     value_fig_name = 'Values_qEI.png'
-    #     mask_fig_name = 'mask_best_qEI.png'
-    #     best_qEI, x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
-    #                     qEI_policy, q, value_fig_name, mask_fig_name, True)
-
-    # else:
-    #     value_fig_name = 'Values_qKG.png'
-    #     mask_fig_name = 'mask_best_qKG.png'
-    #     best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
-    #                     KG_policy, q, value_fig_name, mask_fig_name, True)
 
 
     if q == 1:
@@ -115,7 +98,6 @@ if __name__ == '__main__':
                     KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)  
     params_best_qKG = x_qKG[np.argmax(y_qKG)]
     recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
-
 
     np.save('./bo_results/best_qKG.npy',best_qKG)
     np.save('./bo_results/best_qEI.npy',best_qEI)
