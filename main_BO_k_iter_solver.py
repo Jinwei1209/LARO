@@ -38,7 +38,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast=contrast, 
             split='test',
-            SNR=100,
+            SNR=10,
             flag_BO=1,
             slice_spacing=25
         )
@@ -46,7 +46,8 @@ if __name__ == '__main__':
 
     bounds = np.array([[-1., -1.], [1., 1.]])  # for log uniform space
     # bounds = np.array([[0., 0.], [10., 10.]])  # for uniform space
-    objective = lambda z: recon_loss(z, data_loader, sampling_ratio)
+    objective_k5 = lambda z: recon_loss(z, data_loader, sampling_ratio, K=5)
+    objective_k10 = lambda z: recon_loss(z, data_loader, sampling_ratio, K=10)
 
     # Read in data from a file.
     filename = 'presample_data.csv'
@@ -67,76 +68,84 @@ if __name__ == '__main__':
     if not os.path.exists('bo_results'):
         os.makedirs('bo_results')
 
-    # Read in data from file  
-    data = np.loadtxt(filename)
-    data_y = []
-    data[:,-1] = np.array([objective(data[i, 0:2]) for i in range(len(data))])
+    # # Read in data from file
+    data_k5 = np.loadtxt(filename)
+    data_k5[:,-1] = np.array([objective_k5(data_k5[i, 0:2]) for i in range(len(data))])
+
+    data_k10 = np.loadtxt(filename)
+    data_k10[:,-1] = np.array([objective_k10(data_k10[i, 0:2]) for i in range(len(data))])
 
     if opt['cv'] == 1:
         cross_validation(train_x = data[:,0:2], train_y = data[:,-1])
 
 
+    # EI
     if q == 1:
         value_fig_name = './bo_results/Values_EI.png'
-        mask_fig_name = './bo_results/mask_best_EI.png'
-        best_EI, x_EI, y_EI = policy_update(data, bounds, objective, n_iters,
-                        EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+        mask_k5_fig_name = './bo_results/mask_k5_best_EI.png'
+        best_EI_k5, x_EI, y_EI = policy_update(data_k5, bounds, objective_k5, n_iters,
+                        EI_policy, q, value_fig_name, mask_k5_fig_name, sampling_ratio, True)
         params_best_EI = x_EI[np.argmax(y_EI)]
-        recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI')
+        recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI_k5')
 
+        mask_k10_fig_name = './bo_results/mask_k10_best_EI.png'
+        best_EI_k10, x_EI, y_EI = policy_update(data_k10, bounds, objective_k10, n_iters,
+                        EI_policy, q, value_fig_name, mask_k10_fig_name, sampling_ratio, True)
+        params_best_EI = x_EI[np.argmax(y_EI)]
+        recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI_k10')
+
+    # qEI
     value_fig_name = './bo_results/Values_qEI.png'
-    mask_fig_name = './bo_results/mask_best_qEI.png'
-    best_qEI, x_qEI, y_qEI = policy_update(data, bounds, objective, n_iters,
-                    qEI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
+    mask_k5_fig_name = './bo_results/mask_k5_best_qEI.png'
+    best_qEI_k5, x_qEI, y_qEI = policy_update(data_k5, bounds, objective_k5, n_iters,
+                    qEI_policy, q, value_fig_name, mask_k5_fig_name, sampling_ratio, True)
     params_best_qEI = x_qEI[np.argmax(y_qEI)]
-    recon_loss(params_best_qEI, data_loader, sampling_ratio, K=20, save_name='Recons_qEI')
+    recon_loss(params_best_qEI, data_loader, sampling_ratio, K=20, save_name='Recons_qEI_k5')
 
+    mask_k10_fig_name = './bo_results/mask_k10_best_qEI.png'
+    best_qEI_k10, x_qEI, y_qEI = policy_update(data_k10, bounds, objective_k10, n_iters,
+                    qEI_policy, q, value_fig_name, mask_k10_fig_name, sampling_ratio, True)
+    params_best_qEI = x_qEI[np.argmax(y_qEI)]
+    recon_loss(params_best_qEI, data_loader, sampling_ratio, K=20, save_name='Recons_qEI_k10')
+
+    # qKG
     value_fig_name = './bo_results/Values_qKG.png'
-    mask_fig_name = './bo_results/mask_best_qKG.png'
-    best_qKG, x_qKG, y_qKG = policy_update(data, bounds, objective, n_iters,
-                    KG_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)  
+    mask_k5_fig_name = './bo_results/mask_k5_best_qKG.png'
+    best_qKG_k5, x_qKG, y_qKG = policy_update(data_k5, bounds, objective_k5, n_iters,
+                    KG_policy, q, value_fig_name, mask_k5_fig_name, sampling_ratio, True)  
     params_best_qKG = x_qKG[np.argmax(y_qKG)]
-    recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
+    recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG_k5')
+
+    mask_k10_fig_name = './bo_results/mask_k10_best_qKG.png'
+    best_qKG_k10, x_qKG, y_qKG = policy_update(data_k10, bounds, objective_k10, n_iters,
+                    KG_policy, q, value_fig_name, mask_k10_fig_name, sampling_ratio, True)  
+    params_best_qKG = x_qKG[np.argmax(y_qKG)]
+    recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG_k10')
+
 
     if q == 1:
         fig, ax = plt.subplots()
-        ax.plot(best_EI, 'b+-', label = 'EI')
-        ax.plot(best_qEI,'k*-', label = 'qEI')
-        ax.plot(best_qKG, 'ro-', label = 'qKG')
+        ax.plot(best_EI_k5, 'b+--', label = 'EI-k5')
+        ax.plot(best_qEI_k5,'k*--', label = 'qEI-k5')
+        ax.plot(best_qKG_k5, 'ro--', label = 'qKG-k5')
+        ax.plot(best_EI_k10, 'b+-', label = 'EI-k10')
+        ax.plot(best_qEI_k10,'k*-', label = 'qEI-k10')
+        ax.plot(best_qKG_k10, 'ro-', label = 'qKG-k10')
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
         plt.legend()
         plt.savefig('./bo_results/policy_comparison_best_results.png')
 
-        plt.close()
-
-        fig, ax = plt.subplots()
-        ax.plot(y_EI, 'b+-', label = 'EI')
-        ax.plot(y_qEI,'k*-', label = 'qEI')
-        ax.plot(y_qKG, 'ro-', label = 'qKG')
-        plt.xlabel('number of iteration')
-        plt.ylabel('sample value')
-        plt.legend()
-        plt.savefig('./bo_results/policy_comparison_samples.png')
         plt.close()
 
     else:
         fig, ax = plt.subplots()
-        ax.plot(best_qEI,'k*-', label = 'qEI')
-        ax.plot(best_qKG, 'ro-', label = 'qKG')
+        ax.plot(best_qEI_k5,'k*--', label = 'qEI-k5')
+        ax.plot(best_qKG_k5, 'ro--', label = 'qKG-k5')
+        ax.plot(best_qEI_k10,'k*-', label = 'qEI-k10')
+        ax.plot(best_qKG_k10, 'ro-', label = 'qKG-k10')
         plt.xlabel('number of iteration')
         plt.ylabel('Best value found')
         plt.legend()
         plt.savefig('./bo_results/policy_comparison_best_results.png')
         plt.close()
-
-
-
-
-
-
-
-
-
-    
-    
