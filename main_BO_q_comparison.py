@@ -89,10 +89,13 @@ if __name__ == '__main__':
         # recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
         q_ind += 1
 
+    np.save('./bo_results/best_qEI.npy',best_qEI)
+    np.save('./bo_results/best_qKG.npy',best_qKG)
 
+    marker = ['b+-', 'k*-', 'ro-']
     fig, ax = plt.subplots()
     for i in range(len(q)): 
-        ax.plot(best_qEI[i, :],'k*--', label = '{}-batch EI'.format(q[i]))
+        ax.plot(best_qEI[i, :], marker[i], label = '{}-batch EI'.format(q[i]))
     plt.xlabel('number of iteration')
     plt.ylabel('Best value found')
     plt.legend()
@@ -101,7 +104,7 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots()
     for i in range(len(q)): 
-        ax.plot(best_qKG[i, :],'k*--', label = '{}-batch KG'.format(q[i]))
+        ax.plot(best_qKG[i, :], marker[i], label = '{}-batch KG'.format(q[i]))
     plt.xlabel('number of iteration')
     plt.ylabel('Best value found')
     plt.legend()

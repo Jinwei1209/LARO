@@ -69,7 +69,6 @@ if __name__ == '__main__':
 
     # Read in data from file  
     data = np.loadtxt(filename)
-    data_y = []
     data[:,-1] = np.array([objective(data[i, 0:2]) for i in range(len(data))])
 
     if opt['cv'] == 1:
@@ -83,6 +82,8 @@ if __name__ == '__main__':
                         EI_policy, q, value_fig_name, mask_fig_name, sampling_ratio, True)
         params_best_EI = x_EI[np.argmax(y_EI)]
         recon_loss(params_best_EI, data_loader, sampling_ratio, K=20, save_name='Recons_EI')
+
+        np.save('./bo_results/best_EI.npy',best_EI)
 
     value_fig_name = './bo_results/Values_qEI.png'
     mask_fig_name = './bo_results/mask_best_qEI.png'
@@ -98,6 +99,8 @@ if __name__ == '__main__':
     params_best_qKG = x_qKG[np.argmax(y_qKG)]
     recon_loss(params_best_qKG, data_loader, sampling_ratio, K=20, save_name='Recons_qKG')
 
+    np.save('./bo_results/best_qKG.npy',best_qKG)
+    np.save('./bo_results/best_qEI.npy',best_qEI)
     if q == 1:
         fig, ax = plt.subplots()
         ax.plot(best_EI, 'b+-', label = 'EI')
