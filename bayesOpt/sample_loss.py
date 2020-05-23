@@ -79,7 +79,7 @@ def recon_loss(params, data_loader, sampling_ratio=0.1, K=5, save_name=None):
         recons = np.squeeze(np.sqrt(recons[..., 0]**2 + recons[..., 1]**2))
         adict = {}
         adict['recons'] = recons
-        sio.savemat('./results/{0}.mat'.format(save_name), adict)
+        sio.savemat('./bo_results/{0}.mat'.format(save_name), adict)
     return 10**(ave_psnr-39)
 
 
