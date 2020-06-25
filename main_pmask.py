@@ -295,6 +295,6 @@ if __name__ == '__main__':
         #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
         #             opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_stochastic={3}.pt'.format(
-                    opt['weight_dir'], opt['flag_solver'], opt['K'], opt['stochasticSampling']))
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_stochastic={3}_ratio={4}.pt'.format(
+                    opt['weight_dir'], opt['flag_solver'], opt['K'], opt['stochasticSampling'], opt['samplingRatio']))
 

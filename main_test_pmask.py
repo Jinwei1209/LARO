@@ -48,6 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--contrast', type=str, default='T2')
     parser.add_argument('--K', type=int, default=1)
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # 0.1/0.2
+    parser.add_argument('--stochasticSampling', type=int, default=1)
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
     parser.add_argument('--flag_prosp', type=int, default=0)  # 0 for retrospective test, 1 for prospective test
     parser.add_argument('--sub_prosp', type=int, default=1)  # subject number of prospective recon
@@ -120,8 +121,8 @@ if __name__ == '__main__':
     if opt['flag_precond'] == 0:
         # weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
                                 # opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_stochastic={3}.pt'.format(
-                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['stochasticSampling']))
+        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_stochastic={3}_ratio={4}.pt'.format(
+                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['stochasticSampling'], opt['samplingRatio']))
     else:
         weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
                                 opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
@@ -140,8 +141,6 @@ if __name__ == '__main__':
 
     Recons, Preconds = [], []
     for idx, (inputs, targets, csms, brain_masks) in enumerate(testLoader):
-        # if idx % 10 == 0:
-        print(idx)
         inputs = inputs.to(device)
         targets = targets.to(device)
         csms = csms.to(device)
@@ -153,21 +152,26 @@ if __name__ == '__main__':
             Preconds.append(precond.cpu().detach())
         Recons.append(Xs[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
+
+        if idx % 10 == 0:
+            print('Idx: {}, sampling Raito : {}, \n'.format(idx, torch.mean(netG_dc.masks)))
+
         if idx == 0:
             print('Pmask: {}, \n'.format(torch.mean(netG_dc.Pmask)))
-            print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
             adict = {}
             Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
             Mask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = 1
             adict['Mask'] = Mask
-            sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+            # sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+            sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_stochastic={2}.mat'.format(opt['flag_solver'], opt['K'], opt['stochasticSampling']), adict)
 
             adict = {}
             Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
             Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
             Pmask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = np.amax(Pmask)
             adict['Pmask'] = Pmask
-            sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+            # sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+            sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_stochastic={2}.mat'.format(opt['flag_solver'], opt['K'], opt['stochasticSampling']), adict)
 
     print(np.mean(np.asarray(metrices_test.PSNRs)))
     Recons = np.concatenate(Recons, axis=0)
