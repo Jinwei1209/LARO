@@ -1,5 +1,5 @@
 """
-    Unrolled network for multi-echo MR parameter estimation
+    Unrolled network for multi-echo MR parameter estimation (archived one)
 """
 import torch
 import torch.nn as nn

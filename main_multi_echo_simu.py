@@ -63,8 +63,8 @@ if __name__ == '__main__':
     num_samples = dataLoader.num_samples
     trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True)
     para_means, para_stds = dataLoader.parameters_means, dataLoader.parameters_stds
-    # np.save(rootName+'/weights/parameters_means_{0}.npy'.format(num_echos), para_means)
-    # np.save(rootName+'/weights/parameters_stds_{0}.npy'.format(num_echos), para_stds)
+    np.save(rootName+'/weights/parameters_means_{0}.npy'.format(num_echos), para_means)
+    np.save(rootName+'/weights/parameters_stds_{0}.npy'.format(num_echos), para_stds)
 
     dataLoader = MultiEchoSimu(
         rootDir=rootName+'/dataset', 

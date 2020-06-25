@@ -118,10 +118,10 @@ if __name__ == '__main__':
     )
     netG_dc.to(device)
     if opt['flag_precond'] == 0:
-        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
-                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
-        # weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
-        #                         opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
+        # weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
+                                # opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
+        weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_stochastic={3}.pt'.format(
+                                opt['weight_dir'], opt['flag_solver'], opt['K'], opt['stochasticSampling']))
     else:
         weights_dict = torch.load(rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
                                 opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
@@ -158,7 +158,6 @@ if __name__ == '__main__':
             print('Sampling Raito : {}, \n'.format(torch.mean(netG_dc.masks)))
             adict = {}
             Mask = np.squeeze(np.asarray(netG_dc.masks.cpu().detach()))
-            # Mask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = 1
             Mask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = 1
             adict['Mask'] = Mask
             sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
@@ -166,7 +165,6 @@ if __name__ == '__main__':
             adict = {}
             Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
             Pmask = Pmask * opt['samplingRatio'] / np.mean(Pmask)
-            # Pmask[netG_dc.nrow//2-14:netG_dc.nrow//2+13, netG_dc.ncol//2-14:netG_dc.ncol//2+13] = np.amax(Pmask)
             Pmask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = np.amax(Pmask)
             adict['Pmask'] = Pmask
             sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)

@@ -29,9 +29,9 @@ from utils.test import *
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 60  # 500 for mask experiment
+    niter = 500  # 500 for mask experiment
     batch_size = 1
-    display_iters = 10
+    display_iters = 2
     lambda_dll2 = 1e-4
     lambda_tv = 1e-4
     rho_penalty = lambda_tv*100
@@ -40,7 +40,6 @@ if __name__ == '__main__':
     fixed_mask = False  # +/-
     optimal_mask = False  # +/-
     rescale = True
-    # flag_save_pmask = 0
 
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
@@ -50,8 +49,9 @@ if __name__ == '__main__':
     parser.add_argument('--flag_solver', type=int, default=0)
     parser.add_argument('--flag_TV', type=int, default=1)
     parser.add_argument('--contrast', type=str, default='T2')
-    parser.add_argument('--K', type=int, default=1)
+    parser.add_argument('--K', type=int, default=1) 
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # 0.1/0.2
+    parser.add_argument('--stochasticSampling', type=int, default=1)
     parser.add_argument('--flag_fix', type=int, default=0)  # 0 not fix, 1 LOUPE, 2 VD, 3 Uniform
     parser.add_argument('--flag_precond', type=int, default=0)  # 0 not use, 1 use
     # argcomplete.autocomplete(parser)
@@ -60,22 +60,22 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/{}_slice_recon_GE'.format(opt['contrast'])
 
-    # # pre-occupy the memory   
-    # total, used = os.popen(
-    #     '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
-    #         ).read().split('\n')[int(opt['gpu_id'])].split(',')
+    # pre-occupy the memory   
+    total, used = os.popen(
+        '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
+            ).read().split('\n')[int(opt['gpu_id'])].split(',')
     
-    # total = int(total)
-    # used = int(used)
+    total = int(total)
+    used = int(used)
 
-    # print('Total memory is {0} MB'.format(total))
-    # print('Used memory is {0} MB'.format(used))
+    print('Total memory is {0} MB'.format(total))
+    print('Used memory is {0} MB'.format(used))
 
-    # max_mem = int(total*0.8)
-    # block_mem = max_mem - used
+    max_mem = int(total*0.8)
+    block_mem = max_mem - used
     
-    # x = torch.rand((256, 1024, block_mem)).cuda()
-    # x = torch.rand((2, 2)).cuda()
+    x = torch.rand((256, 1024, block_mem)).cuda()
+    x = torch.rand((2, 2)).cuda()
 
     # start here
     t0 = time.time()
@@ -145,6 +145,7 @@ if __name__ == '__main__':
         K=opt['K'], 
         unc_map=use_uncertainty,
         passSigmoid=passSigmoid,
+        stochasticSampling=opt['stochasticSampling'], 
         rescale=rescale,
         samplingRatio=opt['samplingRatio'],
         nrow=256,
@@ -169,7 +170,7 @@ if __name__ == '__main__':
     optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
     ms = [0.2, 0.4, 0.6, 0.8]
     ms = [np.floor(m * niter).astype(int) for m in ms]
-    scheduler = MultiStepLR(optimizerG_dc, milestones = ms, gamma = 0.2)
+    # scheduler = MultiStepLR(optimizerG_dc, milestones = ms, gamma = 0.2)
 
     # logger
     logger = Logger(rootName, opt)
@@ -245,7 +246,7 @@ if __name__ == '__main__':
             
         Training_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
 
-        scheduler.step(epoch)
+        # scheduler.step(epoch)
             
         # validation phase
         netG_dc.eval()
@@ -294,6 +295,6 @@ if __name__ == '__main__':
         #     torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_ND={3}_ratio={4}.pt'.format(
         #             opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']))
         if Validation_loss[-1] == min(Validation_loss):
-            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_flag_precond={3}.pt'.format(
-                    opt['weight_dir'], opt['flag_solver'], opt['K'], opt['flag_precond']))
+            torch.save(netG_dc.state_dict(), rootName+'/{0}/Solver={1}_K={2}_stochastic={3}.pt'.format(
+                    opt['weight_dir'], opt['flag_solver'], opt['K'], opt['stochasticSampling']))
 

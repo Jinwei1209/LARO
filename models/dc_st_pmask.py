@@ -36,7 +36,7 @@ class DC_ST_Pmask(nn.Module):
                         #  0 for deep ADMM with resnet denoiser, 
                         #  1 for ADMM solver with learnable parameters, 
                         #  2 for ADMM solver without learnable parameters.
-                        #  3 for adjoint operator recon
+                        #  3 for Unet recon
         flag_TV=0,  # 0 for l2 gradient reg, 1 for l1 gradient reg
         K=1,
         unc_map=False,
@@ -87,14 +87,14 @@ class DC_ST_Pmask(nn.Module):
             temp = (torch.rand(nrow, ncol)-0.5)*30
             temp[nrow//2-13 : nrow//2+12, ncol//2-13 : ncol//2+12] = 15
         if flag_ND != 2:
-            self.weight_parameters = nn.Parameter(temp, requires_grad=True).to('cuda')
+            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
         else:
             self.weight_parameters1 = nn.Parameter(temp1, requires_grad=True)
             self.weight_parameters2 = nn.Parameter(temp2, requires_grad=True)
 
         # flag for all the solvers
         if flag_solver == -3:
-            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False).to('cuda')
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
             # self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
         elif flag_solver == -2:
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
@@ -117,6 +117,9 @@ class DC_ST_Pmask(nn.Module):
         elif flag_solver == 2:
             self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=False)
             self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=False)
+        elif flag_solver == 3:
+            self.unet = Unet(input_channels, input_channels, num_filters=[2**i for i in range(5, 10)], 
+                             use_deconv=0, skip_connect=1)
 
         # flag for using preconditioning:
         if self.flag_precond == 1:
@@ -146,7 +149,11 @@ class DC_ST_Pmask(nn.Module):
             Mask1D = bernoulliSample.apply(Pmask_rescaled)
             Mask = Mask1D.repeat(self.nrow, 1)
         elif flag_ND == 3:
-            Mask = bernoulliSample.apply(Pmask_rescaled)
+            if self.stochasticSampling:
+                Mask = bernoulliSample.apply(Pmask_rescaled)
+            else:
+                thresh = torch.rand(Pmask_rescaled.shape).to('cuda')
+                Mask = 1/(1+torch.exp(-12*(Pmask_rescaled-thresh)))
         return Mask
 
     def generateMask(self):
@@ -205,13 +212,12 @@ class DC_ST_Pmask(nn.Module):
 
     def forward(self, kdata, csms):
         device = kdata.get_device()
-        # if self.flag_ND != 2:
-        #     self.weight_parameters = self.weight_parameters.to(device)
-        # else:
-        #     self.weight_parameters1 = self.weight_parameters1.to(device)
-        #     self.weight_parameters2 = self.weight_parameters2.to(device)
+        if self.flag_ND != 2:
+            self.weight_parameters = self.weight_parameters.to(device)
+        else:
+            self.weight_parameters1 = self.weight_parameters1.to(device)
+            self.weight_parameters2 = self.weight_parameters2.to(device)
         masks = self.generateMask()[None, :, :, None]
-        self.Pmask = self.Pmask
         self.masks = self.Mask
         # keep the calibration region
         masks[:, masks.size()[1]//2-13:masks.size()[1]//2+12,  masks.size()[2]//2-13:masks.size()[2]//2+12, :] = 1
@@ -359,6 +365,7 @@ class DC_ST_Pmask(nn.Module):
 
         elif self.flag_solver == 3:
             Xs = []
-            Xs.append(x_start)
+            x = self.unet(x_start)
+            Xs.append(x)
             return Xs
 

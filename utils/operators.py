@@ -22,7 +22,7 @@ class Back_forward():
         self.mask = mask
         self.lambda_dll2 = lambda_dll2
 
-        device = self.csm.get_device()
+        device = self.csm.get_device()   
         self.flip = torch.ones([self.nrow, self.ncol, 1]) 
         self.flip = torch.cat((self.flip, torch.zeros(self.flip.shape)), -1).to(device)
         self.flip[::2, ...] = - self.flip[::2, ...] 
