@@ -41,7 +41,7 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
     parser.add_argument('--gpu_id', type=str, default='0')
-    parser.add_argument('--weight_dir', type=str, default='weights_new')
+    parser.add_argument('--weight_dir', type=str    , default='weights_new')
     parser.add_argument('--flag_ND', type=int, default=3)
     parser.add_argument('--flag_solver', type=int, default=0)
     parser.add_argument('--flag_TV', type=int, default=1)
@@ -153,7 +153,7 @@ if __name__ == '__main__':
         Recons.append(Xs[-1].cpu().detach())
         metrices_test.get_metrices(Xs[-1], targets)
 
-        if idx % 10 == 0:
+        if idx % 10 == 0:ss
             print('Idx: {}, sampling Raito : {}, \n'.format(idx, torch.mean(netG_dc.masks)))
 
         if idx == 0:
@@ -163,7 +163,7 @@ if __name__ == '__main__':
             Mask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = 1
             adict['Mask'] = Mask
             # sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
-            sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_stochastic={2}.mat'.format(opt['flag_solver'], opt['K'], opt['stochasticSampling']), adict)
+            sio.savemat(rootName+result_dir+'/Mask_Solver={0}_K={1}_stochastic={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['stochasticSampling'], opt['samplingRatio']), adict)
 
             adict = {}
             Pmask = np.squeeze(np.asarray(netG_dc.Pmask.cpu().detach()))
@@ -171,7 +171,7 @@ if __name__ == '__main__':
             Pmask[netG_dc.nrow//2-13:netG_dc.nrow//2+12, netG_dc.ncol//2-13:netG_dc.ncol//2+12] = np.amax(Pmask)
             adict['Pmask'] = Pmask
             # sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
-            sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_stochastic={2}.mat'.format(opt['flag_solver'], opt['K'], opt['stochasticSampling']), adict)
+            sio.savemat(rootName+result_dir+'/Pmask_Solver={0}_K={1}_stochastic={2}_ratio={3}.mat'.format(opt['flag_solver'], opt['K'], opt['stochasticSampling'], opt['samplingRatio']), adict)
 
     print(np.mean(np.asarray(metrices_test.PSNRs)))
     Recons = np.concatenate(Recons, axis=0)
@@ -180,8 +180,8 @@ if __name__ == '__main__':
 
     adict = {}
     adict['Recons'] = Recons
-    sio.savemat(rootName+result_dir+'/Recons_Solver={0}_K={1}_flag_ND={2}_ratio={3}.mat'.format(
-                opt['flag_solver'], opt['K'], opt['flag_ND'], opt['samplingRatio']), adict)
+    sio.savemat(rootName+result_dir+'/Recons_Solver={0}_K={1}_stochastic={2}_ratio={3}.mat'.format(
+                opt['flag_solver'], opt['K'], opt['stochasticSampling'], opt['samplingRatio']), adict)
 
     if opt['flag_precond'] == 1:
         Preconds = np.concatenate(Preconds, axis=0)
