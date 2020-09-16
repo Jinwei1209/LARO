@@ -2,7 +2,6 @@
 __pycache__/
 
 # Jupyter Notebook
-.ipynb_checkpoints
 bayesOpt/.ipynb_checkpoints/*.ipynb
 
 .DS_Store
