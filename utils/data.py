@@ -58,6 +58,38 @@ def load_mat(filename, varname='data'):
     return data
 
 
+def readcfl(name):
+    # get dims from .hdr
+    h = open(name + ".hdr", "r")
+    h.readline() # skip
+    l = h.readline()
+    h.close()
+    dims = [int(i) for i in l.split( )]
+
+    # remove singleton dimensions from the end
+    n = np.prod(dims)
+    dims_prod = np.cumprod(dims)
+    dims = dims[:np.searchsorted(dims_prod, n)+1]
+
+    # load data and reshape into dims
+    d = open(name + ".cfl", "r")
+    a = np.fromfile(d, dtype=np.complex64, count=n);
+    d.close()
+    return a.reshape(dims, order='F') # column-major
+
+	
+def writecfl(name, array):
+    h = open(name + ".hdr", "w")
+    h.write('# Dimensions\n')
+    for i in (array.shape):
+            h.write("%d " % i)
+    h.write('\n')
+    h.close()
+    d = open(name + ".cfl", "w")
+    array.T.astype(np.complex64).tofile(d) # tranpose for column-major order
+    d.close()
+
+
 def div0(a, b):
     """handling division by zero"""
     c = np.divide(a, b, out=np.zeros_like(a), where=b!=0)
@@ -92,14 +124,20 @@ def r2c(img):
     return out
 
 
-def c2r(img):
+def c2r(img, flag_me=0):
     """
     for single image, no batch dim
+    flag_me: flag of multi-echo data
     """
     dtype = np.float32
-    out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
-    out[0, ...] = img.real
-    out[1, ...] = img.imag
+    if flag_me == 0:
+        out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
+        out[0, ...] = img.real
+        out[1, ...] = img.imag
+    else:
+        out = np.zeros((2*img.shape[2], img.shape[0], img.shape[1]), dtype=dtype)
+        out[0::2, ...] = np.moveaxis(img.real, -1, 0)
+        out[1::2, ...] = np.moveaxis(img.imag, -1, 0)
     return out
 
 
@@ -111,6 +149,30 @@ def c2r_kdata(kdata):
     out = np.zeros((kdata.shape+(2,)), dtype=dtype)
     out[..., 0] = kdata.real
     out[..., 1] = kdata.imag
+    return out
+
+
+def torch_channel_concate(img):
+    """
+        concatenate the echo dim (2nd) to the channel dim (1st)
+    """
+    device = img.get_device()
+    # out = torch.empty(img.shape[0:1] + (2*img.shape[2],) + img.shape[3:]).to(device)
+    # out[:, 0::2, ...] = img[:, 0, ...]
+    # out[:, 1::2, ...] = img[:, 1, ...]
+    out = torch.cat([img[:, 0, ...], img[:, 1, ...]], 1)
+    return out
+
+
+def torch_channel_deconcate(img):
+    """
+        deconcatenate the echo dim (2nd) back from the channel dim (1st)
+    """
+    device = img.get_device()
+    # out = torch.empty(img.shape[0:1] + (2, img.shape[1]//2) + img.shape[2:]).to(device)
+    # out[:, 0, ...] = img[:, 0::2, ...]
+    # out[:, 1, ...] = img[:, 1::2, ...]
+    out = torch.cat([img[:, None, :10, ...], img[:, None, 10:, ...]], 1)
     return out
 
 
@@ -158,12 +220,18 @@ def cplx_conj(a):
     return out
 
 
-def fft_shift_row(image, nrows):
-    return torch.cat((image[:, :, nrows//2:nrows, ...], image[:, :, 0:nrows//2, ...]), dim=2)
+def fft_shift_row(image, nrows, flag_me=0):
+    if flag_me == 0:
+        return torch.cat((image[:, :, nrows//2:nrows, ...], image[:, :, 0:nrows//2, ...]), dim=2)
+    else:
+        return torch.cat((image[:, :, :, nrows//2:nrows, ...], image[:, :, :, 0:nrows//2, ...]), dim=3)
 
 
-def fft_shift_col(image, ncols):
-    return torch.cat((image[:, :, :, ncols//2:ncols, ...], image[:, :, :, 0:ncols//2, ...]), dim=3)
+def fft_shift_col(image, ncols, flag_me=0):
+    if flag_me == 0:
+        return torch.cat((image[:, :, :, ncols//2:ncols, ...], image[:, :, :, 0:ncols//2, ...]), dim=3)
+    else:
+        return torch.cat((image[:, :, :, :, ncols//2:ncols, ...], image[:, :, :, :, 0:ncols//2, ...]), dim=4)
 
 
 def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):

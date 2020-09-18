@@ -186,6 +186,102 @@ class backward_forward_CardiacQSM():
             coilComb = coilComb + self.lambda_dll2*img
         return coilComb
 
+
+'''
+    forward and backward imaging model operator for multi echo GRE data 
+    (echo dim as in the channel dim in CNN model)
+'''
+class Back_forward_multiEcho():
+
+    def __init__(
+        self,
+        csm,
+        mask,
+        lambda_dll2,
+    ):
+        self.nrows = csm.size()[3]
+        self.ncols = csm.size()[4]
+        self.nechos = csm.size()[2]
+        self.csm = csm
+        self.mask = mask
+        self.lambda_dll2 = lambda_dll2
+
+        device = self.csm.get_device()   
+        self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
+        self.flip = torch.cat((self.flip, torch.zeros(self.flip.shape)), -1).to(device)
+        self.flip[:, ::2, ...] = - self.flip[:, ::2, ...] 
+        self.flip[:, :, ::2, ...] = - self.flip[:, :, ::2, ...]
+
+    def AtA(
+        self, 
+        img, 
+        use_dll2=1  # 1 for l2-x0 reg, 2 for l2-TV reg, 3 for l1-TV reg
+    ):
+        # forward
+        image = torch_channel_deconcate(img)  # (batch, 2, echo, row, col)
+        image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
+        temp = cplx_mlpy(image, self.flip) # for GE kdata
+        temp = temp[:, None, ...] # multiply order matters (in torch implementation)
+        temp = cplx_mlpy(self.csm, temp) # (batch, coil, echo, row, col, 2)
+        temp = fft_shift_row(temp, self.nrows, 1) # for GE kdata
+        temp = torch.fft(temp, 2) 
+        temp = cplx_mlpy(temp, self.mask)
+        # inverse
+        coilImgs = torch.ifft(temp, 2)
+        coilImgs = fft_shift_row(coilImgs, self.nrows, 1) # for GE kdata
+        coilComb = torch.sum(
+            cplx_mlpy(coilImgs, cplx_conj(self.csm)),
+            dim=1,
+            keepdim=False
+        )
+        coilComb = cplx_mlpy(coilComb, self.flip) # for GE kdata
+        coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
+        coilComb = torch_channel_concate(coilComb) # (batch, 2*echo, row, col)
+        if use_dll2 == 1:
+            coilComb = coilComb + self.lambda_dll2*img
+        elif use_dll2 == 2:
+            coilComb = coilComb + self.lambda_dll2*divergence(gradient(img))
+        elif use_dll2 == 3:
+            coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+3e-5))  #1e-4 best, 5e-5 to have consistent result to ADMM
+        return coilComb
+
+"""
+    backward operator for multi-echo GE data
+"""
+def backward_multiEcho(kdata, csm, mask, flip):
+    nrows = kdata.size()[3]
+    ncols = kdata.size()[4]
+    nechos = kdata.size()[2]
+    temp = cplx_mlpy(kdata, mask)
+    temp = torch.ifft(temp, 2)
+    temp = fft_shift_row(temp, nrows, 1)
+    coilComb = torch.sum(
+        cplx_mlpy(temp, cplx_conj(csm)),
+        dim=1,
+        keepdim=False
+    )
+    coilComb = cplx_mlpy(coilComb, flip)
+    coilComb = coilComb.permute(0, 4, 1, 2, 3)
+    coilComb = torch_channel_concate(coilComb)
+    return coilComb
+
+"""
+    forward operator for multi-echo GE data
+"""
+def forward_multiEcho(kdata, csm, mask, flip):
+    image = torch_channel_deconcate(image)  # (batch, 2, echo, row, col)
+    image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
+    nrows = csm.size()[3]
+    ncols = csm.size()[4]
+    nechos = csm.size()[2]
+    temp = cplx_mlpy(image, flip)
+    temp = temp[:, None, ...]
+    temp = cplx_mlpy(csm, temp)
+    temp = fft_shift_row(temp, nrows, 1)
+    temp = torch.fft(temp, 2)
+    return cplx_mlpy(temp, mask)
+
+
 # """
 #     forward and Jacobian operators of multi-echo gradient echo data
 # """

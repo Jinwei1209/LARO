@@ -1,3 +1,7 @@
+"""
+    Experiment on parameters denoising using the first several echos instead of all echos
+"""
+
 # PYTHON_ARGCOMPLETE_OK
 import os
 import time
