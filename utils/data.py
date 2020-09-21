@@ -164,15 +164,22 @@ def c2r_kdata(kdata):
     return out
 
 
-def torch_channel_concate(img):
+def torch_channel_concate(img, necho=10):
     """
         concatenate the echo dim (2nd) to the channel dim (1st)
     """
-    device = img.get_device()
-    out = torch.empty(img.shape[0:1] + (2*img.shape[2],) + img.shape[3:]).to(device)
-    out[:, 0::2, ...] = img[:, 0, ...]
-    out[:, 1::2, ...] = img[:, 1, ...]
-    # out = torch.cat([img[:, 0, ...], img[:, 1, ...]], 1)
+    # device = img.get_device()
+    # out = torch.empty(img.shape[0:1] + (2*img.shape[2],) + img.shape[3:]).to(device)
+    # out[:, 0::2, ...] = img[:, 0, ...]
+    # out[:, 1::2, ...] = img[:, 1, ...]
+
+    # # option1
+    # # out = torch.cat([img[:, 0, ...], img[:, 1, ...]], 1)
+
+    # option2
+    out = img[:, :, 0, ...]
+    for i in range(1, necho):
+        out = torch.cat([out, img[:, :, i, ...]], dim=1)
     return out
 
 
@@ -180,11 +187,18 @@ def torch_channel_deconcate(img):
     """
         deconcatenate the echo dim (2nd) back from the channel dim (1st)
     """
-    device = img.get_device()
-    out = torch.empty(img.shape[0:1] + (2, img.shape[1]//2) + img.shape[2:]).to(device)
-    out[:, 0, ...] = img[:, 0::2, ...]
-    out[:, 1, ...] = img[:, 1::2, ...]
-    # out = torch.cat([img[:, None, :10, ...], img[:, None, 10:, ...]], 1)
+    # device = img.get_device()
+    # out = torch.empty(img.shape[0:1] + (2, img.shape[1]//2) + img.shape[2:]).to(device)
+    # out[:, 0, ...] = img[:, 0::2, ...]
+    # out[:, 1, ...] = img[:, 1::2, ...]
+
+    # # option1
+    # out = torch.cat([img[:, None, :10, ...], img[:, None, 10:, ...]], dim=1)
+
+    # option2
+    out1 = img[:, 0::2, ...]
+    out2 = img[:, 1::2, ...]
+    out = torch.cat([out1[:, None, ...], out2[:, None, ...]], dim=1)
     return out
 
 
@@ -192,10 +206,14 @@ def cplx_mlpy(a, b):
     """
     multiply two 'complex' tensors (with the last dim = 2, representing real and imaginary parts)
     """
-    device = a.get_device()
-    out = torch.empty(a.shape).to(device)
-    out[..., 0] = a[..., 0]*b[..., 0] - a[..., 1]*b[..., 1]
-    out[..., 1] = a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
+    # device = a.get_device()
+    # out = torch.empty(a.shape).to(device)
+    # out[..., 0] = a[..., 0]*b[..., 0] - a[..., 1]*b[..., 1]
+    # out[..., 1] = a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
+
+    out1 = a[..., 0:1]*b[..., 0:1] - a[..., 1:2]*b[..., 1:2]
+    out2 = a[..., 0:1]*b[..., 1:2] + a[..., 1:2]*b[..., 0:1]
+    out = torch.cat([out1, out2], dim=-1)
     return out
 
 
@@ -225,10 +243,12 @@ def cplx_conj(a):
     """
     conjugate of a complex number
     """
-    device = a.get_device()
-    out = torch.empty(a.shape).to(device)
-    out[..., 0] = a[..., 0]
-    out[..., 1] = -a[..., 1]
+    # device = a.get_device()
+    # out = torch.empty(a.shape).to(device)
+    # out[..., 0] = a[..., 0]
+    # out[..., 1] = -a[..., 1]
+
+    out = torch.cat([a[..., 0:1], -a[..., 1:2]], dim=-1)
     return out
 
 

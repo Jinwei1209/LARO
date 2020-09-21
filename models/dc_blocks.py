@@ -12,20 +12,26 @@ def mlpy_in_cg(a, b):
     """
     multiply two 'complex' tensors (with the second dim = 2, representing real and imaginary parts)
     """
-    device = a.get_device()
-    out = torch.empty(a.shape).to(device)
-    out[:,0,...] = a[:,0,...]*b[:,0,...] - a[:,1,...]*b[:,1,...]
-    out[:,1,...] = a[:,0,...]*b[:,1,...] + a[:,1,...]*b[:,0,...]
+    # device = a.get_device()
+    # out = torch.empty(a.shape).to(device)
+    # out[:,0,...] = a[:,0,...]*b[:,0,...] - a[:,1,...]*b[:,1,...]
+    # out[:,1,...] = a[:,0,...]*b[:,1,...] + a[:,1,...]*b[:,0,...]
+
+    out1 = a[:,0:1,...]*b[:,0:1,...] - a[:,1:2,...]*b[:,1:2,...]
+    out2 = a[:,0:1,...]*b[:,1:2,...] + a[:,1:2,...]*b[:,0:1,...]
+    out = torch.cat([out1, out2], dim=1)
     return out
 
 def conj_in_cg(a):
     """
     conjugate of a complex number (with the second dim = 2, representing real and imaginary parts)
     """
-    device = a.get_device()
-    out = torch.empty(a.shape).to(device)
-    out[:,0,...] = a[:,0,...]
-    out[:,1,...] = -a[:,1,...]
+    # device = a.get_device()
+    # out = torch.empty(a.shape).to(device)
+    # out[:,0,...] = a[:,0,...]
+    # out[:,1,...] = -a[:,1,...]
+
+    out = torch.cat([a[:,0:1,...], -a[:,1:2,...]], dim=1)
     return out
 
 # complex valued CG layer
@@ -136,17 +142,20 @@ class DC_layer_multiEcho():
         Ap = self.AtA(torch_channel_concate(p)) # (batch, 2*echo, row, col)
         Ap = torch_channel_deconcate(Ap) # (batch, 2, echo, row, col)
         alpha = rTr / torch.sum(mlpy_in_cg(conj_in_cg(p), Ap))
-        alpha = torch.ones(x.shape).to(self.device)*alpha
-        alpha[:,1,...] = 0
+        # alpha = torch.ones(x.shape).to(self.device)*alpha
+        # alpha[:,1,...] = 0
 
-        x = x + mlpy_in_cg(p, alpha)
-        r = r - mlpy_in_cg(Ap, alpha)
+        # x = x + mlpy_in_cg(p, alpha)
+        x = x + p * alpha
+        # r = r - mlpy_in_cg(Ap, alpha)
+        r = r - Ap * alpha
         rTrNew = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
 
         beta = rTrNew /  rTr
-        beta = torch.ones(x.shape).to(self.device)*beta
-        beta[:,1,...] = 0
-        p = r + mlpy_in_cg(p, beta)
+        # beta = torch.ones(x.shape).to(self.device)*beta
+        # beta[:,1,...] = 0
+        # p = r + mlpy_in_cg(p, beta)
+        p = r + p * beta
         return i+1, rTrNew, x, r, p
 
     def while_cond(self, i, rTr, max_iter=10):

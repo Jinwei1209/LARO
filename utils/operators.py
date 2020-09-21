@@ -197,6 +197,7 @@ class Back_forward_multiEcho():
         self,
         csm,
         mask,
+        flip,
         lambda_dll2
     ):
         self.nrows = csm.size()[3]
@@ -205,12 +206,13 @@ class Back_forward_multiEcho():
         self.csm = csm
         self.mask = mask
         self.lambda_dll2 = lambda_dll2
+        self.flip = flip
 
-        device = self.csm.get_device()   
-        self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
-        self.flip = torch.cat((self.flip, torch.zeros(self.flip.shape)), -1).to(device)
-        self.flip[:, ::2, ...] = - self.flip[:, ::2, ...] 
-        self.flip[:, :, ::2, ...] = - self.flip[:, :, ::2, ...]
+        # device = self.csm.get_device()   
+        # self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
+        # self.flip = torch.cat((self.flip, torch.zeros(self.flip.shape)), -1).to(device)
+        # self.flip[:, ::2, ...] = - self.flip[:, ::2, ...] 
+        # self.flip[:, :, ::2, ...] = - self.flip[:, :, ::2, ...]
 
     def AtA(
         self, 

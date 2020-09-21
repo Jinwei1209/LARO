@@ -56,7 +56,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
- 
+
     # load mask
     masks = np.real(readcfl(rootName+'/megre_slice_GE/mask'))
     # masks = np.ones(masks.shape)
@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
                 inputs = backward_multiEcho(kdatas, csms, masks, flip)
                 optimizerG_dc.zero_grad()
-                Xs = netG_dc(inputs, csms, masks)
+                Xs = netG_dc(inputs, csms, masks, flip)
 
                 lossl2_sum = 0
                 for i in range(len(Xs)):
@@ -189,7 +189,7 @@ if __name__ == '__main__':
                     brain_masks = brain_masks.to(device)
 
                     inputs = backward_multiEcho(kdatas, csms, masks, flip)
-                    Xs = netG_dc(inputs, csms, masks)
+                    Xs = netG_dc(inputs, csms, masks, flip)
 
                     metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
                     targets = np.asarray(targets.cpu().detach())
@@ -250,7 +250,7 @@ if __name__ == '__main__':
             brain_masks = brain_masks.to(device)
 
             inputs = backward_multiEcho(kdatas, csms, masks, flip)
-            Xs = netG_dc(inputs, csms, masks)
+            Xs = netG_dc(inputs, csms, masks, flip)
 
             Inputs.append(inputs.cpu().detach())
             Targets.append(targets.cpu().detach())

@@ -36,7 +36,7 @@ class Resnet_with_DC(nn.Module):
     def forward(self, x, csms, masks):
         device = x.get_device()
         x_start = x
-        self.lambda_dll2 = self.lambda_dll2.to(device)
+        # self.lambda_dll2 = self.lambda_dll2.to(device)
         A = backward_forward_CardiacQSM(csms, masks, self.lambda_dll2)
         Xs = []
         for i in range(self.K):
@@ -79,11 +79,11 @@ class Resnet_with_DC2(nn.Module):
             self.lambda_dll2 = nn.Parameter(torch.ones(1, 2*necho, 1, 1)*lambda_dll2, requires_grad=True)
             # self.lambda_dll2 = self.lambda_dll2[None, :, None, None].repeat(1, 2, 1, 1)
 
-    def forward(self, x, csms, masks):
+    def forward(self, x, csms, masks, flip):
         device = x.get_device()
         x_start = x
-        self.lambda_dll2 = self.lambda_dll2.to(device)
-        A = Back_forward_multiEcho(csms, masks, self.lambda_dll2)
+        # self.lambda_dll2 = self.lambda_dll2.to(device)
+        A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2)
         Xs = []
         for i in range(self.K):
             x_block = self.resnet_block(x)
