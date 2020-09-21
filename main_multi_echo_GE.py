@@ -129,6 +129,9 @@ if __name__ == '__main__':
                 targets = targets[:, :2*necho, ...]
                 brain_masks = brain_masks[:, :2*necho, ...]
 
+                if torch.sum(brain_masks) == 0:
+                    continue
+
                 if gen_iterations%display_iters == 0:
 
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
@@ -208,7 +211,7 @@ if __name__ == '__main__':
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
                 if opt['flag_model'] == 0:
-                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL.pt')
+                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL2.pt')
     
     # for test
     if opt['flag_train'] == 0:
@@ -220,7 +223,7 @@ if __name__ == '__main__':
                 flag_lambda=0,
                 K=K
             )
-            weights_dict = torch.load(rootName+'/weights/weight_MoDL.pt')
+            weights_dict = torch.load(rootName+'/weights/weight_MoDL2.pt')
         netG_dc.to(device)
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
