@@ -51,6 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--flag_model', type=int, default=0)  # 0 for vanilla MoDL
     parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
+    parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -89,7 +90,8 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='train',
-            normalization=opt['normalization']
+            normalization=opt['normalization'],
+            echo_cat=opt['echo_cat']
         )
         trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
@@ -97,17 +99,26 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='val',
-            normalization=opt['normalization']
+            normalization=opt['normalization'],
+            echo_cat=opt['echo_cat']
         )
         valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
 
-        if opt['flag_model'] == 0:
+        if opt['echo_cat'] == 1:
             netG_dc = Resnet_with_DC2(
                 input_channels=2*necho,
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
-                flag_lambda=0,
-                K=K
+                K=K,
+                echo_cat=1
+            )
+        else:
+            netG_dc = Resnet_with_DC2(
+                input_channels=2,
+                filter_channels=32,
+                lambda_dll2=lambda_dll2,
+                K=K,
+                echo_cat=0
             )
         netG_dc.to(device)
 
@@ -124,10 +135,10 @@ if __name__ == '__main__':
             for idx, (kdatas, targets, csms, brain_masks) in enumerate(trainLoader):
                 # print(idx)
 
-                kdatas = kdatas[:, :, :necho, ...]
-                csms = csms[:, :, :necho, ...]
-                targets = targets[:, :2*necho, ...]
-                brain_masks = brain_masks[:, :2*necho, ...]
+                # kdatas = kdatas[:, :, :necho, ...]
+                # csms = csms[:, :, :necho, ...]
+                # targets = targets[:, :2*necho, ...]
+                # brain_masks = brain_masks[:, :2*necho, ...]
 
                 if torch.sum(brain_masks) == 0:
                     continue
@@ -158,7 +169,8 @@ if __name__ == '__main__':
                 # save_mat(rootName+'/results/test_image.mat', 'test_image', test_image)
 
 
-                inputs = backward_multiEcho(kdatas, csms, masks, flip)
+                inputs = backward_multiEcho(kdatas, csms, masks, flip, 
+                                            opt['echo_cat'])
                 optimizerG_dc.zero_grad()
                 Xs = netG_dc(inputs, csms, masks, flip)
 
@@ -181,17 +193,21 @@ if __name__ == '__main__':
             loss_total_list = []
             with torch.no_grad():  # to solve memory exploration issue
                 for idx, (kdatas, targets, csms, brain_masks) in enumerate(valLoader):
-                    kdatas = kdatas[:, :, :necho, ...]
-                    csms = csms[:, :, :necho, ...]
-                    targets = targets[:, :2*necho, ...]
-                    brain_masks = brain_masks[:, :2*necho, ...]
+                    # kdatas = kdatas[:, :, :necho, ...]
+                    # csms = csms[:, :, :necho, ...]
+                    # targets = targets[:, :2*necho, ...]
+                    # brain_masks = brain_masks[:, :2*necho, ...]
+
+                    if torch.sum(brain_masks) == 0:
+                        continue
 
                     kdatas = kdatas.to(device)
                     targets = targets.to(device)
                     csms = csms.to(device)
                     brain_masks = brain_masks.to(device)
 
-                    inputs = backward_multiEcho(kdatas, csms, masks, flip)
+                    inputs = backward_multiEcho(kdatas, csms, masks, flip,
+                                                opt['echo_cat'])
                     Xs = netG_dc(inputs, csms, masks, flip)
 
                     metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
@@ -210,20 +226,31 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                if opt['flag_model'] == 0:
+                if opt['echo_cat'] == 1:
                     torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL2.pt')
+                else:
+                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL_3D.pt')
     
     # for test
     if opt['flag_train'] == 0:
-        if opt['flag_model'] == 0:
+        if opt['echo_cat'] == 1:
             netG_dc = Resnet_with_DC2(
                 input_channels=2*necho,
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
-                flag_lambda=0,
-                K=K
+                K=K,
+                echo_cat=1
             )
             weights_dict = torch.load(rootName+'/weights/weight_MoDL2.pt')
+        else:
+            netG_dc = Resnet_with_DC2(
+                input_channels=2,
+                filter_channels=32,
+                lambda_dll2=lambda_dll2,
+                K=K,
+                echo_cat=0
+            )
+            weights_dict = torch.load(rootName+'/weights/weight_MoDL_3D.pt')
         netG_dc.to(device)
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
@@ -236,7 +263,8 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='test',
-            normalization=opt['normalization']
+            normalization=opt['normalization'],
+            echo_cat=opt['echo_cat']
         )
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 

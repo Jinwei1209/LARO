@@ -59,39 +59,40 @@ class Resnet_with_DC2(nn.Module):
         input_channels,
         filter_channels,
         lambda_dll2, # initializing lambda_dll2
-        flag_lambda=0, # flag for mutlple lambdas each echo
-        K=1,
-        necho=10
+        K=1,  # number of unrolls
+        echo_cat=1, # flag to concatenate echo dimension into channel
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
-        layers = ResBlock(input_channels, filter_channels, \
-                        output_dim=input_channels, use_norm=2)
+        self.echo_cat = echo_cat
+        if self.echo_cat == 1:
+            layers = ResBlock(input_channels, filter_channels, \
+                            output_dim=input_channels, use_norm=2)
+        elif self.echo_cat == 0:
+            layers = ResBlock_3D(input_channels, filter_channels, \
+                            output_dim=input_channels, use_norm=2)
         for layer in layers:
             self.resnet_block.append(layer)
         self.resnet_block = nn.Sequential(*self.resnet_block)
         self.resnet_block.apply(init_weights)
-        self.flag_lambda = flag_lambda
         self.K = K
-        if self.flag_lambda == 0:
-            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
-        elif self.flag_lambda == 1:
-            self.lambda_dll2 = nn.Parameter(torch.ones(1, 2*necho, 1, 1)*lambda_dll2, requires_grad=True)
-            # self.lambda_dll2 = self.lambda_dll2[None, :, None, None].repeat(1, 2, 1, 1)
-
+        self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+    
     def forward(self, x, csms, masks, flip):
         device = x.get_device()
         x_start = x
         # self.lambda_dll2 = self.lambda_dll2.to(device)
-        A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2)
+        A = Back_forward_multiEcho(csms, masks, flip, 
+                                self.lambda_dll2, self.echo_cat)
         Xs = []
         for i in range(self.K):
             x_block = self.resnet_block(x)
             x_block1 = x - x_block
             rhs = x_start + self.lambda_dll2*x_block1
-            dc_layer = DC_layer_multiEcho(A, rhs)
+            dc_layer = DC_layer_multiEcho(A, rhs, self.echo_cat)
             x = dc_layer.CG_iter()
-            x = torch_channel_concate(x)
+            if self.echo_cat:
+                x = torch_channel_concate(x)
             Xs.append(x)
         return Xs
 

@@ -139,11 +139,12 @@ def r2c(img, flag_me=0):
 def c2r(img, flag_me=0):
     """
     for single image, no batch dim
-    flag_me: flag of multi-echo data
+    flag_me: flag to concatenate echo dimension into the channel dimension
     """
     dtype = np.float32
     if flag_me == 0:
-        out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
+        # out = np.zeros((2, img.shape[0], img.shape[1]), dtype=dtype)
+        out = np.zeros((2,) + img.shape, dtype=dtype)
         out[0, ...] = img.real
         out[1, ...] = img.imag
     else:

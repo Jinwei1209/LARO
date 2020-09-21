@@ -198,7 +198,8 @@ class Back_forward_multiEcho():
         csm,
         mask,
         flip,
-        lambda_dll2
+        lambda_dll2,
+        echo_cat = 1 # flag to concatenate echo dimension into channel
     ):
         self.nrows = csm.size()[3]
         self.ncols = csm.size()[4]
@@ -207,6 +208,7 @@ class Back_forward_multiEcho():
         self.mask = mask
         self.lambda_dll2 = lambda_dll2
         self.flip = flip
+        self.echo_cat = echo_cat
 
         # device = self.csm.get_device()   
         # self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
@@ -220,7 +222,10 @@ class Back_forward_multiEcho():
         use_dll2=1  # 1 for l2-x0 reg, 2 for l2-TV reg, 3 for l1-TV reg
     ):
         # forward
-        image = torch_channel_deconcate(img)  # (batch, 2, echo, row, col)
+        if self.echo_cat:
+            image = torch_channel_deconcate(img)  # (batch, 2, echo, row, col)
+        else:
+            image = img
         image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
         temp = cplx_mlpy(image, self.flip) # for GE kdata
         temp = temp[:, None, ...] # multiply order matters (in torch implementation)
@@ -238,7 +243,8 @@ class Back_forward_multiEcho():
         )
         coilComb = cplx_mlpy(coilComb, self.flip) # for GE kdata
         coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
-        coilComb = torch_channel_concate(coilComb) # (batch, 2*echo, row, col)
+        if self.echo_cat:
+            coilComb = torch_channel_concate(coilComb) # (batch, 2*echo, row, col)
         if use_dll2 == 1:
             coilComb = coilComb + self.lambda_dll2*img
         elif use_dll2 == 2:
@@ -250,7 +256,7 @@ class Back_forward_multiEcho():
 """
     backward operator for multi-echo GE data
 """
-def backward_multiEcho(kdata, csm, mask, flip):
+def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1):
     nrows = kdata.size()[3]
     ncols = kdata.size()[4]
     nechos = kdata.size()[2]
@@ -263,15 +269,17 @@ def backward_multiEcho(kdata, csm, mask, flip):
         keepdim=False
     )
     coilComb = cplx_mlpy(coilComb, flip)
-    coilComb = coilComb.permute(0, 4, 1, 2, 3)
-    coilComb = torch_channel_concate(coilComb)
+    coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
+    if echo_cat:
+        coilComb = torch_channel_concate(coilComb) # (batch, 2*echo, row, col)
     return coilComb
 
 """
     forward operator for multi-echo GE data
 """
-def forward_multiEcho(kdata, csm, mask, flip):
-    image = torch_channel_deconcate(image)  # (batch, 2, echo, row, col)
+def forward_multiEcho(image, csm, mask, flip, echo_cat=1):
+    if echo_cat:
+        image = torch_channel_deconcate(image)  # (batch, 2, echo, row, col)
     image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
     nrows = csm.size()[3]
     ncols = csm.size()[4]

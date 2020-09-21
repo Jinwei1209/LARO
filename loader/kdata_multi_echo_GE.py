@@ -33,6 +33,7 @@ class kdata_multi_echo_GE(data.Dataset):
         necho = 10, # number of echos
         split = 'train',
         normalization = 0,  # flag to normalize the data
+        echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
         augmentations = [None]
     ):
@@ -42,6 +43,7 @@ class kdata_multi_echo_GE(data.Dataset):
         self.contrast = contrast
         self.necho = necho
         self.normalization = normalization
+        self.echo_cat = echo_cat
         self.norm_list = [0.3032, 0.2220, 0.4013, 0.2890, 0.2306]
         if contrast == 'MultiEcho':
             self.startIdx = int(self.dataRange[split][0])
@@ -71,9 +73,12 @@ class kdata_multi_echo_GE(data.Dataset):
             self.augmentation = self.augmentations[self.augIndex]
         self.batchIndex += 1
 
-        org = readcfl(self.dataFD + 'fully_slice_{}'.format(idx))
-        org =  c2r(org, 1)  # (2*echo, row, col) with first dimension real&imag concatenated for all echos 
-
+        org = readcfl(self.dataFD + 'fully_slice_{}'.format(idx))  # (row, col, echo)
+        org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
+                                        # echo_cat == 0: (2, row, col, echo)
+        if self.echo_cat == 0:
+            org = np.transpose(org, (0, 3, 1, 2)) # (2, echo, row, col)
+        
         csm = readcfl(self.dataFD + 'sensMaps_slice_{}'.format(idx))
         csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
         csm = np.repeat(csm, self.necho, axis=1)  # (coil, echo, row, col)
@@ -83,8 +88,12 @@ class kdata_multi_echo_GE(data.Dataset):
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
-        brain_mask = np.real(readcfl(self.dataFD + 'mask_slice_{}'.format(idx)))
-        brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0)
+        brain_mask = np.real(readcfl(self.dataFD + 'mask_slice_{}'.format(idx)))  # (row, col)
+        if self.echo_cat:
+            brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
+        else:
+            brain_mask = np.repeat(brain_mask[np.newaxis, ...], 2, axis=0) # (2, row, col)
+            brain_mask = np.repeat(brain_mask[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
         
         if self.normalization == 0:
             return kdata, org, csm, brain_mask

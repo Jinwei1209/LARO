@@ -133,14 +133,21 @@ class DC_layer_real():
 
 # CG layer for (necho, nrow, ncol) data
 class DC_layer_multiEcho():
-    def __init__(self, A, rhs, use_dll2=1):
+    def __init__(self, A, rhs, echo_cat=1, use_dll2=1):
         self.AtA = lambda z: A.AtA(z, use_dll2=use_dll2)
-        self.rhs = torch_channel_deconcate(rhs) # (batch, 2, echo, row, col)
+        self.echo_cat = echo_cat
+        if self.echo_cat:
+            self.rhs = torch_channel_deconcate(rhs) # (batch, 2, echo, row, col)
+        else:
+            self.rhs = rhs
         self.device = rhs.get_device()
 
     def CG_body(self, i, rTr, x, r, p):
-        Ap = self.AtA(torch_channel_concate(p)) # (batch, 2*echo, row, col)
-        Ap = torch_channel_deconcate(Ap) # (batch, 2, echo, row, col)
+        if self.echo_cat:
+            Ap = self.AtA(torch_channel_concate(p)) # (batch, 2*echo, row, col)
+            Ap = torch_channel_deconcate(Ap) # (batch, 2, echo, row, col)
+        else:
+            Ap = self.AtA(p)
         alpha = rTr / torch.sum(mlpy_in_cg(conj_in_cg(p), Ap))
         # alpha = torch.ones(x.shape).to(self.device)*alpha
         # alpha[:,1,...] = 0
