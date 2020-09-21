@@ -29,7 +29,7 @@ from utils.operators import *
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 1
+    niter = 500
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
