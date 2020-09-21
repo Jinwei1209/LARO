@@ -117,7 +117,8 @@ def r2c(img, flag_me=0):
     if flag_me == 0:
         if len(img.shape) == 3:
             img = img[np.newaxis, ...]
-        out = np.zeros((img.shape[0], img.shape[2], img.shape[3]), dtype=dtype)
+        # out = np.zeros((img.shape[0], img.shape[2], img.shape[3]), dtype=dtype)
+        out = np.zeros(img.shape[0:1] + img.shape[2:], dtype=dtype)
     
     elif flag_me == 1:
         # img = np.concatenate((img[:, np.newaxis, :10, ...], img[:, np.newaxis, 10:, ...]), axis=1)

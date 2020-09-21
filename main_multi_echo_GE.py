@@ -288,11 +288,11 @@ if __name__ == '__main__':
             Targets.append(targets.cpu().detach())
             Recons.append(Xs[-1].cpu().detach())
 
-        Inputs = r2c(np.concatenate(Inputs, axis=0), 1)
+        Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
         Inputs = np.transpose(Inputs, [0, 2, 3, 1])
-        Targets = r2c(np.concatenate(Targets, axis=0), 1)
+        Targets = r2c(np.concatenate(Targets, axis=0), opt['echo_cat'])
         Targets = np.transpose(Targets, [0, 2, 3, 1])
-        Recons = r2c(np.concatenate(Recons, axis=0), 1)
+        Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
         Recons = np.transpose(Recons, [0, 2, 3, 1])
 
         save_mat(rootName+'/results/Inputs_sub5.mat', 'Inputs', Inputs)
