@@ -59,7 +59,9 @@ class Resnet_with_DC2(nn.Module):
         input_channels,
         filter_channels,
         lambda_dll2, # initializing lambda_dll2
-        K=1
+        flag_lambda=0, # flag for mutlple lambdas each echo
+        K=1,
+        necho=10
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
@@ -69,8 +71,13 @@ class Resnet_with_DC2(nn.Module):
             self.resnet_block.append(layer)
         self.resnet_block = nn.Sequential(*self.resnet_block)
         self.resnet_block.apply(init_weights)
+        self.flag_lambda = flag_lambda
         self.K = K
-        self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+        if self.flag_lambda == 0:
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+        elif self.flag_lambda == 1:
+            self.lambda_dll2 = nn.Parameter(torch.ones(1, 2*necho, 1, 1)*lambda_dll2, requires_grad=True)
+            # self.lambda_dll2 = self.lambda_dll2[None, :, None, None].repeat(1, 2, 1, 1)
 
     def forward(self, x, csms, masks):
         device = x.get_device()
@@ -86,5 +93,5 @@ class Resnet_with_DC2(nn.Module):
             x = dc_layer.CG_iter()
             x = torch_channel_concate(x)
             Xs.append(x)
-        return Xs[-1]
+        return Xs
 

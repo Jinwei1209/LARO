@@ -10,20 +10,17 @@ from PIL import Image
 
 
 def recursiveFilesWithSuffix(rootDir = '.', suffix = ''):
-
     return [os.path.join(looproot, filename)
         for looproot, _, filenames in os.walk(rootDir)
         for filename in filenames if filename.endswith(suffix)]
 
 
 def listFolders(rootDir = '.'):
-
     return [os.path.join(rootDir, filename)
         for filename in os.listdir(rootDir) if os.path.isdir(os.path.join(rootDir, filename))]
 
 
 def listFilesWithSuffix(rootDir = '.', suffix = None):
-
     if suffix:
         res = [os.path.join(rootDir, filename) 
             for filename in os.listdir(rootDir) 
@@ -36,7 +33,6 @@ def listFilesWithSuffix(rootDir = '.', suffix = None):
 
 
 def load_h5(filename, varname='data'):
-
     import h5py
     with h5py.File(filename, 'r') as f:
         data = f[varname][:]
@@ -44,7 +40,6 @@ def load_h5(filename, varname='data'):
 
 
 def load_mat(filename, varname='data'):
-
     try:
         f = sio.loadmat(filename)
         data = f[varname]
@@ -56,6 +51,12 @@ def load_mat(filename, varname='data'):
         elif data.ndim == 3:
             data = data.transpose(2,1,0)
     return data
+
+
+def save_mat(filename, varname, data):
+    adict = {}
+    adict[varname] = data
+    sio.savemat(filename, adict)
 
 
 def readcfl(name):
@@ -104,7 +105,7 @@ def normalization(img):
     return img_new
 
 
-def r2c(img):
+def r2c(img, flag_me=0):
     """
     for both images with and without batch dim, return an image with batch dim
     """
@@ -113,14 +114,25 @@ def r2c(img):
     else:
         dtype = np.complex128
 
-    if len(img.shape) == 3:
-        img = img[np.newaxis, ...]
+    if flag_me == 0:
+        if len(img.shape) == 3:
+            img = img[np.newaxis, ...]
+        out = np.zeros((img.shape[0], img.shape[2], img.shape[3]), dtype=dtype)
+    
+    elif flag_me == 1:
+        # img = np.concatenate((img[:, np.newaxis, :10, ...], img[:, np.newaxis, 10:, ...]), axis=1)
 
-    out = np.zeros((img.shape[0], img.shape[2], img.shape[3]), dtype=dtype)
+        img_old = img
+        img = np.zeros(img.shape[0:1] + (2, img.shape[1]//2) + img.shape[2:], dtype=dtype)
+        img[:, 0, ...] = img_old[:, 0::2, ...]
+        img[:, 1, ...] = img_old[:, 1::2, ...]
+        out = np.zeros((img.shape[0], img.shape[2], img.shape[3], img.shape[4]), dtype=dtype)
+    
     if img.shape[1] == 1:
         out = img[:, 0, ...]
     else:
         out = img[:, 0, ...] + 1j*img[:, 1, ...]
+
     return out
 
 
@@ -157,10 +169,10 @@ def torch_channel_concate(img):
         concatenate the echo dim (2nd) to the channel dim (1st)
     """
     device = img.get_device()
-    # out = torch.empty(img.shape[0:1] + (2*img.shape[2],) + img.shape[3:]).to(device)
-    # out[:, 0::2, ...] = img[:, 0, ...]
-    # out[:, 1::2, ...] = img[:, 1, ...]
-    out = torch.cat([img[:, 0, ...], img[:, 1, ...]], 1)
+    out = torch.empty(img.shape[0:1] + (2*img.shape[2],) + img.shape[3:]).to(device)
+    out[:, 0::2, ...] = img[:, 0, ...]
+    out[:, 1::2, ...] = img[:, 1, ...]
+    # out = torch.cat([img[:, 0, ...], img[:, 1, ...]], 1)
     return out
 
 
@@ -169,10 +181,10 @@ def torch_channel_deconcate(img):
         deconcatenate the echo dim (2nd) back from the channel dim (1st)
     """
     device = img.get_device()
-    # out = torch.empty(img.shape[0:1] + (2, img.shape[1]//2) + img.shape[2:]).to(device)
-    # out[:, 0, ...] = img[:, 0::2, ...]
-    # out[:, 1, ...] = img[:, 1::2, ...]
-    out = torch.cat([img[:, None, :10, ...], img[:, None, 10:, ...]], 1)
+    out = torch.empty(img.shape[0:1] + (2, img.shape[1]//2) + img.shape[2:]).to(device)
+    out[:, 0, ...] = img[:, 0::2, ...]
+    out[:, 1, ...] = img[:, 1::2, ...]
+    # out = torch.cat([img[:, None, :10, ...], img[:, None, 10:, ...]], 1)
     return out
 
 
@@ -235,7 +247,6 @@ def fft_shift_col(image, ncols, flag_me=0):
 
 
 def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
-
     img = np.asarray(img)
     if len(img.shape) == 4:
         img = r2c(img)
@@ -262,7 +273,6 @@ def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
 
 
 class Logger():
-
     def __init__(
         self, 
         rootName,
@@ -316,62 +326,6 @@ class Logger():
         # self.flagFrint = False
         # self.flagSave = False
         self.file.close()
-
-# def sphere_kernel(matrix_size,voxel_size, radius):
-    
-#     x = np.arange(-matrix_size[1]/2, matrix_size[1]/2, 1)
-#     y = np.arange(-matrix_size[0]/2, matrix_size[0]/2, 1)
-#     z = np.arange(-matrix_size[2]/2, matrix_size[2]/2, 1)
-#     Y, X, Z = np.meshgrid(x, y, z)
-    
-#     X = X*voxel_size[0]
-#     Y = Y*voxel_size[1]
-#     Z = Z*voxel_size[2]
-    
-#     Sphere_out = (np.maximum(abs(X) - 0.5*voxel_size[0], 0)**2 + np.maximum(abs(Y) - 0.5*voxel_size[1], 0)**2 
-#                   + np.maximum(abs(Z) - 0.5*voxel_size[2], 0)**2) > radius**2
-    
-#     Sphere_in = ((abs(X) + 0.5*voxel_size[0])**2 + (abs(Y) + 0.5*voxel_size[1])**2 
-#                   + (abs(Z) + 0.5*voxel_size[2])**2) <= radius**2
-    
-#     Sphere_mid = np.zeros(matrix_size)
-    
-#     split = 10  #such that error is controlled at <1/(2*10)
-    
-#     x_v = np.arange(-split+0.5, split+0.5, 1)
-#     y_v = np.arange(-split+0.5, split+0.5, 1)
-#     z_v = np.arange(-split+0.5, split+0.5, 1)
-#     X_v, Y_v, Z_v = np.meshgrid(x_v, y_v, z_v)
-        
-#     X_v = X_v/(2*split)
-#     Y_v = Y_v/(2*split)
-#     Z_v = Z_v/(2*split)
-    
-#     shell = 1-Sphere_in-Sphere_out
-#     X = X[shell==1]
-#     Y = Y[shell==1]
-#     Z = Z[shell==1]
-#     shell_val = np.zeros(X.shape)
-    
-#     for i in range(X.size):
-#         xx = X[i]
-#         yy = Y[i]
-#         zz = Z[i]
-#         occupied = ((xx+X_v*voxel_size[0])**2+(yy+Y_v*voxel_size[1])**2+(zz+Z_v*voxel_size[2])**2)<=radius**2
-#         shell_val[i] = np.sum(occupied)/X_v.size
-        
-#     Sphere_mid[shell==1] = shell_val
-#     Sphere = Sphere_in + Sphere_mid    
-#     Sphere = Sphere/np.sum(Sphere)
-#     y = np.fft.fftn(np.fft.fftshift(Sphere))
-#     return y
-    
-# def SMV_kernel(matrix_size,voxel_size, radius):
-#     return 1-sphere_kernel(matrix_size, voxel_size,radius)
-
-# def SMV(iFreq,matrix_size,voxel_size,radius):
-#     return np.fft.ifftn(np.fft.fftn(iFreq)*sphere_kernel(matrix_size, voxel_size,radius))
-
 
     
 

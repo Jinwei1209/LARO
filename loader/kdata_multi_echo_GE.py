@@ -18,9 +18,12 @@ class kdata_multi_echo_GE(data.Dataset):
     }
 
     dataRange = {
-        'train': ['200', '800'],   
-        'val': ['0', '200'],
-        'test': ['800', '1000']
+        # 'train': ['200', '800'], 
+        'train': ['300', '350'], 
+        # 'val': ['0', '200'],
+        'val': ['300', '350'],
+        # 'test': ['800', '1000']  
+        'test': ['300', '350']
     }
     
 
@@ -29,6 +32,7 @@ class kdata_multi_echo_GE(data.Dataset):
         contrast = 'MultiEcho',
         necho = 10, # number of echos
         split = 'train',
+        normalization = 0,  # flag to normalize the data
         batchSize = 1,
         augmentations = [None]
     ):
@@ -37,6 +41,8 @@ class kdata_multi_echo_GE(data.Dataset):
         self.dataFD = rootDir + self.folderMatcher[contrast]
         self.contrast = contrast
         self.necho = necho
+        self.normalization = normalization
+        self.norm_list = [0.3032, 0.2220, 0.4013, 0.2890, 0.2306]
         if contrast == 'MultiEcho':
             self.startIdx = int(self.dataRange[split][0])
             self.endIdx = int(self.dataRange[split][1])
@@ -79,7 +85,14 @@ class kdata_multi_echo_GE(data.Dataset):
 
         brain_mask = np.ones(org.shape, dtype=np.float32)
         
-        return kdata, org, csm, brain_mask
+        if self.normalization == 0:
+            return kdata, org, csm, brain_mask
+
+        elif self.normalization == 1:
+            index = idx // 200
+            return kdata/self.norm_list[index], org/self.norm_list[index], csm, brain_mask
+
+
 
 
 

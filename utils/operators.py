@@ -197,7 +197,7 @@ class Back_forward_multiEcho():
         self,
         csm,
         mask,
-        lambda_dll2,
+        lambda_dll2
     ):
         self.nrows = csm.size()[3]
         self.ncols = csm.size()[4]
