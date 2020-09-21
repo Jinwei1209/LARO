@@ -83,7 +83,8 @@ class kdata_multi_echo_GE(data.Dataset):
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
-        brain_mask = np.ones(org.shape, dtype=np.float32)
+        brain_mask = readcfl(self.dataFD + 'mask_slice_{}'.format(idx))
+        brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0)
         
         if self.normalization == 0:
             return kdata, org, csm, brain_mask
