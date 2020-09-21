@@ -208,7 +208,7 @@ if __name__ == '__main__':
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
                 if opt['flag_model'] == 0:
-                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL_.pt')
+                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL.pt')
     
     # for test
     if opt['flag_train'] == 0:
@@ -220,7 +220,7 @@ if __name__ == '__main__':
                 flag_lambda=0,
                 K=K
             )
-            weights_dict = torch.load(rootName+'/weights/weight_MoDL_.pt')
+            weights_dict = torch.load(rootName+'/weights/weight_MoDL.pt')
         netG_dc.to(device)
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
