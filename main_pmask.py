@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     # typein parameters
     parser = argparse.ArgumentParser(description='LOUPE-ST')
-    parser.add_argument('--gpu_id', type=str, default='1')
+    parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--weight_dir', type=str, default='weights_new')
     parser.add_argument('--flag_ND', type=int, default=3)
     parser.add_argument('--flag_solver', type=int, default=0)
