@@ -91,7 +91,7 @@ if __name__ == '__main__':
             split='train',
             normalization=opt['normalization']
         )
-        trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=False, num_workers=1)
+        trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
         dataLoader_val = kdata_multi_echo_GE(
             rootDir=rootName,
@@ -99,7 +99,7 @@ if __name__ == '__main__':
             split='val',
             normalization=opt['normalization']
         )
-        valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=False, num_workers=1)
+        valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
 
         if opt['flag_model'] == 0:
             netG_dc = Resnet_with_DC2(
