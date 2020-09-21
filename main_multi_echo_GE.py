@@ -280,7 +280,8 @@ if __name__ == '__main__':
             csms = csms.to(device)
             brain_masks = brain_masks.to(device)
 
-            inputs = backward_multiEcho(kdatas, csms, masks, flip)
+            inputs = backward_multiEcho(kdatas, csms, masks, flip,
+                                        opt['echo_cat'])
             Xs = netG_dc(inputs, csms, masks, flip)
 
             Inputs.append(inputs.cpu().detach())
