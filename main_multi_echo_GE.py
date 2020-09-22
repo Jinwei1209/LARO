@@ -295,8 +295,9 @@ if __name__ == '__main__':
         Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
         Recons = np.transpose(Recons, [0, 2, 3, 1])
 
-        save_mat(rootName+'/results/Inputs_sub5.mat', 'Inputs', Inputs)
-        save_mat(rootName+'/results/Targets_sub5.mat', 'Targets', Targets)
-        save_mat(rootName+'/results/Recons_sub5.mat', 'Recons', Recons)
+        save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
+        save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
+        save_mat(rootName+'/results/Recons_echo_cat={}.mat'.format( \
+                opt['echo_cat']), 'Recons', Recons)
 
 
