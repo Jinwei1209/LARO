@@ -105,14 +105,24 @@ if __name__ == '__main__':
         valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
 
         if opt['echo_cat'] == 1:
-            netG_dc = Resnet_with_DC2(
-                input_channels=2*necho,
-                filter_channels=32*necho,
-                lambda_dll2=lambda_dll2,
-                K=K,
-                echo_cat=1,
-                att=opt['att']
-            )
+            if opt['att'] == 0:
+                netG_dc = Resnet_with_DC2(
+                    input_channels=2*necho,
+                    filter_channels=32*necho,
+                    lambda_dll2=lambda_dll2,
+                    K=K,
+                    echo_cat=1,
+                    att=0
+                )
+            elif opt['att'] == 1:
+                netG_dc = Resnet_with_DC2(
+                    input_channels=2*necho,
+                    filter_channels=29*necho,
+                    lambda_dll2=lambda_dll2,
+                    K=K,
+                    echo_cat=1,
+                    att=1
+                )
         else:
             netG_dc = Resnet_with_DC2(
                 input_channels=2,
