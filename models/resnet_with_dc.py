@@ -82,7 +82,7 @@ class Resnet_with_DC2(nn.Module):
         self.resnet_block.apply(init_weights)
 
         if self.att == 1:
-            self.attBlock = daBlock(input_channels, filter_channels//8, \
+            self.attBlock = daBlock(input_channels, filter_channels//9, \
                                     out_channels=input_channels, use_norm=2)
 
         self.K = K
