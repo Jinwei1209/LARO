@@ -49,9 +49,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='CardiacQSM')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--flag_model', type=int, default=0)  # 0 for vanilla MoDL
     parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
+    parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -110,7 +110,8 @@ if __name__ == '__main__':
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=1
+                echo_cat=1,
+                att=opt['att']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -227,7 +228,7 @@ if __name__ == '__main__':
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
                 if opt['echo_cat'] == 1:
-                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL2.pt')
+                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL2_att.pt')
                 else:
                     torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL_3D.pt')
     
@@ -239,7 +240,8 @@ if __name__ == '__main__':
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=1
+                echo_cat=1,
+                att=opt['att']
             )
             weights_dict = torch.load(rootName+'/weights/weight_MoDL2.pt')
         else:
@@ -268,36 +270,37 @@ if __name__ == '__main__':
         )
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
-        for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
-            print(idx)
-            kdatas = kdatas[:, :, :necho, ...]
-            csms = csms[:, :, :necho, ...]
-            targets = targets[:, :2*necho, ...]
-            brain_masks = brain_masks[:, :2*necho, ...]
+        with torch.no_grad():
+            for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
+                print(idx)
+                kdatas = kdatas[:, :, :necho, ...]
+                csms = csms[:, :, :necho, ...]
+                targets = targets[:, :2*necho, ...]
+                brain_masks = brain_masks[:, :2*necho, ...]
 
-            kdatas = kdatas.to(device)
-            targets = targets.to(device)
-            csms = csms.to(device)
-            brain_masks = brain_masks.to(device)
+                kdatas = kdatas.to(device)
+                targets = targets.to(device)
+                csms = csms.to(device)
+                brain_masks = brain_masks.to(device)
 
-            inputs = backward_multiEcho(kdatas, csms, masks, flip,
-                                        opt['echo_cat'])
-            Xs = netG_dc(inputs, csms, masks, flip)
+                inputs = backward_multiEcho(kdatas, csms, masks, flip,
+                                            opt['echo_cat'])
+                Xs = netG_dc(inputs, csms, masks, flip)
 
-            Inputs.append(inputs.cpu().detach())
-            Targets.append(targets.cpu().detach())
-            Recons.append(Xs[-1].cpu().detach())
+                Inputs.append(inputs.cpu().detach())
+                Targets.append(targets.cpu().detach())
+                Recons.append(Xs[-1].cpu().detach())
 
-        Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
-        Inputs = np.transpose(Inputs, [0, 2, 3, 1])
-        Targets = r2c(np.concatenate(Targets, axis=0), opt['echo_cat'])
-        Targets = np.transpose(Targets, [0, 2, 3, 1])
-        Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
-        Recons = np.transpose(Recons, [0, 2, 3, 1])
+            Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
+            Inputs = np.transpose(Inputs, [0, 2, 3, 1])
+            Targets = r2c(np.concatenate(Targets, axis=0), opt['echo_cat'])
+            Targets = np.transpose(Targets, [0, 2, 3, 1])
+            Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
+            Recons = np.transpose(Recons, [0, 2, 3, 1])
 
-        save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
-        save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-        save_mat(rootName+'/results/Recons_echo_cat={}.mat'.format( \
-                opt['echo_cat']), 'Recons', Recons)
+            save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
+            save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
+            save_mat(rootName+'/results/Recons_echo_cat={}.mat'.format( \
+                    opt['echo_cat']), 'Recons', Recons)
 
 

@@ -9,7 +9,9 @@ from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
 from models.resBlocks import *
+from models.danet import daBlock    
 from utils.operators import *
+
 
 '''
     For Cardiac QSM data
@@ -61,10 +63,13 @@ class Resnet_with_DC2(nn.Module):
         lambda_dll2, # initializing lambda_dll2
         K=1,  # number of unrolls
         echo_cat=1, # flag to concatenate echo dimension into channel
+        att=0, # flag to use attention-based denoiser
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
         self.echo_cat = echo_cat
+        self.att = att
+
         if self.echo_cat == 1:
             layers = ResBlock(input_channels, filter_channels, \
                             output_dim=input_channels, use_norm=2)
@@ -75,6 +80,11 @@ class Resnet_with_DC2(nn.Module):
             self.resnet_block.append(layer)
         self.resnet_block = nn.Sequential(*self.resnet_block)
         self.resnet_block.apply(init_weights)
+
+        if self.att == 1:
+            self.attBlock = daBlock(input_channels, filter_channels//8, \
+                                    out_channels=input_channels, use_norm=2)
+
         self.K = K
         self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
     
@@ -86,7 +96,10 @@ class Resnet_with_DC2(nn.Module):
                                 self.lambda_dll2, self.echo_cat)
         Xs = []
         for i in range(self.K):
-            x_block = self.resnet_block(x)
+            if i < self.K - 1:
+                x_block = self.resnet_block(x)
+            else:
+                x_block = self.attBlock(x)
             x_block1 = x - x_block
             rhs = x_start + self.lambda_dll2*x_block1
             dc_layer = DC_layer_multiEcho(A, rhs, self.echo_cat)
