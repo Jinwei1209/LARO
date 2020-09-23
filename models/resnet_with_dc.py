@@ -10,6 +10,7 @@ from models.unet_blocks import *
 from models.initialization import *
 from models.resBlocks import *
 from models.danet import daBlock    
+from utils.data import *
 from utils.operators import *
 
 
@@ -64,11 +65,13 @@ class Resnet_with_DC2(nn.Module):
         K=1,  # number of unrolls
         echo_cat=1, # flag to concatenate echo dimension into channel
         att=0, # flag to use attention-based denoiser
+        random=0, # flag to multiply the input data with a random complex number
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
         self.echo_cat = echo_cat
         self.att = att
+        self.random = random
 
         if self.echo_cat == 1:
             layers = ResBlock(input_channels, filter_channels, \
@@ -96,15 +99,30 @@ class Resnet_with_DC2(nn.Module):
                                 self.lambda_dll2, self.echo_cat)
         Xs = []
         for i in range(self.K):
+
+            if self.random:
+                mag = (1 + torch.randn(1)).to(device)
+                phase = (torch.rand(1) * 3.14 - 3.14/2).to(device)
+                factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None]
+                x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))
+
             # if i < self.K - 1:
             if i != self.K // 2:
                 x_block = self.resnet_block(x)
             else:
-                x_block = self.attBlock(x)
+                if self.att == 1:
+                    x_block = self.attBlock(x)
+                else:
+                    x_block = self.resnet_block(x)
             x_block1 = x - x_block
             rhs = x_start + self.lambda_dll2*x_block1
             dc_layer = DC_layer_multiEcho(A, rhs, self.echo_cat)
             x = dc_layer.CG_iter()
+            
+            if self.random:
+                factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None]
+                x = mlpy_in_cg(x, factor)
+
             if self.echo_cat:
                 x = torch_channel_concate(x)
             Xs.append(x)

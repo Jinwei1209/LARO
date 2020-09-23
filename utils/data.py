@@ -169,6 +169,7 @@ def c2r_kdata(kdata):
 def torch_channel_concate(img, necho=10):
     """
         concatenate the echo dim (2nd) to the channel dim (1st)
+        output: (batch, 2*necho, nrow, ncol)
     """
     # device = img.get_device()
     # out = torch.empty(img.shape[0:1] + (2*img.shape[2],) + img.shape[3:]).to(device)
@@ -188,6 +189,7 @@ def torch_channel_concate(img, necho=10):
 def torch_channel_deconcate(img):
     """
         deconcatenate the echo dim (2nd) back from the channel dim (1st)
+        output: (batch, 2, necho, nrow, ncol)
     """
     # device = img.get_device()
     # out = torch.empty(img.shape[0:1] + (2, img.shape[1]//2) + img.shape[2:]).to(device)
