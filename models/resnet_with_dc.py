@@ -97,7 +97,7 @@ class Resnet_with_DC2(nn.Module):
         Xs = []
         for i in range(self.K):
             # if i < self.K - 1:
-            if i == K // 2:
+            if i == self.K // 2:
                 x_block = self.resnet_block(x)
             else:
                 x_block = self.attBlock(x)
