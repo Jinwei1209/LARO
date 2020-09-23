@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.initialization import *
+from models.fa import faBlockNew
 
 
 def ResBlock(
@@ -48,7 +49,8 @@ def ResBlock_3D(
     padding=1, 
     use_norm=1,  # 0 for no, 1 for batchnorm, 2 for instant norm
     N=5,
-    unc_map=False
+    unc_map=False,
+    use_fa=0  # 0 not use, 2 to use
 ):  
     layers = []
 
@@ -66,6 +68,11 @@ def ResBlock_3D(
         elif use_norm == 2:
             layers.append(nn.GroupNorm(filter_dim, filter_dim))
         layers.append(nn.ReLU(inplace=True))
+
+        if i == N//2 - 1 and use_fa == 2:
+            print('Use FANet for 3D ResBlock')
+            layers.append(faBlockNew(filter_dim))
+
     if unc_map:
         layers.append(nn.Conv3d(filter_dim, output_dim+2, 1))
     else:

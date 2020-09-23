@@ -153,6 +153,9 @@ if __name__ == '__main__':
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                     % (epoch, niter, idx, 600//batch_size, time.time()-t0))
 
+                    print('echo_cat: {}, att: {}, random: {}'.format( \
+                            opt['echo_cat'], opt['att'], opt['random']))
+
                     print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f, K: %d, necho: %d'
                         % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2, K, necho))
 
@@ -161,6 +164,8 @@ if __name__ == '__main__':
                     if epoch > 1:
                         print('Average PSNR in Validation dataset is %.2f' 
                         % (np.mean(np.asarray(metrices_val.PSNRs))))
+                    
+                    print(' ')
 
                     errL2_dc_sum = 0
                 
@@ -231,33 +236,34 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                if opt['echo_cat'] == 1:
-                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL2_att.pt')
-                else:
-                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL_3D_att2.pt')
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_att={}_ \
+                           random={}.pt'.format(opt['echo_cat'], opt['att'], opt['random']))
+
     
     # for test
     if opt['flag_train'] == 0:
         if opt['echo_cat'] == 1:
             netG_dc = Resnet_with_DC2(
                 input_channels=2*necho,
-                filter_channels=32*necho,  # 20 for last 
+                filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
                 K=K,
                 echo_cat=1,
-                att=opt['att']
+                att=opt['att'],
+                random=opt['random']
             )
-            weights_dict = torch.load(rootName+'/weights/weight_MoDL2.pt')
-            # weights_dict = torch.load(rootName+'/weights/weight_MoDL2_att.pt')
         else:
             netG_dc = Resnet_with_DC2(
                 input_channels=2,
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=0
+                echo_cat=0,
+                att=opt['att'],
+                random=opt['random']
             )
-            weights_dict = torch.load(rootName+'/weights/weight_MoDL_3D.pt')
+        weights_dict = torch.load(rootName+'/weights/echo_cat={}_att={}_ \
+                random={}.pt'.format(opt['echo_cat'], opt['att'], opt['random']))
         netG_dc.to(device)
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
@@ -305,7 +311,7 @@ if __name__ == '__main__':
 
             save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
             save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-            save_mat(rootName+'/results/Recons_echo_cat={}.mat'.format( \
-                    opt['echo_cat']), 'Recons', Recons)
+            save_mat(rootName+'/results/Recons_echo_cat={}_att={}_random={}.mat' \
+              .format(opt['echo_cat'], opt['att'], opt['random']), 'Recons', Recons)
 
 
