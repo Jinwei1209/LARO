@@ -9,7 +9,8 @@ from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
 from models.resBlocks import *
-from models.danet import daBlock    
+from models.danet import daBlock  
+from models.fa import faBlockNew
 from utils.data import *
 from utils.operators import *
 
@@ -87,6 +88,8 @@ class Resnet_with_DC2(nn.Module):
         if self.att == 1:
             self.attBlock = daBlock(input_channels, filter_channels//8, \
                                     out_channels=input_channels, use_norm=2)
+        elif self.att == 2:
+            self.attBlock = faBlockNew(input_channels)
 
         self.K = K
         self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
@@ -100,28 +103,34 @@ class Resnet_with_DC2(nn.Module):
         Xs = []
         for i in range(self.K):
 
-            # if self.random:
-            #     mag = (1 + torch.randn(1)/3).to(device)
-            #     phase = (torch.rand(1) * 3.14/2 - 3.14/4).to(device)
-            #     factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None]
-            #     x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))
+            if self.random:
+                mag = (1 + torch.randn(1)/3).to(device)
+                phase = (torch.rand(1) * 3.14/2 - 3.14/4).to(device)
+                factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None]
+                x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))
 
             # if i < self.K - 1:
             if i != self.K // 2:
                 x_block = self.resnet_block(x)
+                if self.att == 2:
+                    x_block = self.faBlockNew(x_block)
             else:
                 if self.att == 1:
                     x_block = self.attBlock(x)
                 else:
                     x_block = self.resnet_block(x)
+                    if self.att == 2:
+                        x_block = self.faBlockNew(x_block)
+
             x_block1 = x - x_block
+            if self.random:
+                factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None]
+                x_block1 = mlpy_in_cg(x_block1, factor)
+
             rhs = x_start + self.lambda_dll2*x_block1
             dc_layer = DC_layer_multiEcho(A, rhs, self.echo_cat)
             x = dc_layer.CG_iter()
-            
-            # if self.random:
-            #     factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None]
-            #     x = mlpy_in_cg(x, factor)
+
 
             if self.echo_cat:
                 x = torch_channel_concate(x)
