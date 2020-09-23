@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
+    parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -105,31 +106,24 @@ if __name__ == '__main__':
         valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
 
         if opt['echo_cat'] == 1:
-            if opt['att'] == 0:
-                netG_dc = Resnet_with_DC2(
-                    input_channels=2*necho,
-                    filter_channels=32*necho,
-                    lambda_dll2=lambda_dll2,
-                    K=K,
-                    echo_cat=1,
-                    att=0
-                )
-            elif opt['att'] == 1:
-                netG_dc = Resnet_with_DC2(
-                    input_channels=2*necho,
-                    filter_channels=32*necho,
-                    lambda_dll2=lambda_dll2,
-                    K=K,
-                    echo_cat=1,
-                    att=1
-                )
+            netG_dc = Resnet_with_DC2(
+                input_channels=2*necho,
+                filter_channels=32*necho,
+                lambda_dll2=lambda_dll2,
+                K=K,
+                echo_cat=1,
+                att=opt['att'],
+                random=opt['random']
+            )
         else:
             netG_dc = Resnet_with_DC2(
                 input_channels=2,
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=0
+                echo_cat=0,
+                att=opt['att'],
+                random=opt['random']
             )
         netG_dc.to(device)
 

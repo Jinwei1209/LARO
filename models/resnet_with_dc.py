@@ -72,7 +72,7 @@ class Resnet_with_DC2(nn.Module):
         self.resnet_block = []
         self.echo_cat = echo_cat
         self.att = att
-        # self.random = random
+        self.random = random
 
         if self.echo_cat == 1:
             layers = ResBlock(input_channels, filter_channels, \
@@ -113,14 +113,14 @@ class Resnet_with_DC2(nn.Module):
             if i != self.K // 2:
                 x_block = self.resnet_block(x)
                 if self.att == 2:
-                    x_block = self.faBlockNew(x_block)
+                    x_block = self.attBlock(x_block)
             else:
                 if self.att == 1:
                     x_block = self.attBlock(x)
                 else:
                     x_block = self.resnet_block(x)
                     if self.att == 2:
-                        x_block = self.faBlockNew(x_block)
+                        x_block = self.attBlock(x_block)
 
             x_block1 = x - x_block
             if self.random:
