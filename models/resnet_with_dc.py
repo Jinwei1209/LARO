@@ -106,8 +106,9 @@ class Resnet_with_DC2(nn.Module):
             if self.random:
                 mag = (1 + torch.randn(1)/3).to(device)
                 phase = (torch.rand(1) * 3.14/2 - 3.14/4).to(device)
-                factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None]
-                x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))
+                factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None, None]
+                # x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))  # for echo_cat=1
+                x = mlpy_in_cg(x, factor)  # for echo_cat=1
 
             # if i < self.K - 1:
             if i != self.K // 2:
@@ -124,7 +125,7 @@ class Resnet_with_DC2(nn.Module):
 
             x_block1 = x - x_block
             if self.random:
-                factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None]
+                factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None, None]
                 x_block1 = mlpy_in_cg(x_block1, factor)
 
             rhs = x_start + self.lambda_dll2*x_block1

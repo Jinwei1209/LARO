@@ -124,7 +124,7 @@ if __name__ == '__main__':
                 echo_cat=0,
                 att=opt['att'],
                 random=opt['random']
-            )
+            )   
         netG_dc.to(device)
 
         # optimizer
@@ -234,7 +234,7 @@ if __name__ == '__main__':
                 if opt['echo_cat'] == 1:
                     torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL2_att.pt')
                 else:
-                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL_3D_att.pt')
+                    torch.save(netG_dc.state_dict(), rootName+'/weights/weight_MoDL_3D_att2.pt')
     
     # for test
     if opt['flag_train'] == 0:
