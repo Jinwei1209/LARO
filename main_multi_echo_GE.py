@@ -117,7 +117,7 @@ if __name__ == '__main__':
             elif opt['att'] == 1:
                 netG_dc = Resnet_with_DC2(
                     input_channels=2*necho,
-                    filter_channels=20*necho,
+                    filter_channels=32*necho,
                     lambda_dll2=lambda_dll2,
                     K=K,
                     echo_cat=1,
