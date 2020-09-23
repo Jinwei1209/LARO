@@ -96,7 +96,8 @@ class Resnet_with_DC2(nn.Module):
                                 self.lambda_dll2, self.echo_cat)
         Xs = []
         for i in range(self.K):
-            if i < self.K - 1:
+            # if i < self.K - 1:
+            if i == K // 2:
                 x_block = self.resnet_block(x)
             else:
                 x_block = self.attBlock(x)
