@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
+    parser.add_argument('--random', type=int, default=0)  # flag to use attention-based denoiser
     opt = {**vars(parser.parse_args())}
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
@@ -253,7 +254,7 @@ if __name__ == '__main__':
                 echo_cat=1,
                 att=opt['att']
             )
-            weights_dict = torch.load(rootName+'/weights/weight_MoDL2.pt')
+            weights_dict = torch.load(rootName+'/weights/weight_MoDL2_att.pt')
         else:
             netG_dc = Resnet_with_DC2(
                 input_channels=2,

@@ -71,7 +71,7 @@ class Resnet_with_DC2(nn.Module):
         self.resnet_block = []
         self.echo_cat = echo_cat
         self.att = att
-        self.random = random
+        # self.random = random
 
         if self.echo_cat == 1:
             layers = ResBlock(input_channels, filter_channels, \
@@ -100,11 +100,11 @@ class Resnet_with_DC2(nn.Module):
         Xs = []
         for i in range(self.K):
 
-            if self.random:
-                mag = (1 + torch.randn(1)).to(device)
-                phase = (torch.rand(1) * 3.14 - 3.14/2).to(device)
-                factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None]
-                x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))
+            # if self.random:
+            #     mag = (1 + torch.randn(1)/3).to(device)
+            #     phase = (torch.rand(1) * 3.14/2 - 3.14/4).to(device)
+            #     factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None]
+            #     x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))
 
             # if i < self.K - 1:
             if i != self.K // 2:
@@ -119,9 +119,9 @@ class Resnet_with_DC2(nn.Module):
             dc_layer = DC_layer_multiEcho(A, rhs, self.echo_cat)
             x = dc_layer.CG_iter()
             
-            if self.random:
-                factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None]
-                x = mlpy_in_cg(x, factor)
+            # if self.random:
+            #     factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None]
+            #     x = mlpy_in_cg(x, factor)
 
             if self.echo_cat:
                 x = torch_channel_concate(x)
