@@ -236,8 +236,8 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_att={}_ \
-                           random={}.pt'.format(opt['echo_cat'], opt['att'], opt['random']))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_att={}_random={}_falast.pt' \
+                           .format(opt['echo_cat'], opt['att'], opt['random']))
 
     
     # for test
@@ -262,8 +262,8 @@ if __name__ == '__main__':
                 att=opt['att'],
                 random=opt['random']
             )
-        weights_dict = torch.load(rootName+'/weights/echo_cat={}_att={}_ \
-                random={}.pt'.format(opt['echo_cat'], opt['att'], opt['random']))
+        weights_dict = torch.load(rootName+'/weights/echo_cat={}_att={}_random={}.pt' \
+                                .format(opt['echo_cat'], opt['att'], opt['random']))
         netG_dc.to(device)
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
