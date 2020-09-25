@@ -69,10 +69,6 @@ def ResBlock_3D(
             layers.append(nn.GroupNorm(filter_dim, filter_dim))
         layers.append(nn.ReLU(inplace=True))
 
-        if i == N//2 - 1 and use_fa == 2:
-            print('Use FANet for 3D ResBlock')
-            layers.append(faBlockNew(filter_dim))
-
     if unc_map:
         layers.append(nn.Conv3d(filter_dim, output_dim+2, 1))
     else:

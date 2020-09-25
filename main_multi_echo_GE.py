@@ -111,9 +111,7 @@ if __name__ == '__main__':
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=1,
-                att=opt['att'],
-                random=opt['random']
+                echo_cat=1
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -121,9 +119,7 @@ if __name__ == '__main__':
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=0,
-                att=opt['att'],
-                random=opt['random']
+                echo_cat=0
             )   
         netG_dc.to(device)
 
@@ -236,8 +232,8 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_att={}_random={}_falast.pt' \
-                           .format(opt['echo_cat'], opt['att'], opt['random']))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}.pt' \
+                           .format(opt['echo_cat']))
 
     
     # for test
@@ -248,9 +244,7 @@ if __name__ == '__main__':
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=1,
-                att=opt['att'],
-                random=opt['random']
+                echo_cat=1
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -258,12 +252,10 @@ if __name__ == '__main__':
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
                 K=K,
-                echo_cat=0,
-                att=opt['att'],
-                random=opt['random']
+                echo_cat=0
             )
-        weights_dict = torch.load(rootName+'/weights/echo_cat={}_att={}_random={}.pt' \
-                                .format(opt['echo_cat'], opt['att'], opt['random']))
+        weights_dict = torch.load(rootName+'/weights/echo_cat={}.pt' \
+                                .format(opt['echo_cat']))
         netG_dc.to(device)
         netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
@@ -311,7 +303,7 @@ if __name__ == '__main__':
 
             save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
             save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-            save_mat(rootName+'/results/Recons_echo_cat={}_att={}_random={}.mat' \
-              .format(opt['echo_cat'], opt['att'], opt['random']), 'Recons', Recons)
+            save_mat(rootName+'/results/Recons_echo_cat={}.mat' \
+              .format(opt['echo_cat']), 'Recons', Recons)
 
 
