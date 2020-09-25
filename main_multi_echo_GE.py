@@ -42,7 +42,6 @@ if __name__ == '__main__':
     nrow = 206
     ncol = 80
     necho = 10
-    K = 5
     lambda_dll2 = 0.001
     
     # typein parameters
@@ -51,9 +50,11 @@ if __name__ == '__main__':
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
+    parser.add_argument('--K', type=int, default=5)  # number of unrolls
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
     opt = {**vars(parser.parse_args())}
+    K = opt['K']
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
