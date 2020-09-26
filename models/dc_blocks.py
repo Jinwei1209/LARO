@@ -133,13 +133,18 @@ class DC_layer_real():
 
 # CG layer for (necho, nrow, ncol) data
 class DC_layer_multiEcho():
-    def __init__(self, A, rhs, echo_cat=1, use_dll2=1):
+    def __init__(self, A, rhs, echo_cat=1, 
+                 flag_precond=0, precond=0, use_dll2=1):
         self.AtA = lambda z: A.AtA(z, use_dll2=use_dll2)
         self.echo_cat = echo_cat
+        self.flag_precond = flag_precond
         if self.echo_cat:
             self.rhs = torch_channel_deconcate(rhs) # (batch, 2, echo, row, col)
         else:
             self.rhs = rhs
+        if self.flag_precond:
+            # precond: C^-1, M_inv = C^-TC^-1, size: (batch, 2, echo, row, col)
+            self.M_inv = mlpy_in_cg(precond, precond)
         self.device = rhs.get_device()
 
     def CG_body(self, i, rTr, x, r, p):
@@ -149,21 +154,33 @@ class DC_layer_multiEcho():
         else:
             Ap = self.AtA(p)
         alpha = rTr / torch.sum(mlpy_in_cg(conj_in_cg(p), Ap))
-        # alpha = torch.ones(x.shape).to(self.device)*alpha
-        # alpha[:,1,...] = 0
 
-        # x = x + mlpy_in_cg(p, alpha)
         x = x + p * alpha
-        # r = r - mlpy_in_cg(Ap, alpha)
         r = r - Ap * alpha
         rTrNew = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
 
         beta = rTrNew /  rTr
-        # beta = torch.ones(x.shape).to(self.device)*beta
-        # beta[:,1,...] = 0
-        # p = r + mlpy_in_cg(p, beta)
         p = r + p * beta
         return i+1, rTrNew, x, r, p
+
+    def precond_CG_body(self, i, rTy, x, r, y, p):
+        if self.echo_cat:
+            Ap = self.AtA(torch_channel_concate(p)) # (batch, 2*echo, row, col)
+            Ap = torch_channel_deconcate(Ap) # (batch, 2, echo, row, col)
+        else:
+            Ap = self.AtA(p)
+        alpha = cplx_dvd(rTy, torch.sum(mlpy_in_cg(conj_in_cg(p), Ap), dim=(0, 2, 3, 4)))
+        alpha = alpha[None, :, None, None, None]
+
+        x = x + mlpy_in_cg(p, alpha)
+        r = r + mlpy_in_cg(Ap, alpha)
+        y = mlpy_in_cg(self.M_inv, r)
+
+        rTyNew = torch.sum(mlpy_in_cg(conj_in_cg(r), y), dim=(0, 2, 3, 4))
+        beta = cplx_dvd(rTyNew, rTy)
+        beta = beta[None, :, None, None, None]
+        p = -y + mlpy_in_cg(beta, p)
+        return i+1, rTyNew, x, r, y, p
 
     def while_cond(self, i, rTr, max_iter=10):
         return (i<max_iter) and (rTr>1e-10)
@@ -171,14 +188,22 @@ class DC_layer_multiEcho():
     def CG_iter(self, max_iter=10):
         x = torch.zeros(self.rhs.shape).to(self.device)
 
-        i, r, p = 0, self.rhs, self.rhs
-        rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
-        while self.while_cond(i, rTr, max_iter):
-            i, rTr, x, r, p = self.CG_body(i, rTr, x, r, p)
-            # print('i = {0}, rTr = {1}'.format(i, rTr))
-        return x
-
-
+        if self.flag_precond == 0:
+            i, r, p = 0, self.rhs, self.rhs
+            rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
+            while self.while_cond(i, rTr, max_iter):
+                i, rTr, x, r, p = self.CG_body(i, rTr, x, r, p)
+            return x
+        elif self.flag_precond == 1:
+            i, r = 0, -self.rhs
+            y = mlpy_in_cg(self.M_inv, r)
+            p = -y
+            rTy = torch.sum(mlpy_in_cg(conj_in_cg(r), y), dim=(0, 2, 3, 4))  #(2,) tensor
+            rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
+            while self.while_cond(i, rTr, max_iter):
+                i, rTy, x, r, y, p = self.precond_CG_body(i, rTy, x, r, y, p)
+                rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
+            return x
         
 
 

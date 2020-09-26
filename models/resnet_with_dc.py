@@ -11,6 +11,7 @@ from models.initialization import *
 from models.resBlocks import *
 from models.danet import daBlock  
 from models.fa import faBlockNew
+from models.unet import *
 from utils.data import *
 from utils.operators import *
 
@@ -63,14 +64,18 @@ class Resnet_with_DC2(nn.Module):
         input_channels,
         filter_channels,
         lambda_dll2, # initializing lambda_dll2
+        necho=10, # number of echos in the data
         K=1,  # number of unrolls
         echo_cat=1, # flag to concatenate echo dimension into channel
+        flag_precond=0, # flag to use the preconditioner in the CG layer
         # att=0, # flag to use attention-based denoiser
         # random=0, # flag to multiply the input data with a random complex number
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
+        self.necho = necho
         self.echo_cat = echo_cat
+        self.flag_precond = flag_precond    
         # self.att = att
         # self.random = random
 
@@ -91,11 +96,30 @@ class Resnet_with_DC2(nn.Module):
 
         self.K = K
         self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+
+        # flag for using preconditioning:
+        if self.flag_precond == 1:
+            print('Apply preconditioning in the CG block')
+            self.preconditioner = Unet(2*self.necho, 2*self.necho, num_filters=[2**i for i in range(4, 8)])
     
     def forward(self, x, csms, masks, flip):
         device = x.get_device()
+        # input
         x_start = x
-        # self.lambda_dll2 = self.lambda_dll2.to(device)
+        if self.echo_cat == 0:
+            x_start_ = torch_channel_concate(x_start)
+        else:
+            x_start_ = x_start
+
+        # generate preconditioner
+        if self.flag_precond == 1:
+            precond = 9 / (1 + torch.exp(-0.1 * self.preconditioner(x_start_))) + 1
+            precond = torch_channel_deconcate(precond)
+            precond[:, 1, ...] = 0
+            self.precond = precond
+        else:
+            self.precond = 0
+
         A = Back_forward_multiEcho(csms, masks, flip, 
                                 self.lambda_dll2, self.echo_cat)
         Xs = []
@@ -129,7 +153,8 @@ class Resnet_with_DC2(nn.Module):
             #         x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))  # for echo_cat=1
 
             rhs = x_start + self.lambda_dll2*x_block1
-            dc_layer = DC_layer_multiEcho(A, rhs, self.echo_cat)
+            dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
+                    flag_precond=self.flag_precond, precond=self.precond)
             x = dc_layer.CG_iter()
 
             if self.echo_cat:

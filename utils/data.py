@@ -230,16 +230,20 @@ def cplx_dvd(a, b):
     """
     division between a and b
     """
-    device = a.get_device()
+    # device = a.get_device()
 
-    denom = torch.empty(a.shape).to(device)
-    denom[..., 0] = b[..., 0]**2 + b[..., 1]**2
-    denom[..., 1] = denom[..., 0]
+    # denom = torch.empty(a.shape).to(device)
+    # denom[..., 0] = b[..., 0]**2 + b[..., 1]**2
+    # denom[..., 1] = denom[..., 0]
 
-    out = torch.empty(a.shape).to(device)
-    out[..., 0] = a[..., 0]*b[..., 0] + a[..., 1]*b[..., 1]
-    out[..., 1] = -a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
-    out = out/denom
+    # out = torch.empty(a.shape).to(device)
+    # out[..., 0] = a[..., 0]*b[..., 0] + a[..., 1]*b[..., 1]
+    # out[..., 1] = -a[..., 0]*b[..., 1] + a[..., 1]*b[..., 0]
+    # out = out/denom
+
+    denom0 = cplx_mlpy(cplx_conj(b), b)[..., 0:1]
+    denom = torch.cat([denom0, denom0], dim=-1)
+    out = cplx_mlpy(cplx_conj(b), a) / denom
     return out
 
 
