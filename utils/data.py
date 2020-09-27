@@ -300,6 +300,25 @@ def showImage(img, idxs=[1,2,3,4,5], numShow=5, sampling=False):
     return imgstack, idxs
 
 
+def memory_pre_alloc(gpu_id):
+    # pre-occupy the memory   
+    total, used = os.popen(
+        '"nvidia-smi" --query-gpu=memory.total,memory.used --format=csv,nounits,noheader'
+            ).read().split('\n')[int(gpu_id)].split(',')
+    
+    total = int(total)
+    used = int(used)
+
+    print('Total memory is {0} MB'.format(total))
+    print('Used memory is {0} MB'.format(used))
+
+    max_mem = int(total*0.8)
+    block_mem = max_mem - used
+    
+    x = torch.rand((256, 1024, block_mem)).cuda()
+    x = torch.rand((2, 2)).cuda()
+
+
 class Logger():
     def __init__(
         self, 

@@ -45,7 +45,7 @@ if __name__ == '__main__':
     lambda_dll2 = 1e-3
     
     # typein parameters
-    parser = argparse.ArgumentParser(description='CardiacQSM')
+    parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -53,6 +53,7 @@ if __name__ == '__main__':
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--K', type=int, default=5)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  # flag to use loupe for sampling pattern optimization
+    
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
@@ -66,7 +67,8 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+    memory_pre_alloc(opt['gpu_id'])
+    
     # load mask
     masks = np.real(readcfl(rootName+'/megre_slice_GE/mask'))
     # masks = np.ones(masks.shape)
@@ -157,8 +159,8 @@ if __name__ == '__main__':
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                     % (epoch, niter, idx, 600//batch_size, time.time()-t0))
 
-                    print('echo_cat: {}, precond: {}'.format( \
-                            opt['echo_cat'], opt['precond']))
+                    print('echo_cat: {}, solver: {}'.format( \
+                            opt['echo_cat'], opt['solver']))
                     
                     if opt['loupe']:
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
@@ -235,8 +237,8 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_precond={}_K={}.pt' \
-                           .format(opt['echo_cat'], opt['precond'], opt['K']))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}.pt' \
+                           .format(opt['echo_cat'], opt['solver'], opt['K']))
 
     
     # for test
@@ -263,8 +265,8 @@ if __name__ == '__main__':
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe']
             )
-        # weights_dict = torch.load(rootName+'/weights/echo_cat={}_precond={}_K={}.pt' \
-        #                         .format(opt['echo_cat'], opt['precond'], opt['K']))
+        # weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}.pt' \
+        #                         .format(opt['echo_cat'], opt['solver'], opt['K']))
         # netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()

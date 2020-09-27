@@ -279,7 +279,7 @@ class Resnet_with_DC2(nn.Module):
                 rhs = x_start - A.AtA(x, use_dll2=3)
                 dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
                     flag_precond=self.flag_precond, precond=self.precond, use_dll2=3)
-                delta_x = dc_layer.CG_iter(max_iter=20)
+                delta_x = dc_layer.CG_iter(max_iter=10)
                 if self.echo_cat:
                     delta_x = torch_channel_concate(delta_x)
                 x = x + delta_x
@@ -304,7 +304,7 @@ class Resnet_with_DC2(nn.Module):
                 rhs = x_start + self.rho_penalty*divergence(wk) - divergence(etak)
                 dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
                             flag_precond=self.flag_precond, precond=self.precond, use_dll2=2)
-                x = dc_layer.CG_iter(max_iter=20)
+                x = dc_layer.CG_iter(max_iter=10)
                 if self.echo_cat:
                     x = torch_channel_concate(x)
                 Xs.append(x)
