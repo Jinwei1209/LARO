@@ -42,20 +42,26 @@ if __name__ == '__main__':
     nrow = 206
     ncol = 80
     necho = 10
-    lambda_dll2 = 0.001
+    lambda_dll2 = 1e-3
     
     # typein parameters
     parser = argparse.ArgumentParser(description='CardiacQSM')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
+    parser.add_argument('--solver', type=int, default=0)  # 0 for deep Quasi-newton, 1 for deep ADMM,
+                                                          # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--K', type=int, default=5)  # number of unrolls
+    parser.add_argument('--loupe', type=int, default=0)  # flag to use loupe for sampling pattern optimization
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
+    parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     opt = {**vars(parser.parse_args())}
     K = opt['K']
+    # concatenate echo dimension to the channel dimension for TV regularization
+    if opt['solver'] > 1:
+        opt['echo_cat'] = 1
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
@@ -114,7 +120,9 @@ if __name__ == '__main__':
                 lambda_dll2=lambda_dll2,
                 K=K,
                 echo_cat=1,
-                flag_precond=opt['precond']
+                flag_solver=opt['solver'],
+                flag_precond=opt['precond'],
+                flag_loupe=opt['loupe']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -123,7 +131,9 @@ if __name__ == '__main__':
                 lambda_dll2=lambda_dll2,
                 K=K,
                 echo_cat=0,
-                flag_precond=opt['precond']
+                flag_solver=opt['solver'],
+                flag_precond=opt['precond'],
+                flag_loupe=opt['loupe']
             )   
         netG_dc.to(device)
 
@@ -138,12 +148,6 @@ if __name__ == '__main__':
             netG_dc.train()
             metrices_train = Metrices()
             for idx, (kdatas, targets, csms, brain_masks) in enumerate(trainLoader):
-                # print(idx)
-
-                # kdatas = kdatas[:, :, :necho, ...]
-                # csms = csms[:, :, :necho, ...]
-                # targets = targets[:, :2*necho, ...]
-                # brain_masks = brain_masks[:, :2*necho, ...]
 
                 if torch.sum(brain_masks) == 0:
                     continue
@@ -155,9 +159,13 @@ if __name__ == '__main__':
 
                     print('echo_cat: {}, precond: {}'.format( \
                             opt['echo_cat'], opt['precond']))
+                    
+                    if opt['loupe']:
+                        print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
+                        % (torch.mean(netG_dc.Mask), netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
 
-                    print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f, K: %d, necho: %d'
-                        % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2, K, necho))
+                    print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f, K: %d'
+                        % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2, K))
 
                     print('Average PSNR in Training dataset is %.2f' 
                     % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
@@ -178,11 +186,8 @@ if __name__ == '__main__':
                 # test_image = operator.AtA(targets, 0).cpu().detach().numpy()
                 # save_mat(rootName+'/results/test_image.mat', 'test_image', test_image)
 
-
-                inputs = backward_multiEcho(kdatas, csms, masks, flip, 
-                                            opt['echo_cat'])
                 optimizerG_dc.zero_grad()
-                Xs = netG_dc(inputs, csms, masks, flip)
+                Xs = netG_dc(kdatas, csms, masks, flip)
 
                 lossl2_sum = 0
                 for i in range(len(Xs)):
@@ -203,10 +208,6 @@ if __name__ == '__main__':
             loss_total_list = []
             with torch.no_grad():  # to solve memory exploration issue
                 for idx, (kdatas, targets, csms, brain_masks) in enumerate(valLoader):
-                    # kdatas = kdatas[:, :, :necho, ...]
-                    # csms = csms[:, :, :necho, ...]
-                    # targets = targets[:, :2*necho, ...]
-                    # brain_masks = brain_masks[:, :2*necho, ...]
 
                     if torch.sum(brain_masks) == 0:
                         continue
@@ -216,9 +217,7 @@ if __name__ == '__main__':
                     csms = csms.to(device)
                     brain_masks = brain_masks.to(device)
 
-                    inputs = backward_multiEcho(kdatas, csms, masks, flip,
-                                                opt['echo_cat'])
-                    Xs = netG_dc(inputs, csms, masks, flip)
+                    Xs = netG_dc(kdatas, csms, masks, flip)
 
                     metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
                     targets = np.asarray(targets.cpu().detach())
@@ -249,7 +248,9 @@ if __name__ == '__main__':
                 lambda_dll2=lambda_dll2,
                 K=K,
                 echo_cat=1,
-                flag_precond=opt['precond']
+                flag_solver=opt['solver'],
+                flag_precond=opt['precond'],
+                flag_loupe=opt['loupe']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -258,17 +259,20 @@ if __name__ == '__main__':
                 lambda_dll2=lambda_dll2,
                 K=K,
                 echo_cat=0,
-                flag_precond=opt['precond']
+                flag_solver=opt['solver'],
+                flag_precond=opt['precond'],
+                flag_loupe=opt['loupe']
             )
-        weights_dict = torch.load(rootName+'/weights/echo_cat={}_precond={}_K={}.pt' \
-                                .format(opt['echo_cat'], opt['precond'], opt['K']))
+        # weights_dict = torch.load(rootName+'/weights/echo_cat={}_precond={}_K={}.pt' \
+        #                         .format(opt['echo_cat'], opt['precond'], opt['K']))
+        # netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
-        netG_dc.load_state_dict(weights_dict)
         netG_dc.eval()
 
         Inputs = []
         Targets = []
         Recons = []
+        preconds = []
 
         dataLoader_test = kdata_multi_echo_GE(
             rootDir=rootName,
@@ -282,10 +286,11 @@ if __name__ == '__main__':
         with torch.no_grad():
             for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
                 print(idx)
-                kdatas = kdatas[:, :, :necho, ...]
-                csms = csms[:, :, :necho, ...]
-                targets = targets[:, :2*necho, ...]
-                brain_masks = brain_masks[:, :2*necho, ...]
+                if idx == 1 and opt['loupe'] == 1:
+                    print('Saving sampling mask')
+                    Mask = netG_dc.Mask.cpu().detach().numpy()
+                    Mask[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12] = 1
+                    save_mat(rootName+'/results/Mask.mat', 'Mask', Mask)
 
                 kdatas = kdatas.to(device)
                 targets = targets.to(device)
@@ -294,11 +299,13 @@ if __name__ == '__main__':
 
                 inputs = backward_multiEcho(kdatas, csms, masks, flip,
                                             opt['echo_cat'])
-                Xs = netG_dc(inputs, csms, masks, flip)
+                Xs = netG_dc(kdatas, csms, masks, flip)
+                precond = netG_dc.precond
 
                 Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs[-1].cpu().detach())
+                # preconds.append(precond.cpu().detach())
 
             Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
             Inputs = np.transpose(Inputs, [0, 2, 3, 1])

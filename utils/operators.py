@@ -90,13 +90,18 @@ def gradient(x):
     for 5d data: (batchsize, real/imag dim, row dim, col dim, gradient dim)
 """
 def divergence(d):
-    device = d.get_device()
+    # device = d.get_device()
+    # dx = d[..., 0]
+    # dy = d[..., 1]
+    # zerox = torch.zeros(dx.size()[:3] + (1,)).to(device)
+    # zeroy = torch.zeros(dy.size()[:2] + (1,) + dy.size()[-1:]).to(device)
+    # dxx = torch.cat((dx[:, :, :, :-1], zerox), dim=3) - torch.cat((zerox, dx[:, :, :, :-1]), dim=3) 
+    # dyy = torch.cat((dy[:, :, :-1, :], zeroy), dim=2) - torch.cat((zeroy, dy[:, :, :-1, :]), dim=2)
+
     dx = d[..., 0]
     dy = d[..., 1]
-    zerox = torch.zeros(dx.size()[:3] + (1,)).to(device)
-    zeroy = torch.zeros(dy.size()[:2] + (1,) + dy.size()[-1:]).to(device)
-    dxx = torch.cat((dx[:, :, :, :-1], zerox), dim=3) - torch.cat((zerox, dx[:, :, :, :-1]), dim=3) 
-    dyy = torch.cat((dy[:, :, :-1, :], zeroy), dim=2) - torch.cat((zeroy, dy[:, :, :-1, :]), dim=2)
+    dxx = dx - torch.cat((dx[:, :, :, :1], dx[:, :, :, :-1]), dim=3) 
+    dyy = dy - torch.cat((dy[:, :, :1, :], dy[:, :, :-1, :]), dim=2)
     return  - dxx - dyy
 
 """

@@ -144,7 +144,7 @@ class DC_layer_multiEcho():
             self.rhs = rhs
         if self.flag_precond:
             # precond: C^-1, M_inv = C^-TC^-1, size: (batch, 2, echo, row, col)
-            self.M_inv = mlpy_in_cg(precond, precond)
+            self.M_inv = mlpy_in_cg(conj_in_cg(precond), precond)
         self.device = rhs.get_device()
 
     def CG_body(self, i, rTr, x, r, p):
@@ -203,6 +203,7 @@ class DC_layer_multiEcho():
             while self.while_cond(i, rTr, max_iter):
                 i, rTy, x, r, y, p = self.precond_CG_body(i, rTy, x, r, y, p)
                 rTr = torch.sum(mlpy_in_cg(conj_in_cg(r), r))
+                # print('i = {0}, rTr = {1}'.format(i, rTr))
             return x
         
 
