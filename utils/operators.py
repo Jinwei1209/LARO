@@ -255,7 +255,7 @@ class Back_forward_multiEcho():
         elif use_dll2 == 2:
             coilComb = coilComb + self.lambda_dll2*divergence(gradient(img))
         elif use_dll2 == 3:
-            coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+3e-5))  #1e-4 best, 5e-5 to have consistent result to ADMM
+            coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+5e-4))  #1e-4 best, 5e-5 to have consistent result to ADMM
         return coilComb
 
 """

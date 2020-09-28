@@ -76,7 +76,7 @@ class Resnet_with_DC2(nn.Module):
         flag_solver=0,  # 0 for deep Quasi-newton, 1 for deep ADMM,
                         # 2 for TV Quasi-newton, 3 for TV ADMM.
         flag_precond=0, # flag to use the preconditioner in the CG layer
-        flag_loupe=0, # flag to learn the optimal mask
+        flag_loupe=0, # 1: same mask across echos, 2: mask for each echo
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -134,22 +134,40 @@ class Resnet_with_DC2(nn.Module):
             print('Apply preconditioning in the CG block')
             self.preconditioner = Unet(2*self.necho, 2*self.necho, num_filters=[2**i for i in range(4, 8)])
 
-        if self.flag_loupe:
+        # flag for mask learning strategy
+        if self.flag_loupe == 1:
             temp = (torch.rand(self.nrow, self.ncol)-0.5)*30
             temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
             self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+        elif self.flag_loupe == 2:
+            temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30
+            temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
 
-    def generateMask(self):
+    def generateMask(self, weight_parameters):
         if self.passSigmoid:
-            self.Pmask = passThroughSigmoid.apply(self.slope * self.weight_parameters)
+            Pmask = passThroughSigmoid.apply(self.slope * weight_parameters)
         else:
-            self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters))
+            Pmask = 1 / (1 + torch.exp(-self.slope * weight_parameters))
         if self.rescale:
-            self.Pmask_rescaled = self.rescalePmask(self.Pmask, self.samplingRatio)
+            Pmask_rescaled = self.rescalePmask(Pmask, self.samplingRatio)
         else:
-            self.Pmask_rescaled = self.Pmask
-        self.Mask = self.samplingPmask(self.Pmask_rescaled)
-        return self.Mask
+            Pmask_rescaled = Pmask
+
+        masks = self.samplingPmask(Pmask_rescaled)[:, :, None] # (nrow, ncol, 1)
+        # keep central calibration region to 1
+        masks[self.nrow//2-13:self.nrow//2+12, self.ncol//2-13:self.ncol//2+12, :] = 1
+        # to complex data
+        masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (nrow, ncol, 2)
+        # add echo dimension
+        masks = masks[None, ...] # (1, nrow, ncol, 2)
+        masks = torch.cat(self.necho*[masks]) # (necho, nrow, ncol, 2)
+        # add coil dimension
+        masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+        masks = torch.cat(self.ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+        # add batch dimension
+        masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+        return masks
 
     def rescalePmask(self, Pmask, samplingRatio):
         xbar = torch.mean(Pmask)
@@ -168,21 +186,17 @@ class Resnet_with_DC2(nn.Module):
         return Mask
 
     def forward(self, kdatas, csms, masks, flip):
-        # sampling mask
-        if self.flag_loupe:
-            masks = self.generateMask()[:, :, None] # (nrow, ncol, 1)
-            # keep central calibration region to 1
-            masks[self.nrow//2-13:self.nrow//2+12, self.ncol//2-13:self.ncol//2+12, :] = 1
-            # to complex data
-            masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (nrow, ncol, 2)
-            # add echo dimension
-            masks = masks[None, ...] # (1, nrow, ncol, 2)
-            masks = torch.cat(self.necho*[masks]) # (necho, nrow, ncol, 2)
-            # add coil dimension
-            masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
-            masks = torch.cat(self.ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
-            # add batch dimension
-            masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+        # generate sampling mask
+        if self.flag_loupe == 1:
+            masks = self.generateMask(self.weight_parameters)
+            self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters))
+            self.Mask = masks[0, 0, 0, :, :, 0]
+        elif self.flag_loupe == 2:
+            masks = torch.zeros(1, self.ncoil, self.necho, self.nrow, self.ncol, 2).to('cuda')
+            for echo in range(self.necho):
+                masks[:, :, echo, ...] = self.generateMask(self.weight_parameters[echo, ...])[:, :, echo, ...]
+            self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters)).permute(1, 2, 0)
+            self.Mask = masks[0, 0, :, :, :, 0].permute(1, 2, 0)
 
         # input
         x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat)
@@ -251,7 +265,7 @@ class Resnet_with_DC2(nn.Module):
             A = Back_forward_multiEcho(csms, masks, flip, 
                                     self.lambda_dll2, self.echo_cat)
             Xs = []
-            uk = torch.zeros(x_start.size()).to(device)
+            uk = torch.zeros(x_start.size()).to('cuda')
             for i in range(self.K):
                 # update auxiliary variable v
                 v_block = self.resnet_block(x+uk/self.lambda_dll2)
@@ -275,7 +289,6 @@ class Resnet_with_DC2(nn.Module):
                                     self.lambda_dll2, self.echo_cat)
             Xs = []
             for i in range(self.K):
-                x_old = x
                 rhs = x_start - A.AtA(x, use_dll2=3)
                 dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
                     flag_precond=self.flag_precond, precond=self.precond, use_dll2=3)
@@ -291,9 +304,9 @@ class Resnet_with_DC2(nn.Module):
             A = Back_forward_multiEcho(csms, masks, flip, 
                                     self.rho_penalty, self.echo_cat)
             Xs = []
-            wk = torch.zeros(x_start.size()+(2,)).to(device)
-            etak = torch.zeros(x_start.size()+(2,)).to(device)
-            zeros_ = torch.zeros(x_start.size()+(2,)).to(device)
+            wk = torch.zeros(x_start.size()+(2,)).to('cuda')
+            etak = torch.zeros(x_start.size()+(2,)).to('cuda')
+            zeros_ = torch.zeros(x_start.size()+(2,)).to('cuda')
             for i in range(self.K):
                 # update auxiliary variable wk through threshold
                 ek = gradient(x) + etak/self.rho_penalty

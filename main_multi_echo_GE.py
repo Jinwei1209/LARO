@@ -69,7 +69,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # load mask
-    masks = np.real(readcfl(rootName+'/megre_slice_GE/mask'))
+    masks = np.real(readcfl(rootName+'/megre_slice_GE/mask_loupe'))
     # masks = np.ones(masks.shape)
     masks = masks[..., np.newaxis] # (nrow, ncol, 1)
     masks = torch.tensor(masks, device=device).float()
@@ -288,14 +288,12 @@ if __name__ == '__main__':
 
         with torch.no_grad():
             for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
-                print(idx)
                 if idx == 1 and opt['loupe'] == 1:
-                    print('Saving sampling mask')
                     Mask = netG_dc.Mask.cpu().detach().numpy()
-                    Mask[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12] = 1
+                    print('Saving sampling mask: %', np.mean(Mask)*100)
                     save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}.mat' \
                             .format(opt['echo_cat'], opt['solver'], opt['K']), 'Mask', Mask)
-
+                print(idx)
                 kdatas = kdatas.to(device)
                 targets = targets.to(device)
                 csms = csms.to(device)
