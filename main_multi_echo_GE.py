@@ -67,8 +67,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    memory_pre_alloc(opt['gpu_id'])
-    
+
     # load mask
     masks = np.real(readcfl(rootName+'/megre_slice_GE/mask'))
     # masks = np.ones(masks.shape)
@@ -95,6 +94,7 @@ if __name__ == '__main__':
 
     # training
     if opt['flag_train'] == 1:
+        memory_pre_alloc(opt['gpu_id'])
         lossl1 = lossL1()
 
         dataLoader = kdata_multi_echo_GE(
@@ -166,8 +166,9 @@ if __name__ == '__main__':
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
                         % (torch.mean(netG_dc.Mask), netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
 
-                    print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f, K: %d'
-                        % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2, K))
+                    if opt['solver'] < 3:
+                        print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f, K: %d'
+                            % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2, K))
 
                     print('Average PSNR in Training dataset is %.2f' 
                     % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
@@ -265,9 +266,9 @@ if __name__ == '__main__':
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe']
             )
-        # weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}.pt' \
-        #                         .format(opt['echo_cat'], opt['solver'], opt['K']))
-        # netG_dc.load_state_dict(weights_dict)
+        weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}.pt' \
+                                .format(opt['echo_cat'], opt['solver'], opt['K']))
+        netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
 
@@ -292,7 +293,8 @@ if __name__ == '__main__':
                     print('Saving sampling mask')
                     Mask = netG_dc.Mask.cpu().detach().numpy()
                     Mask[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12] = 1
-                    save_mat(rootName+'/results/Mask.mat', 'Mask', Mask)
+                    save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}.mat' \
+                            .format(opt['echo_cat'], opt['solver'], opt['K']), 'Mask', Mask)
 
                 kdatas = kdatas.to(device)
                 targets = targets.to(device)
@@ -318,7 +320,7 @@ if __name__ == '__main__':
 
             save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
             save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-            save_mat(rootName+'/results/Recons_echo_cat={}_precond={}_K={}.mat' \
-              .format(opt['echo_cat'], opt['precond'], opt['K']), 'Recons', Recons)
+            save_mat(rootName+'/results/Recons_echo_cat={}_solver={}_K={}.mat' \
+              .format(opt['echo_cat'], opt['solver'], opt['K']), 'Recons', Recons)
 
 

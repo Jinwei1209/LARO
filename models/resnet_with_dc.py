@@ -117,11 +117,11 @@ class Resnet_with_DC2(nn.Module):
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         
         elif self.flag_solver == 2:
-            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
         
         elif self.flag_solver == 3:
-            self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=True)
-            self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=True)
+            self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=False)
+            self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=False)
         
         # if self.att == 1:
         #     self.attBlock = daBlock(input_channels, filter_channels//8, \
