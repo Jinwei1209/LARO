@@ -159,16 +159,19 @@ if __name__ == '__main__':
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                     % (epoch, niter, idx, 600//batch_size, time.time()-t0))
 
-                    print('echo_cat: {}, solver: {}'.format( \
-                            opt['echo_cat'], opt['solver']))
+                    print('echo_cat: {}, solver: {}, K: {}, loupe: {}'.format( \
+                            opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']))
                     
                     if opt['loupe']:
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
                         % (torch.mean(netG_dc.Mask), netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
 
                     if opt['solver'] < 3:
-                        print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f, K: %d'
-                            % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2, K))
+                        print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f'
+                            % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2))
+                    else:
+                        print('netG_dc --- loss_L2_dc: %f, lambda_tv: %f, rho_penalty: %f'
+                            % (errL2_dc_sum/display_iters, netG_dc.lambda_tv, netG_dc.rho_penalty))
 
                     print('Average PSNR in Training dataset is %.2f' 
                     % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
@@ -238,8 +241,8 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}.pt' \
-                           .format(opt['echo_cat'], opt['solver'], opt['K']))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}.pt' \
+                           .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']))
 
     
     # for test
@@ -266,8 +269,8 @@ if __name__ == '__main__':
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe']
             )
-        weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}.pt' \
-                                .format(opt['echo_cat'], opt['solver'], opt['K']))
+        weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}.pt' \
+                                .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
