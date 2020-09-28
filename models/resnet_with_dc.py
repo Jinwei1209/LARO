@@ -215,7 +215,6 @@ class Resnet_with_DC2(nn.Module):
         else:
             self.precond = 0
 
-        device = x_start.get_device()
         # Deep Quasi-newton
         if self.flag_solver == 0:
             A = Back_forward_multiEcho(csms, masks, flip, 
