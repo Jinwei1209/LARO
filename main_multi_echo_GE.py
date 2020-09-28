@@ -52,7 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('--solver', type=int, default=0)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--K', type=int, default=5)  # number of unrolls
-    parser.add_argument('--loupe', type=int, default=0)  # flag to use loupe for sampling pattern optimization
+    parser.add_argument('--loupe', type=int, default=0)  # 1: same mask across echos, 2: mask for each echo
     
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # load mask
-    masks = np.real(readcfl(rootName+'/megre_slice_GE/mask_loupe'))
+    masks = np.real(readcfl(rootName+'/megre_slice_GE/mask'))
     # masks = np.ones(masks.shape)
     masks = masks[..., np.newaxis] # (nrow, ncol, 1)
     masks = torch.tensor(masks, device=device).float()
