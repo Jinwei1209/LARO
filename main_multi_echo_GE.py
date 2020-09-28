@@ -321,7 +321,7 @@ if __name__ == '__main__':
 
             save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
             save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-            save_mat(rootName+'/results/Recons_echo_cat={}_solver={}_K={}.mat' \
-              .format(opt['echo_cat'], opt['solver'], opt['K']), 'Recons', Recons)
+            save_mat(rootName+'/results/Recons_echo_cat={}_solver={}_K={}_loupe={}.mat' \
+              .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Recons', Recons)
 
 
