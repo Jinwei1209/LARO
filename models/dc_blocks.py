@@ -1,5 +1,5 @@
 """
-This file contains data consistency blocks in model
+This file contains data consistency blocks in the model
 """
 import torch
 import torch.nn as nn

@@ -1,7 +1,3 @@
-'''
-    Dataloader of multi-echo GRE data from GE scanner
-'''
-
 import os
 import numpy as np
 from torch.utils import data
@@ -11,7 +7,9 @@ from utils.operators import *
 
 
 class kdata_multi_echo_GE(data.Dataset):
-
+    '''
+        Dataloader of multi-echo GRE data from GE scanner
+    '''
 
     folderMatcher = {
         'MultiEcho': '/megre_slice_GE/'

@@ -4,11 +4,10 @@ import numpy as np
 from utils.data import *
 
 
-'''
-    forward and backward imaging model operator
-'''
 class Back_forward():
-
+    '''
+        forward and backward imaging model operator
+    '''
     def __init__(
         self,
         csm,
@@ -77,19 +76,19 @@ def backward_operator(kspaceUnder, csm, mask, ncoil, nrow, ncol):
     return coilComb
 
 
-"""
-    for 4d data: (batchsize, real/imag dim, row dim, col dim)
-"""
 def gradient(x):
+    """
+        for 4d data: (batchsize, real/imag dim, row dim, col dim)
+    """
     dx = torch.cat((x[:, :, :, 1:], x[:, :, :, -1:]), dim=3) - x
     dy = torch.cat((x[:, :, 1:, :], x[:, :, -1:, :]), dim=2) - x
     return torch.cat((dx[..., None], dy[..., None]), dim=-1)
 
 
-"""
-    for 5d data: (batchsize, real/imag dim, row dim, col dim, gradient dim)
-"""
 def divergence(d):
+    """
+        for 5d data: (batchsize, real/imag dim, row dim, col dim, gradient dim)
+    """
     # device = d.get_device()
     # dx = d[..., 0]
     # dy = d[..., 1]
@@ -104,10 +103,10 @@ def divergence(d):
     dyy = dy - torch.cat((dy[:, :, :1, :], dy[:, :, :-1, :]), dim=2)
     return  - dxx - dyy
 
-"""
-    backward operator for CardiacQSM rawdata recon
-"""
 def backward_CardiacQSM(kdata, csm, mask, flip):
+    """
+        backward operator for CardiacQSM rawdata recon
+    """
     nrows = kdata.size()[2]
     ncols = kdata.size()[3]
     temp = cplx_mlpy(kdata, mask)
@@ -123,10 +122,10 @@ def backward_CardiacQSM(kdata, csm, mask, flip):
     coilComb = coilComb.permute(0, 3, 1, 2)
     return coilComb
 
-"""
-    forward operator for CardiacQSM rawdata recon
-"""
 def forward_CardiacQSM(image, csm, mask, flip):
+    """
+        forward operator for CardiacQSM rawdata recon
+    """
     image = image.permute(0, 2, 3, 1)
     nrows = csm.size()[2]
     ncols = csm.size()[3]
@@ -138,11 +137,11 @@ def forward_CardiacQSM(image, csm, mask, flip):
     temp = torch.fft(temp, 2)
     return cplx_mlpy(temp, mask)
 
-"""
-    AtA operator for CardiacQSM data
-"""
+
 class backward_forward_CardiacQSM():
-    
+    """
+        AtA operator for CardiacQSM data
+    """
     def __init__(
         self,
         csm,
@@ -191,13 +190,11 @@ class backward_forward_CardiacQSM():
             coilComb = coilComb + self.lambda_dll2*img
         return coilComb
 
-
-'''
-    forward and backward imaging model operator for multi echo GRE data 
-    (echo dim as in the channel dim in CNN model)
-'''
 class Back_forward_multiEcho():
-
+    '''
+        forward and backward imaging model operator for multi echo GRE data 
+        (echo dim as in the channel dim in CNN model)
+    '''
     def __init__(
         self,
         csm,
@@ -258,10 +255,10 @@ class Back_forward_multiEcho():
             coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+5e-4))  #1e-4 best, 5e-5 to have consistent result to ADMM
         return coilComb
 
-"""
-    backward operator for multi-echo GE data
-"""
 def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1):
+    """
+    backward operator for multi-echo GE data
+    """
     nrows = kdata.size()[3]
     ncols = kdata.size()[4]
     nechos = kdata.size()[2]
@@ -279,10 +276,10 @@ def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1):
         coilComb = torch_channel_concate(coilComb) # (batch, 2*echo, row, col)
     return coilComb
 
-"""
-    forward operator for multi-echo GE data
-"""
 def forward_multiEcho(image, csm, mask, flip, echo_cat=1):
+    """
+        forward operator for multi-echo GE data
+    """
     if echo_cat:
         image = torch_channel_deconcate(image)  # (batch, 2, echo, row, col)
     image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
@@ -297,11 +294,11 @@ def forward_multiEcho(image, csm, mask, flip, echo_cat=1):
     return cplx_mlpy(temp, mask)
 
 
-# """
-#     forward and Jacobian operators of multi-echo gradient echo data
-# """
+
 # class OperatorsMultiEcho():
-    
+    # """
+    #     forward and Jacobian operators of multi-echo gradient echo data
+    # """
 #     def __init__(
 #         self,
 #         mask,
@@ -436,11 +433,10 @@ def forward_multiEcho(image, csm, mask, flip, echo_cat=1):
 #         else:
 #             return self.jacobian_conj(kdata=kdata, flag=flag)
 
-"""
-    forward and Jacobian operators of multi-echo gradient echo data
-"""
 class OperatorsMultiEcho():
-    
+    """
+        forward and Jacobian operators of multi-echo gradient echo data
+    """
     def __init__(
         self,
         M_0,

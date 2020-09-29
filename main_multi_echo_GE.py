@@ -292,7 +292,7 @@ if __name__ == '__main__':
         with torch.no_grad():
             for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
                 if idx == 1 and opt['loupe'] > 0:
-                    Mask = netG_dc.Pmask.cpu().detach().numpy()
+                    Mask = netG_dc.Mask.cpu().detach().numpy()
                     print('Saving sampling mask: %', np.mean(Mask)*100)
                     save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}.mat' \
                             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Mask', Mask)

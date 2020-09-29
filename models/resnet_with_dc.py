@@ -17,10 +17,10 @@ from utils.data import *
 from utils.operators import *
 
 
-'''
-    For Cardiac QSM data
-'''
 class Resnet_with_DC(nn.Module):
+    '''
+        For Cardiac QSM data
+    '''
 
     def __init__(
         self,
@@ -55,11 +55,10 @@ class Resnet_with_DC(nn.Module):
         return Xs[-1]
 
 
-'''
-    For multi_echo GRE brain data
-'''
 class Resnet_with_DC2(nn.Module):
-
+    '''
+        For multi_echo GRE brain data
+    '''
     def __init__(
         self,
         input_channels,
