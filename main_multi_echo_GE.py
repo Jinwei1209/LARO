@@ -61,7 +61,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # load mask
-    masks = np.real(readcfl(rootName+'/megre_slice_GE/mask'))
+    masks = np.real(readcfl(rootName+'/megre_slice_GE/mask_nn'))
     # masks = np.ones(masks.shape)
     masks = masks[..., np.newaxis] # (nrow, ncol, 1)
     masks = torch.tensor(masks, device=device).float()
@@ -130,6 +130,9 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe']
             )   
         netG_dc.to(device)
+        weights_dict = torch.load(rootName+'/weights/echo_cat=0_solver={}_K=2_loupe=1.pt'
+                                  .format(opt['solver']))
+        netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
