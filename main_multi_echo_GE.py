@@ -135,7 +135,7 @@ if __name__ == '__main__':
         netG_dc.load_state_dict(weights_dict)
 
         # optimizer
-        optimizerG_dc = optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
+        optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
 
         while epoch < niter:
 
