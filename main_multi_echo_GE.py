@@ -6,25 +6,17 @@ import time
 import torch
 import math
 import argparse
+import scipy.io as sio
 import numpy as np
 
+from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
-from utils.data import *
-from models.unet import Unet
-from models.initialization import *
-from models.discriminator import Basic_D
-from utils.train import *
-from IPython.display import clear_output
-from utils.loss import *
-from models.dc_blocks import *
-from models.unet_with_dc import *
-from models.dc_with_prop_mask import *
-from models.dc_with_straight_through_pmask import *
-from models.dc_st_pmask import *
-from models.resnet_with_dc import *
-from utils.test import *
-from utils.operators import *
+from utils.data import save_mat, readcfl, memory_pre_alloc
+from utils.loss import lossL1
+from utils.test import Metrices
+from utils.operators import backward_multiEcho
+from models.resnet_with_dc import Resnet_with_DC2
 
 if __name__ == '__main__':
 
@@ -296,7 +288,8 @@ if __name__ == '__main__':
                     print('Saving sampling mask: %', np.mean(Mask)*100)
                     save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}.mat' \
                             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Mask', Mask)
-                print(idx)
+                if idx % 10 == 0:
+                    print('Finish slice #', idx)
                 kdatas = kdatas.to(device)
                 targets = targets.to(device)
                 csms = csms.to(device)
@@ -312,16 +305,47 @@ if __name__ == '__main__':
                 Recons.append(Xs[-1].cpu().detach())
                 # preconds.append(precond.cpu().detach())
 
-            Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
-            Inputs = np.transpose(Inputs, [0, 2, 3, 1])
-            Targets = r2c(np.concatenate(Targets, axis=0), opt['echo_cat'])
-            Targets = np.transpose(Targets, [0, 2, 3, 1])
-            Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
-            Recons = np.transpose(Recons, [0, 2, 3, 1])
+            # write into .bin file
+            # (200, 2, 10, 206, 80) to (80, 206, 200, 10, 2)
+            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
+            iField[..., 1] = - iField[..., 1]
+            if os.path.exists(rootName+'/results_QSM/iField.bin'):
+                os.remove(rootName+'/results_QSM/iField.bin')
+            iField.tofile(rootName+'/results_QSM/iField.bin')
+            print('Successfully save iField.bin')
 
-            save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
-            save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-            save_mat(rootName+'/results/Recons_echo_cat={}_solver={}_K={}_loupe={}.mat' \
-              .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Recons', Recons)
+            # run MEDIN
+            os.system('medin ' + rootName + '/results_QSM/iField.bin' 
+                    + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                    + ' --temp ' + rootName +  '/results_QSM/'
+                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                    + ' --CSF ' + ' -of QR')
+            
+            # read .bin files and save into .mat files
+            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
+            QSM = np.transpose(QSM.reshape([80, 206, 200]), [2, 1, 0])
+
+            iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
+            iMag = np.transpose(iMag.reshape([80, 206, 200]), [2, 1, 0])
+
+            R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
+            R2star = np.transpose(R2star.reshape([80, 206, 200]), [2, 1, 0])
+
+            adict = {}
+            adict['QSM'], adict['iMag'], adict['R2star'] = QSM, iMag, R2star
+            sio.savemat(rootName+'/results/QSM.mat', adict)
+            
+            # # write into .mat file
+            # Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
+            # Inputs = np.transpose(Inputs, [0, 2, 3, 1])
+            # Targets = r2c(np.concatenate(Targets, axis=0), opt['echo_cat'])
+            # Targets = np.transpose(Targets, [0, 2, 3, 1])
+            # Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
+            # Recons = np.transpose(Recons, [0, 2, 3, 1])
+
+            # save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
+            # save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
+            # save_mat(rootName+'/results/Recons_echo_cat={}_solver={}_K={}_loupe={}.mat' \
+            #   .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Recons', Recons)
 
 
