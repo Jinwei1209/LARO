@@ -130,8 +130,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe']
             )   
         netG_dc.to(device)
-        weights_dict = torch.load(rootName+'/weights/echo_cat=0_solver={}_K=2_loupe=1.pt'
-                                  .format(opt['solver']))
+        weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1.pt'
+                                  .format(opt['echo_cat'], opt['solver']))
         netG_dc.load_state_dict(weights_dict)
 
         # optimizer
