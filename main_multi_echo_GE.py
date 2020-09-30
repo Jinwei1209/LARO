@@ -38,7 +38,7 @@ if __name__ == '__main__':
     
     # typein parameters
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
-    parser.add_argument('--gpu_id', type=str, default='1')
+    parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--solver', type=int, default=0)  # 0 for deep Quasi-newton, 1 for deep ADMM,
