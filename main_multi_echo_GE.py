@@ -12,7 +12,7 @@ import numpy as np
 from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
-from utils.data import save_mat, readcfl, memory_pre_alloc
+from utils.data import save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate
 from utils.loss import lossL1
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
@@ -130,9 +130,10 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe']
             )   
         netG_dc.to(device)
-        weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1.pt'
-                                  .format(opt['echo_cat'], opt['solver']))
-        netG_dc.load_state_dict(weights_dict)
+        if opt['loupe'] == 0:
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1.pt'
+                                    .format(opt['echo_cat'], opt['solver']))
+            netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -300,16 +301,21 @@ if __name__ == '__main__':
 
                 inputs = backward_multiEcho(kdatas, csms, masks, flip,
                                             opt['echo_cat'])
-                Xs = netG_dc(kdatas, csms, masks, flip)
+                Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
                 precond = netG_dc.precond
+                if opt['echo_cat']:
+                    targets = torch_channel_deconcate(targets)
+                    inputs = torch_channel_deconcate(inputs)
+                    Xs_1 = torch_channel_deconcate(Xs_1)
 
                 Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
-                Recons.append(Xs[-1].cpu().detach())
+                Recons.append(Xs_1.cpu().detach())
                 # preconds.append(precond.cpu().detach())
 
             # write into .bin file
             # (200, 2, 10, 206, 80) to (80, 206, 200, 10, 2)
+            print(np.concatenate(Recons, axis=0).shape)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             iField[..., 1] = - iField[..., 1]
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
