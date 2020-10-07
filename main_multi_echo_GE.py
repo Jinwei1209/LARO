@@ -45,7 +45,7 @@ if __name__ == '__main__':
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--K', type=int, default=5)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  # 1: same mask across echos, 2: mask for each echo
-    
+    parser.add_argument('--samplingRatio', type=float, default=0.2)
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
@@ -60,21 +60,24 @@ if __name__ == '__main__':
     rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # load mask
-    masks = np.real(readcfl(rootName+'/megre_slice_GE/mask_nn'))
-    # masks = np.ones(masks.shape)
-    masks = masks[..., np.newaxis] # (nrow, ncol, 1)
-    masks = torch.tensor(masks, device=device).float()
-    # to complex data
-    masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, 2)
-    # add echo dimension
-    masks = masks[None, ...] # (1, nrow, ncol, 2)
-    masks = torch.cat(necho*[masks]) # (necho, nrow, ncol, 2)
-    # add coil dimension
-    masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
-    masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
-    # add batch dimension
-    masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+    if opt['loupe'] == 0:
+        # load mask
+        masks = np.real(readcfl(rootName+'/megre_slice_GE/mask_{}'.format(opt['samplingRatio'])))
+        # masks = np.ones(masks.shape)
+        masks = masks[..., np.newaxis] # (nrow, ncol, 1)
+        masks = torch.tensor(masks, device=device).float()
+        # to complex data
+        masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, 2)
+        # add echo dimension
+        masks = masks[None, ...] # (1, nrow, ncol, 2)
+        masks = torch.cat(necho*[masks]) # (necho, nrow, ncol, 2)
+        # add coil dimension
+        masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+        masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+        # add batch dimension
+        masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+    else:
+        masks = []
  
     # flip matrix
     flip = torch.ones([necho, nrow, ncol, 1]) 
@@ -116,7 +119,8 @@ if __name__ == '__main__':
                 echo_cat=1,
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
-                flag_loupe=opt['loupe']
+                flag_loupe=opt['loupe'],
+                samplingRatio=opt['samplingRatio']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -127,12 +131,13 @@ if __name__ == '__main__':
                 echo_cat=0,
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
-                flag_loupe=opt['loupe']
+                flag_loupe=opt['loupe'],
+                samplingRatio=opt['samplingRatio']
             )   
         netG_dc.to(device)
         if opt['loupe'] == 0:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1.pt'
-                                    .format(opt['echo_cat'], opt['solver']))
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}.pt'
+                                    .format(opt['echo_cat'], opt['solver'], opt['samplingRatio']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -237,8 +242,8 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}.pt' \
-                           .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}.pt' \
+                           .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']))
 
     
     # for test
@@ -252,7 +257,8 @@ if __name__ == '__main__':
                 echo_cat=1,
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
-                flag_loupe=opt['loupe']
+                flag_loupe=opt['loupe'],
+                samplingRatio=opt['samplingRatio']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -263,11 +269,13 @@ if __name__ == '__main__':
                 echo_cat=0,
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
-                flag_loupe=opt['loupe']
+                flag_loupe=opt['loupe'],
+                samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}.pt' \
-                                .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']))
-        netG_dc.load_state_dict(weights_dict)
+        if opt['solver'] < 2:
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}.pt' \
+                                    .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']))
+            netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
 
@@ -290,8 +298,8 @@ if __name__ == '__main__':
                 if idx == 1 and opt['loupe'] > 0:
                     Mask = netG_dc.Mask.cpu().detach().numpy()
                     print('Saving sampling mask: %', np.mean(Mask)*100)
-                    save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}.mat' \
-                            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Mask', Mask)
+                    save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}_ratio={}.mat' \
+                            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
                 if idx % 10 == 0:
                     print('Finish slice #', idx)
                 kdatas = kdatas.to(device)
@@ -342,7 +350,7 @@ if __name__ == '__main__':
 
             adict = {}
             adict['QSM'], adict['iMag'], adict['R2star'] = QSM, iMag, R2star
-            sio.savemat(rootName+'/results/QSM.mat', adict)
+            sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
             
             # # write into .mat file
             # Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
