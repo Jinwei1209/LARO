@@ -196,7 +196,8 @@ class Resnet_with_DC2(nn.Module):
                 masks[:, :, echo, ...] = self.generateMask(self.weight_parameters[echo, ...])[:, :, echo, ...]
             self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters)).permute(1, 2, 0)
             self.Mask = masks[0, 0, :, :, :, 0].permute(1, 2, 0)
-
+        else:
+            self.Mask = masks[0, 0, 0, :, :, 0]
         # input
         x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat)
         x_start = x

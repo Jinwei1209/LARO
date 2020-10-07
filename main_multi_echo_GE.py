@@ -44,8 +44,10 @@ if __name__ == '__main__':
     parser.add_argument('--solver', type=int, default=0)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--K', type=int, default=5)  # number of unrolls
-    parser.add_argument('--loupe', type=int, default=0)  # 1: same mask across echos, 2: mask for each echo
+    parser.add_argument('--loupe', type=int, default=0)  #-1: manually designed mask, 0 fixed learned mask
+                                                         # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
     parser.add_argument('--samplingRatio', type=float, default=0.2)
+
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
@@ -60,9 +62,14 @@ if __name__ == '__main__':
     rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if opt['loupe'] == 0:
-        # load mask
-        masks = np.real(readcfl(rootName+'/megre_slice_GE/mask_{}'.format(opt['samplingRatio'])))
+    if opt['loupe'] == -1:
+        # load manually designed mask
+        masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
+    elif opt['loupe'] == 0:
+        # load fixed loupe optimized mask
+        masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
+        
+    if opt['loupe'] < 1:
         # masks = np.ones(masks.shape)
         masks = masks[..., np.newaxis] # (nrow, ncol, 1)
         masks = torch.tensor(masks, device=device).float()
@@ -135,7 +142,7 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )   
         netG_dc.to(device)
-        if opt['loupe'] == 0:
+        if opt['loupe'] < 1:
             weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}.pt'
                                     .format(opt['echo_cat'], opt['solver'], opt['samplingRatio']))
             netG_dc.load_state_dict(weights_dict)
@@ -163,9 +170,11 @@ if __name__ == '__main__':
                     print('echo_cat: {}, solver: {}, K: {}, loupe: {}'.format( \
                             opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']))
                     
-                    if opt['loupe']:
+                    if opt['loupe'] > 0:
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
                         % (torch.mean(netG_dc.Mask), netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
+                    else:
+                        print('Sampling ratio cal: %f' % (torch.mean(netG_dc.Mask)))
 
                     if opt['solver'] < 3:
                         print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f'
@@ -300,6 +309,8 @@ if __name__ == '__main__':
                     print('Saving sampling mask: %', np.mean(Mask)*100)
                     save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}_ratio={}.mat' \
                             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
+                if idx == 1:
+                    print('Sampling ratio: {}%'.format(torch.mean(netG_dc.Mask)*100))
                 if idx % 10 == 0:
                     print('Finish slice #', idx)
                 kdatas = kdatas.to(device)
@@ -348,10 +359,16 @@ if __name__ == '__main__':
             R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
             R2star = np.transpose(R2star.reshape([80, 206, 200]), [2, 1, 0])
 
+            Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
+            Mask = np.transpose(Mask.reshape([80, 206, 200]), [2, 1, 0]) > 0
+
             adict = {}
-            adict['QSM'], adict['iMag'], adict['R2star'] = QSM, iMag, R2star
-            sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
-            
+            adict['QSM'], adict['iMag'] = QSM, iMag
+            adict['R2star'], adict['Mask'] = R2star, Mask
+            if opt['loupe'] == -1:
+                sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
+            elif opt['loupe'] == 0:
+                sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
             # # write into .mat file
             # Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
             # Inputs = np.transpose(Inputs, [0, 2, 3, 1])
