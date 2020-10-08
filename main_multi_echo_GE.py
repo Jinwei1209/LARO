@@ -318,16 +318,16 @@ if __name__ == '__main__':
                 csms = csms.to(device)
                 brain_masks = brain_masks.to(device)
 
-                inputs = backward_multiEcho(kdatas, csms, masks, flip,
-                                            opt['echo_cat'])
+                # inputs = backward_multiEcho(kdatas, csms, masks, flip,
+                                            # opt['echo_cat'])
                 Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
                 precond = netG_dc.precond
                 if opt['echo_cat']:
                     targets = torch_channel_deconcate(targets)
-                    inputs = torch_channel_deconcate(inputs)
+                    # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
 
-                Inputs.append(inputs.cpu().detach())
+                # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
                 # preconds.append(precond.cpu().detach())
@@ -367,7 +367,7 @@ if __name__ == '__main__':
             adict['R2star'], adict['Mask'] = R2star, Mask
             if opt['loupe'] == -1:
                 sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
-            elif opt['loupe'] == 0:
+            else:
                 sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
             # # write into .mat file
             # Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
