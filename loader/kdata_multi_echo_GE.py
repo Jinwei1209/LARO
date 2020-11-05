@@ -21,7 +21,6 @@ class kdata_multi_echo_GE(data.Dataset):
         'val': ['0', '200'],
         # 'val': ['300', '350'],
         'test': ['800', '1000']  
-        # 'test': ['300', '350']
     }
     
 

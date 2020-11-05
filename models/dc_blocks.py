@@ -34,6 +34,15 @@ def conj_in_cg(a):
     out = torch.cat([a[:,0:1,...], -a[:,1:2,...]], dim=1)
     return out
 
+def dvd_in_cg(a, b):
+    """
+        division between a and b (with the second dim = 2, representing real and imaginary parts)
+    """
+    denom0 = mlpy_in_cg(conj_in_cg(b), b)[:,0:1,...]
+    denom = torch.cat([denom0, denom0], dim=1)
+    out = mlpy_in_cg(conj_in_cg(b), a) / denom
+    return out
+
 # complex valued CG layer
 class DC_layer():
     def __init__(self, A, rhs, flag_precond=0, precond=0, use_dll2=1):

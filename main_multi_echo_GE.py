@@ -12,11 +12,12 @@ import numpy as np
 from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
-from utils.data import save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate
+from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate
 from utils.loss import lossL1
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
+from fits.fits import fit_R2_LM
 
 if __name__ == '__main__':
 
@@ -290,6 +291,8 @@ if __name__ == '__main__':
 
         Inputs = []
         Targets = []
+        R2s = []
+        water = []
         Recons = []
         preconds = []
 
@@ -326,15 +329,31 @@ if __name__ == '__main__':
                     targets = torch_channel_deconcate(targets)
                     # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
+                    y = fit_R2_LM(targets)
 
                 # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
+                R2s.append(y[:, 0, ...].cpu().detach())
+                water.append(y[:, 2, ...].cpu().detach())
                 # preconds.append(precond.cpu().detach())
+
+            # write into .mat file
+            Targets = np.squeeze(r2c(np.concatenate(Targets, axis=0), opt['echo_cat']))
+            Targets = np.transpose(Targets, [0, 2, 3, 1])
+            save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
+
+            # write R2s into .mat file
+            R2s = np.concatenate(R2s, axis=0)
+            save_mat(rootName+'/results/R2s.mat', 'R2s', R2s)
+
+            # write water into .mat file
+            water = np.concatenate(water, axis=0)
+            save_mat(rootName+'/results/water.mat', 'water', water)
 
             # write into .bin file
             # (200, 2, 10, 206, 80) to (80, 206, 200, 10, 2)
-            print(np.concatenate(Recons, axis=0).shape)
+            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             iField[..., 1] = - iField[..., 1]
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
@@ -342,33 +361,39 @@ if __name__ == '__main__':
             iField.tofile(rootName+'/results_QSM/iField.bin')
             print('Successfully save iField.bin')
 
-            # run MEDIN
-            os.system('medin ' + rootName + '/results_QSM/iField.bin' 
-                    + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-                    + ' --temp ' + rootName +  '/results_QSM/'
-                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                    + ' --CSF ' + ' -of QR')
+            # # run MEDIN
+            # os.system('medin ' + rootName + '/results_QSM/iField.bin' 
+            #         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+            #         + ' --temp ' + rootName +  '/results_QSM/'
+            #         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+            #         + ' --CSF ' + ' -of QR')
             
-            # read .bin files and save into .mat files
-            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
-            QSM = np.transpose(QSM.reshape([80, 206, 200]), [2, 1, 0])
+            # # read .bin files and save into .mat files
+            # QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
+            # QSM = np.transpose(QSM.reshape([80, 206, 200]), [2, 1, 0])
 
-            iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
-            iMag = np.transpose(iMag.reshape([80, 206, 200]), [2, 1, 0])
+            # iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
+            # iMag = np.transpose(iMag.reshape([80, 206, 200]), [2, 1, 0])
 
-            R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
-            R2star = np.transpose(R2star.reshape([80, 206, 200]), [2, 1, 0])
+            # RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
+            # RDF = np.transpose(RDF.reshape([80, 206, 200]), [2, 1, 0])
 
-            Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
-            Mask = np.transpose(Mask.reshape([80, 206, 200]), [2, 1, 0]) > 0
+            # R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
+            # R2star = np.transpose(R2star.reshape([80, 206, 200]), [2, 1, 0])
 
-            adict = {}
-            adict['QSM'], adict['iMag'] = QSM, iMag
-            adict['R2star'], adict['Mask'] = R2star, Mask
-            if opt['loupe'] == -1:
-                sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
-            else:
-                sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
+            # Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
+            # Mask = np.transpose(Mask.reshape([80, 206, 200]), [2, 1, 0]) > 0
+
+            # adict = {}
+            # adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
+            # adict['R2star'], adict['Mask'] = R2star, Mask
+            # if opt['loupe'] == -1:
+            #     sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
+            # else:
+            #     sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
+            
+            
+            
             # # write into .mat file
             # Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
             # Inputs = np.transpose(Inputs, [0, 2, 3, 1])
