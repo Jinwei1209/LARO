@@ -47,6 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--K', type=int, default=5)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  #-1: manually designed mask, 0 fixed learned mask
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
+    parser.add_argument('--1d_type', type=str, default='shear')  # sampling type of 1D mask
     parser.add_argument('--samplingRatio', type=float, default=0.2)
 
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
@@ -65,20 +66,35 @@ if __name__ == '__main__':
 
     if opt['loupe'] == -1:
         # load manually designed mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_{}'.format(opt['samplingRatio'], opt['1d_type'])))
     elif opt['loupe'] == 0:
         # load fixed loupe optimized mask
         masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
         
     if opt['loupe'] < 1:
-        # masks = np.ones(masks.shape)
-        masks = masks[..., np.newaxis] # (nrow, ncol, 1)
+        # # for 2D random sampling
+        # masks = masks[..., np.newaxis] # (nrow, ncol, 1)
+        # masks = torch.tensor(masks, device=device).float()
+        # # to complex data
+        # masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, 2)
+        # # add echo dimension
+        # masks = masks[None, ...] # (1, nrow, ncol, 2)
+        # masks = torch.cat(necho*[masks]) # (necho, nrow, ncol, 2)
+        # # add coil dimension
+        # masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+        # masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+        # # add batch dimension
+        # masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+
+        # for 1D recon
+        masks = masks[..., np.newaxis] # (nrow, ncol, necho, 1)
+        masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
         masks = torch.tensor(masks, device=device).float()
         # to complex data
-        masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, 2)
-        # add echo dimension
-        masks = masks[None, ...] # (1, nrow, ncol, 2)
-        masks = torch.cat(necho*[masks]) # (necho, nrow, ncol, 2)
+        masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, necho, 2)
+        # permute echo dimension
+        masks = masks.permute(2, 0, 1, 3) # (necho, nrow, ncol, 2)
         # add coil dimension
         masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
         masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
@@ -143,10 +159,10 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )   
         netG_dc.to(device)
-        if opt['loupe'] < 1:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}.pt'
-                                    .format(opt['echo_cat'], opt['solver'], opt['samplingRatio']))
-            netG_dc.load_state_dict(weights_dict)
+        # if opt['loupe'] < 1:
+        #     weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}.pt'
+        #                             .format(opt['echo_cat'], opt['solver'], opt['samplingRatio']))
+        #     netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -252,8 +268,8 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}.pt' \
-                           .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}.pt' \
+                           .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['1d_type']))
 
     
     # for test
