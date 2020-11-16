@@ -73,33 +73,38 @@ if __name__ == '__main__':
         masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
         
     if opt['loupe'] < 1:
-        # # for 2D random sampling
+        # # for 2D random sampling 
         # masks = masks[..., np.newaxis] # (nrow, ncol, 1)
-        # masks = torch.tensor(masks, device=device).float()
-        # # to complex data
-        # masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, 2)
-        # # add echo dimension
-        # masks = masks[None, ...] # (1, nrow, ncol, 2)
-        # masks = torch.cat(necho*[masks]) # (necho, nrow, ncol, 2)
-        # # add coil dimension
-        # masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
-        # masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
-        # # add batch dimension
-        # masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
-
-        # for 1D recon
-        masks = masks[..., np.newaxis] # (nrow, ncol, necho, 1)
+        
+        # for 1D echo-identical sampling
+        masks = masks[..., 0, np.newaxis] # (nrow, ncol, 1)
         masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
+
         masks = torch.tensor(masks, device=device).float()
         # to complex data
-        masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, necho, 2)
-        # permute echo dimension
-        masks = masks.permute(2, 0, 1, 3) # (necho, nrow, ncol, 2)
+        masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, 2)
+        # add echo dimension
+        masks = masks[None, ...] # (1, nrow, ncol, 2)
+        masks = torch.cat(necho*[masks]) # (necho, nrow, ncol, 2)
         # add coil dimension
         masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
         masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
         # add batch dimension
         masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+
+        # # for 1D recon
+        # masks = masks[..., np.newaxis] # (nrow, ncol, necho, 1)
+        # masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
+        # masks = torch.tensor(masks, device=device).float()
+        # # to complex data
+        # masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, necho, 2)
+        # # permute echo dimension
+        # masks = masks.permute(2, 0, 1, 3) # (necho, nrow, ncol, 2)
+        # # add coil dimension
+        # masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+        # masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+        # # add batch dimension
+        # masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
     else:
         masks = []
  
