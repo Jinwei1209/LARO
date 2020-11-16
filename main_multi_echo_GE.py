@@ -47,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--K', type=int, default=5)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  #-1: manually designed mask, 0 fixed learned mask
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
-    parser.add_argument('--1d_type', type=str, default='shear')  # sampling type of 1D mask
+    parser.add_argument('--1d_type', type=str, default='shear')  # 'shear' or 'random' sampling type of 1D mask
     parser.add_argument('--samplingRatio', type=float, default=0.2)
 
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
         # for 1D recon
         masks = masks[..., np.newaxis] # (nrow, ncol, necho, 1)
-        masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
+        masks[nrow//2-13:nrow//2+12, ...] = 1 # add calibration region
         masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, necho, 2)
@@ -269,7 +269,7 @@ if __name__ == '__main__':
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
                 torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}.pt' \
-                           .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['1d_type']))
+                    .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['1d_type']))
 
     
     # for test
@@ -300,7 +300,7 @@ if __name__ == '__main__':
             )
         if opt['solver'] < 2:
             weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}.pt' \
-                                    .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']))
+                            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['1d_type']))
             netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -377,36 +377,36 @@ if __name__ == '__main__':
             iField.tofile(rootName+'/results_QSM/iField.bin')
             print('Successfully save iField.bin')
 
-            # # run MEDIN
-            # os.system('medin ' + rootName + '/results_QSM/iField.bin' 
-            #         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-            #         + ' --temp ' + rootName +  '/results_QSM/'
-            #         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-            #         + ' --CSF ' + ' -of QR')
+            # run MEDIN
+            os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                    + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                    + ' --temp ' + rootName +  '/results_QSM/'
+                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                    + ' --CSF ' + ' -of QR')
             
-            # # read .bin files and save into .mat files
-            # QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
-            # QSM = np.transpose(QSM.reshape([80, 206, 200]), [2, 1, 0])
+            # read .bin files and save into .mat files
+            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
+            QSM = np.transpose(QSM.reshape([80, 206, 200]), [2, 1, 0])
 
-            # iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
-            # iMag = np.transpose(iMag.reshape([80, 206, 200]), [2, 1, 0])
+            iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
+            iMag = np.transpose(iMag.reshape([80, 206, 200]), [2, 1, 0])
 
-            # RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
-            # RDF = np.transpose(RDF.reshape([80, 206, 200]), [2, 1, 0])
+            RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
+            RDF = np.transpose(RDF.reshape([80, 206, 200]), [2, 1, 0])
 
-            # R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
-            # R2star = np.transpose(R2star.reshape([80, 206, 200]), [2, 1, 0])
+            R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
+            R2star = np.transpose(R2star.reshape([80, 206, 200]), [2, 1, 0])
 
-            # Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
-            # Mask = np.transpose(Mask.reshape([80, 206, 200]), [2, 1, 0]) > 0
+            Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
+            Mask = np.transpose(Mask.reshape([80, 206, 200]), [2, 1, 0]) > 0
 
-            # adict = {}
-            # adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
-            # adict['R2star'], adict['Mask'] = R2star, Mask
-            # if opt['loupe'] == -1:
-            #     sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
-            # else:
-            #     sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
+            adict = {}
+            adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
+            adict['R2star'], adict['Mask'] = R2star, Mask
+            if opt['loupe'] == -1:
+                sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
+            else:
+                sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
             
             
             
