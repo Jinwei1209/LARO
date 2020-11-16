@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
         # for 1D recon
         masks = masks[..., np.newaxis] # (nrow, ncol, necho, 1)
-        masks[nrow//2-13:nrow//2+12, ...] = 1 # add calibration region
+        masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
         masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (nrow, ncol, necho, 2)
