@@ -10,7 +10,9 @@ from utils.operators import *
 
 
 class MultiEchoSimu(data.Dataset):
-
+    '''
+        Dataloader of temporal undersampled multi-echo GRE data from Siemens Scanner
+    '''
     def __init__(self,
         rootDir = '/data/Jinwei/Multi_echo_kspace/dataset',
         subject_IDs = ['MS1'],

@@ -22,7 +22,7 @@ from fits.fits import fit_R2_LM
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 500
+    niter = 100
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -42,11 +42,13 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
-    parser.add_argument('--solver', type=int, default=0)  # 0 for deep Quasi-newton, 1 for deep ADMM,
+    parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--K', type=int, default=5)  # number of unrolls
+    parser.add_argument('--K', type=int, default=10)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  #-1: manually designed mask, 0 fixed learned mask
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
+    parser.add_argument('--norm_last', type=int, default=0)  # 0: norm+relu, 1: relu+norm
+    parser.add_argument('--temporal_conv', type=int, default=0) # 0: no temporal, 1: center, 2: begining
     parser.add_argument('--1d_type', type=str, default='shear')  # 'shear' or 'random' sampling type of 1D mask
     parser.add_argument('--samplingRatio', type=float, default=0.2)
 
@@ -56,6 +58,8 @@ if __name__ == '__main__':
     parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     opt = {**vars(parser.parse_args())}
     K = opt['K']
+    norm_last = opt['norm_last']
+    flag_temporal_conv = opt['temporal_conv']
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -66,19 +70,19 @@ if __name__ == '__main__':
 
     if opt['loupe'] == -1:
         # load manually designed mask
-        # masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_{}'.format(opt['samplingRatio'], opt['1d_type'])))
+        masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_{}'.format(opt['samplingRatio'], opt['1d_type'])))
     elif opt['loupe'] == 0:
         # load fixed loupe optimized mask
         masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
         
     if opt['loupe'] < 1:
-        # # for 2D random sampling 
-        # masks = masks[..., np.newaxis] # (nrow, ncol, 1)
+        # for 2D random sampling 
+        masks = masks[..., np.newaxis] # (nrow, ncol, 1)
         
-        # for 1D echo-identical sampling
-        masks = masks[..., 0, np.newaxis] # (nrow, ncol, 1)
-        masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
+        # # for 1D echo-identical sampling
+        # masks = masks[..., 0, np.newaxis] # (nrow, ncol, 1)
+        # masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
 
         masks = torch.tensor(masks, device=device).float()
         # to complex data
@@ -92,7 +96,7 @@ if __name__ == '__main__':
         # add batch dimension
         masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
 
-        # # for 1D recon
+        # # for 1D sampling
         # masks = masks[..., np.newaxis] # (nrow, ncol, necho, 1)
         # masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
         # masks = torch.tensor(masks, device=device).float()
@@ -118,7 +122,7 @@ if __name__ == '__main__':
 
     # training
     if opt['flag_train'] == 1:
-        memory_pre_alloc(opt['gpu_id'])
+        # memory_pre_alloc(opt['gpu_id'])
         lossl1 = lossL1()
 
         dataLoader = kdata_multi_echo_GE(
@@ -149,7 +153,9 @@ if __name__ == '__main__':
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe'],
-                samplingRatio=opt['samplingRatio']
+                samplingRatio=opt['samplingRatio'],
+                norm_last=norm_last,
+                flag_temporal_conv=flag_temporal_conv
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -162,12 +168,12 @@ if __name__ == '__main__':
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
-            )   
+            )
         netG_dc.to(device)
-        # if opt['loupe'] < 1:
-        #     weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}.pt'
-        #                             .format(opt['echo_cat'], opt['solver'], opt['samplingRatio']))
-        #     netG_dc.load_state_dict(weights_dict)
+        if opt['loupe'] < 1:
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}_{}{}.pt'
+                        .format(opt['echo_cat'], opt['solver'], opt['samplingRatio'], norm_last, flag_temporal_conv))
+            netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -179,7 +185,7 @@ if __name__ == '__main__':
             # training phase
             netG_dc.train()
             metrices_train = Metrices()
-            for idx, (kdatas, targets, csms, brain_masks) in enumerate(trainLoader):
+            for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(trainLoader):
 
                 if torch.sum(brain_masks) == 0:
                     continue
@@ -214,9 +220,13 @@ if __name__ == '__main__':
                     print(' ')
 
                     errL2_dc_sum = 0
+
+                # # check target and target_gen
+                # save_mat(rootName+'/results/targets.mat', 'targets', targets.numpy())
+                # save_mat(rootName+'/results/targets_gen.mat', 'targets_gen', targets_gen.numpy())
                 
                 kdatas = kdatas.to(device)
-                targets = targets.to(device)
+                targets = targets_gen.to(device)
                 csms = csms.to(device)
                 brain_masks = brain_masks.to(device)
 
@@ -245,13 +255,13 @@ if __name__ == '__main__':
             metrices_val = Metrices()
             loss_total_list = []
             with torch.no_grad():  # to solve memory exploration issue
-                for idx, (kdatas, targets, csms, brain_masks) in enumerate(valLoader):
+                for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(valLoader):
 
                     if torch.sum(brain_masks) == 0:
                         continue
 
                     kdatas = kdatas.to(device)
-                    targets = targets.to(device)
+                    targets = targets_gen.to(device)
                     csms = csms.to(device)
                     brain_masks = brain_masks.to(device)
 
@@ -261,9 +271,11 @@ if __name__ == '__main__':
                     targets = np.asarray(targets.cpu().detach())
                     brain_masks = np.asarray(brain_masks.cpu().detach())
                     temp = 0
-                    for i in range(len(Xs)):
-                        X = np.asarray(Xs[i].cpu().detach())
-                        temp += abs(X - targets) * brain_masks
+                    # for i in range(len(Xs)):
+                    #     X = np.asarray(Xs[i].cpu().detach())
+                    #     temp += abs(X - targets) * brain_masks
+                    X = np.asarray(Xs[-1].cpu().detach())
+                    temp += abs(X - targets) * brain_masks
                     lossl2_sum = np.mean(temp)
                     loss_total_list.append(lossl2_sum)
 
@@ -273,8 +285,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}.pt' \
-                    .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['1d_type']))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
+                .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
+            torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_last.pt' \
+            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
 
     
     # for test
@@ -289,7 +303,9 @@ if __name__ == '__main__':
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe'],
-                samplingRatio=opt['samplingRatio']
+                samplingRatio=opt['samplingRatio'],
+                norm_last=norm_last,
+                flag_temporal_conv=flag_temporal_conv
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -304,8 +320,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         if opt['solver'] < 2:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}.pt' \
-                            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['1d_type']))
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
+            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
             netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -327,7 +343,7 @@ if __name__ == '__main__':
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
         with torch.no_grad():
-            for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
+            for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(testLoader):
                 if idx == 1 and opt['loupe'] > 0:
                     Mask = netG_dc.Mask.cpu().detach().numpy()
                     print('Saving sampling mask: %', np.mean(Mask)*100)
@@ -350,32 +366,36 @@ if __name__ == '__main__':
                     targets = torch_channel_deconcate(targets)
                     # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
-                    y = fit_R2_LM(targets)
+                    # y = fit_R2_LM(targets)
 
                 # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
-                R2s.append(y[:, 0, ...].cpu().detach())
-                water.append(y[:, 2, ...].cpu().detach())
+                # R2s.append(y[:, 0, ...].cpu().detach())
+                # water.append(y[:, 2, ...].cpu().detach())
                 # preconds.append(precond.cpu().detach())
 
             # write into .mat file
-            Targets = np.squeeze(r2c(np.concatenate(Targets, axis=0), opt['echo_cat']))
-            Targets = np.transpose(Targets, [0, 2, 3, 1])
-            save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
+            Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
+            Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
+            if opt['loupe'] == -1:
+                save_mat(rootName+'/results/iField_{}m.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
+            elif opt['loupe'] == 0:
+                save_mat(rootName+'/results/iField_{}.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
 
-            # write R2s into .mat file
-            R2s = np.concatenate(R2s, axis=0)
-            save_mat(rootName+'/results/R2s.mat', 'R2s', R2s)
+            # # write R2s into .mat file
+            # R2s = np.concatenate(R2s, axis=0)
+            # save_mat(rootName+'/results/R2s.mat', 'R2s', R2s)
 
-            # write water into .mat file
-            water = np.concatenate(water, axis=0)
-            save_mat(rootName+'/results/water.mat', 'water', water)
+            # # write water into .mat file
+            # water = np.concatenate(water, axis=0)
+            # save_mat(rootName+'/results/water.mat', 'water', water)
 
             # write into .bin file
             # (200, 2, 10, 206, 80) to (80, 206, 200, 10, 2)
             print('iField size is: ', np.concatenate(Recons, axis=0).shape)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
+            iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
             iField[..., 1] = - iField[..., 1]
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
                 os.remove(rootName+'/results_QSM/iField.bin')
@@ -411,7 +431,7 @@ if __name__ == '__main__':
             if opt['loupe'] == -1:
                 sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
             else:
-                sio.savemat(rootName+'/results/QSM_{}.mat'.format(opt['samplingRatio']), adict)
+                sio.savemat(rootName+'/results/QSM_{}_temporal.mat'.format(opt['samplingRatio']), adict)
             
             
             

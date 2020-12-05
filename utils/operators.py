@@ -443,7 +443,9 @@ class OperatorsMultiEcho():
         R_2,
         phi_0,
         f,
-        num_echos=3
+        num_echos=3,
+        te1=0.003224, # 0.0043 for Siemens, 0.003224 for GE
+        delta_te=0.003884  # 0.0048 for Siemens, 0.003884 for GE
     ):
         self.device = M_0.get_device()
         self.num_samples = M_0.shape[0]
@@ -457,8 +459,8 @@ class OperatorsMultiEcho():
         self.f = f.repeat(1, self.num_echos, 1, 1)
         
         # time slots for multi-echo data
-        self.time_intervals = torch.arange(1, self.num_echos+1) * 0.0048
-        self.time_intervals[0] = 0.0043
+        self.time_intervals = torch.arange(0, self.num_echos) * delta_te
+        self.time_intervals += te1
         self.time_intervals = self.time_intervals[None, :, None, None].float()
         self.time_intervals = self.time_intervals.repeat(self.num_samples, 
                               1, self.num_rows, self.num_cols).to(self.device)

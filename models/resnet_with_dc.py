@@ -76,6 +76,8 @@ class Resnet_with_DC2(nn.Module):
                         # 2 for TV Quasi-newton, 3 for TV ADMM.
         flag_precond=0, # flag to use the preconditioner in the CG layer
         flag_loupe=0, # 1: same mask across echos, 2: mask for each echo
+        norm_last=0, # put normalization after relu
+        flag_temporal_conv=0,
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -104,8 +106,9 @@ class Resnet_with_DC2(nn.Module):
 
         if self.flag_solver <= 1:
             if self.echo_cat == 1:
-                layers = ResBlock(input_channels, filter_channels, \
-                                output_dim=input_channels, use_norm=2)
+                layers = ResBlock(input_channels, filter_channels, output_dim=input_channels, \
+                                  use_norm=2, norm_last=norm_last, flag_temporal_conv=flag_temporal_conv)
+                # self.resnet_block = MultiBranch(input_channels, filter_channels, output_dim=input_channels)
             elif self.echo_cat == 0:
                 layers = ResBlock_3D(input_channels, filter_channels, \
                                 output_dim=input_channels, use_norm=2)

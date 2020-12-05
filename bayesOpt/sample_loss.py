@@ -44,7 +44,7 @@ def gen_pattern(a, b, num_row=256, num_col=192, r_spacing=3):
     for k in range(M_c//r_spacing + 1):
         p_pattern[distances_orders == k] = np.exp(-(b*k/n)**a)
     p_pattern = p_pattern.reshape(num_row, num_col)
-    p_pattern[M_c-13:M_c+12, N_c-13:N_c+12] = 1
+    # p_pattern[M_c-13:M_c+12, N_c-13:N_c+12] = 1
     return p_pattern
 
 def recon_loss(params, data_loader, sampling_ratio=0.1, K=5, save_name=None):

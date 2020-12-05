@@ -21,8 +21,6 @@ class MultiEchoDC(nn.Module):
         filter_channels,
         num_echos,
         lambda_dll2,
-        norm_means,  # means for normalization
-        norm_stds,  # stds for normalization
         K=1,
         flag_model=1  # 0: Unet, 1: unrolled unet, 2: unrolled resnet
     ):
@@ -82,9 +80,7 @@ class MultiEchoDC(nn.Module):
         self.num_echos = num_echos
         self.K = K
         self.lambda_dll2 = nn.Parameter(torch.Tensor(lambda_dll2), requires_grad=False).float()
-        self.gd_stepsize = nn.Parameter(torch.ones(1)*5, requires_grad=False).float()
-        self.norm_means = torch.Tensor(norm_means).cuda()
-        self.norm_stds = torch.Tensor(norm_stds).cuda()
+        self.gd_stepsize = nn.Parameter(torch.ones(1), requires_grad=False).float()
 
     # def forward(self, mask, csm, kdata, mag, phase):
     #     device = kdata.get_device()
@@ -126,7 +122,10 @@ class MultiEchoDC(nn.Module):
 
     #     return para_start, paras, paras
 
-    def forward(self, inputs, iField):
+    def forward(self, inputs, iField, norm_means, norm_stds):
+        # self.norm_means = torch.Tensor(norm_means).cuda()  # for Siemens
+        # self.norm_stds = torch.Tensor(norm_stds).cuda()  # for Siemens
+        self.norm_means, self.norm_stds = norm_means, norm_stds  # for GE
         device = inputs.get_device()
         paras, paras_prior = [], []
         para = torch.cat((inputs[:, 1:2, ...], inputs[:, 3:4, ...]), dim=1)
@@ -154,19 +153,22 @@ class MultiEchoDC(nn.Module):
                 gradient_prior_f = lambda_dll2[3] * (f - f_prior)
 
                 # generate fidelity operator
-                operators = OperatorsMultiEcho(M_0, R_2, phi_0, f, num_echos=self.num_echos)
+                operators = OperatorsMultiEcho(torch.clone(M_0), torch.clone(R_2), 
+                                               torch.clone(phi_0), torch.clone(f), num_echos=self.num_echos)
 
                 # calculate fidelity gradient
                 gradient_fidelity_R_2 = operators.jacobian_conj(operators.forward_operator() - iField, flag=2)
                 gradient_fidelity_f = operators.jacobian_conj(operators.forward_operator() - iField, flag=4)
                 
                 # total gradient
-                gradient_total_R_2 = gradient_prior_R_2  # + gradient_fidelity_R_2
-                gradient_total_f = gradient_prior_f  # + gradient_fidelity_f
+                gradient_total_R_2 = gradient_prior_R_2  + gradient_fidelity_R_2
+                gradient_total_f = gradient_prior_f  + gradient_fidelity_f
+                gradient_total = torch.cat((gradient_total_R_2, gradient_total_f), dim=1)
                 
                 # gradient descent step
-                para[:, 0:1, ...] = para[:, 0:1, ...] - gd_stepsize/(k+1) * gradient_total_R_2
-                para[:, 1:2, ...] = para[:, 1:2, ...] - gd_stepsize/(k+1) * gradient_total_f
+                # para[:, 0:1, ...] = para[:, 0:1, ...] - gd_stepsize/(k+1) * gradient_total_R_2
+                # para[:, 1:2, ...] = para[:, 1:2, ...] - gd_stepsize/(k+1) * gradient_total_f
+                para = para - gd_stepsize/(k+1) * gradient_total
 
                 paras.append(para)
                 paras_prior.append(para_prior)
@@ -194,8 +196,6 @@ class MultiEchoPrg(nn.Module):
         filter_channels,
         num_echos,
         lambda_dll2,
-        norm_means,  # means for normalization
-        norm_stds,  # stds for normalization
         K=1,
         flag_model=-1  # -1: progressive resnet
     ):
@@ -226,7 +226,7 @@ class MultiEchoPrg(nn.Module):
         self.norm_means = torch.Tensor(norm_means).cuda()
         self.norm_stds = torch.Tensor(norm_stds).cuda()
 
-    def forward(self, inputs, iField):
+    def forward(self, inputs, iField, norm_means, norm_stds):
         device = inputs.get_device()
         paras = []
         # norm
