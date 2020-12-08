@@ -8,7 +8,7 @@ from utils.operators import *
 
 class kdata_multi_echo_GE(data.Dataset):
     '''
-        Dataloader of multi-echo GRE data from GE scanner
+        Dataloader of multi-echo GRE data from GE scanner (12-coil scanner)
     '''
 
     folderMatcher = {
@@ -72,16 +72,17 @@ class kdata_multi_echo_GE(data.Dataset):
                 r2s = load_mat(dataFD+'/R2s.mat', 'R2s')[np.newaxis, 15:215, ...]
                 f0 = load_mat(dataFD+'/f0.mat', 'f0')[np.newaxis, 15:215, ...]
                 p = load_mat(dataFD+'/p.mat', 'p')[np.newaxis, 15:215, ...]
+                # for the fully-sampled parameters
+                for i, te in enumerate(TEs):
+                    self.orgs_gen[idx*200:(idx+1)*200, :, :, i] = - m0 * np.exp(- r2s * te) * np.exp(1j * (f0 + p * te))
 
                 # m0 = load_mat(dataFD+'/0.2/m0_10.mat', 'm0')
                 # r2s = load_mat(dataFD+'/0.2/R2s_10.mat', 'R2s')
                 # f0 = load_mat(dataFD+'/0.2/f0_10.mat', 'f0')
                 # p = load_mat(dataFD+'/0.2/p_10.mat', 'p')
 
-                mask = load_mat(dataFD+'/Mask.mat', 'Mask')[np.newaxis, 15:215, ...]
-
-                for i, te in enumerate(TEs):
-                    self.orgs_gen[idx*200:(idx+1)*200, :, :, i] = - m0 * np.exp(- r2s * te) * np.exp(1j * (f0 + p * te))
+                # for i, te in enumerate(TEs):
+                #     self.orgs_gen[idx*200:(idx+1)*200, :, :, i] = m0 * np.exp(- r2s * te) * np.exp(1j * (f0 + p * te))
 
             else:
                 # for the fully-sampled parameters
@@ -94,8 +95,6 @@ class kdata_multi_echo_GE(data.Dataset):
                 # r2s = load_mat(dataFD+'/0.2/R2s_10.mat', 'R2s')
                 # f0 = load_mat(dataFD+'/0.2/f0_10.mat', 'f0')
                 # p = load_mat(dataFD+'/0.2/p_10.mat', 'p')
-
-                mask = load_mat(dataFD+'/Mask.mat', 'Mask')[np.newaxis, 30:230, ...]
                 
                 for i, te in enumerate(TEs):
                     self.orgs_gen[idx*200:(idx+1)*200, :, :, i] = m0 * np.exp(- r2s * te) * np.exp(1j * (f0 + p * te))

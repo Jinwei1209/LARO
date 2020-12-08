@@ -22,7 +22,7 @@ from fits.fits import fit_R2_LM
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 100
+    niter = 500
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
+    parser.add_argument('--normalization', type=int, default=0)  # 0 for no normalization
     opt = {**vars(parser.parse_args())}
     K = opt['K']
     norm_last = opt['norm_last']
@@ -226,7 +226,7 @@ if __name__ == '__main__':
                 # save_mat(rootName+'/results/targets_gen.mat', 'targets_gen', targets_gen.numpy())
                 
                 kdatas = kdatas.to(device)
-                targets = targets_gen.to(device)
+                targets = targets.to(device)
                 csms = csms.to(device)
                 brain_masks = brain_masks.to(device)
 
@@ -261,7 +261,7 @@ if __name__ == '__main__':
                         continue
 
                     kdatas = kdatas.to(device)
-                    targets = targets_gen.to(device)
+                    targets = targets.to(device)
                     csms = csms.to(device)
                     brain_masks = brain_masks.to(device)
 
