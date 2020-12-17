@@ -13,6 +13,7 @@ from models.danet import daBlock
 from models.fa import faBlockNew
 from models.unet import *
 from models.straight_through_layers import *
+from models.BCRNN import BCRNNlayer
 from utils.data import *
 from utils.operators import *
 
@@ -78,6 +79,7 @@ class Resnet_with_DC2(nn.Module):
         flag_loupe=0, # 1: same mask across echos, 2: mask for each echo
         norm_last=0, # put normalization after relu
         flag_temporal_conv=0,
+        flag_BCRNN=0,
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -96,6 +98,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_solver = flag_solver
         self.flag_precond = flag_precond
         self.flag_loupe = flag_loupe
+        self.flag_BCRNN = flag_BCRNN
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -105,17 +108,39 @@ class Resnet_with_DC2(nn.Module):
         # self.random = random
 
         if self.flag_solver <= 1:
-            if self.echo_cat == 1:
-                layers = ResBlock(input_channels, filter_channels, output_dim=input_channels, \
-                                  use_norm=2, norm_last=norm_last, flag_temporal_conv=flag_temporal_conv)
-                # self.resnet_block = MultiBranch(input_channels, filter_channels, output_dim=input_channels)
-            elif self.echo_cat == 0:
-                layers = ResBlock_3D(input_channels, filter_channels, \
-                                output_dim=input_channels, use_norm=2)
-            for layer in layers:
-                self.resnet_block.append(layer)
-            self.resnet_block = nn.Sequential(*self.resnet_block)
-            self.resnet_block.apply(init_weights)
+            if self.flag_BCRNN == 0:
+                if self.echo_cat == 1:
+                    layers = ResBlock(input_channels, filter_channels, output_dim=input_channels, \
+                                    use_norm=2, norm_last=norm_last, flag_temporal_conv=flag_temporal_conv)
+                    # self.resnet_block = MultiBranch(input_channels, filter_channels, output_dim=input_channels)
+                elif self.echo_cat == 0:
+                    layers = ResBlock_3D(input_channels, filter_channels, \
+                                    output_dim=input_channels, use_norm=2)
+                for layer in layers:
+                    self.resnet_block.append(layer)
+                self.resnet_block = nn.Sequential(*self.resnet_block)
+                self.resnet_block.apply(init_weights)
+            elif self.flag_BCRNN == 1:
+                print('Use BCRNN')
+                n_ch = 2  # number of channels
+                nd = 5  # number of CRNN/BCRNN/CNN layers in each iteration
+                nf = 64  # number of filters
+                ks = 3  # kernel size
+                self.n_ch = n_ch
+                self.nd = nd
+                self.nf = nf
+                self.ks = ks
+
+                self.bcrnn = BCRNNlayer(n_ch, nf, ks)
+                self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
+                self.relu = nn.ReLU(inplace=True)
+                
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         
         elif self.flag_solver == 2:
@@ -187,7 +212,7 @@ class Resnet_with_DC2(nn.Module):
             Mask = 1/(1+torch.exp(-12*(Pmask_rescaled-thresh)))
         return Mask
 
-    def forward(self, kdatas, csms, masks, flip):
+    def forward(self, kdatas, csms, masks, flip, test=False):
         # generate sampling mask
         if self.flag_loupe == 1:
             masks = self.generateMask(self.weight_parameters)
@@ -264,26 +289,90 @@ class Resnet_with_DC2(nn.Module):
 
         # Deep ADMM
         elif self.flag_solver == 1:
-            A = Back_forward_multiEcho(csms, masks, flip, 
-                                    self.lambda_dll2, self.echo_cat)
-            Xs = []
-            uk = torch.zeros(x_start.size()).to('cuda')
-            for i in range(self.K):
-                # update auxiliary variable v
-                v_block = self.resnet_block(x+uk/self.lambda_dll2)
-                v_block1 = x + uk/self.lambda_dll2 - v_block
-                # update x using CG block
-                x0 = v_block1 - uk/self.lambda_dll2
-                rhs = x_start + self.lambda_dll2*x0
-                dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
-                        flag_precond=self.flag_precond, precond=self.precond)
-                x = dc_layer.CG_iter()
-                if self.echo_cat:
-                    x = torch_channel_concate(x)
-                Xs.append(x)
-                # update dual variable uk
-                uk = uk + self.lambda_dll2*(x - v_block1)
-            return Xs
+            if self.flag_BCRNN == 0:
+                A = Back_forward_multiEcho(csms, masks, flip, 
+                                        self.lambda_dll2, self.echo_cat)
+                Xs = []
+                uk = torch.zeros(x_start.size()).to('cuda')
+                for i in range(self.K):
+                    # update auxiliary variable v
+                    v_block = self.resnet_block(x+uk/self.lambda_dll2)
+                    v_block1 = x + uk/self.lambda_dll2 - v_block
+                    # update x using CG block
+                    x0 = v_block1 - uk/self.lambda_dll2
+                    print(x0.shape)
+                    rhs = x_start + self.lambda_dll2*x0
+                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
+                            flag_precond=self.flag_precond, precond=self.precond)
+                    x = dc_layer.CG_iter()
+                    if self.echo_cat:
+                        x = torch_channel_concate(x)
+                    Xs.append(x)
+                    # update dual variable uk
+                    uk = uk + self.lambda_dll2*(x - v_block1)
+                return Xs
+            elif self.flag_BCRNN == 1:
+                x = torch_channel_deconcate(x).permute(0, 1, 3, 4, 2)  # (n, 2, nx, ny, n_seq)
+                x = x.contiguous()
+                net = {}
+                n_batch, n_ch, width, height, n_seq = x.size()
+                size_h = [n_seq*n_batch, self.nf, width, height]
+                if test:
+                    with torch.no_grad():
+                        hid_init = Variable(torch.zeros(size_h)).cuda()
+                else:
+                    hid_init = Variable(torch.zeros(size_h)).cuda()
+                for j in range(self.nd-1):
+                    net['t0_x%d'%j]=hid_init
+
+                A = Back_forward_multiEcho(csms, masks, flip, 
+                                        self.lambda_dll2, self.echo_cat)
+                Xs = []
+                uk = torch.zeros(x.size()).to('cuda')
+                for i in range(1, self.K+1):
+                    # update auxiliary variable v
+                    x_ = (x+uk/self.lambda_dll2).permute(4, 0, 1, 2, 3) # (n_seq, n, 2, nx, ny)
+                    x_ = x_.contiguous()
+                    net['t%d_x0'%(i-1)] = net['t%d_x0'%(i-1)].view(n_seq, n_batch, self.nf, width, height)
+                    net['t%d_x0'%i] = self.bcrnn(x_, net['t%d_x0'%(i-1)], test)
+                    net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
+
+                    net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
+                    net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
+                    net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
+
+                    net['t%d_x2'%i] = self.conv2_x(net['t%d_x1'%i])
+                    net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
+                    net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
+
+                    net['t%d_x3'%i] = self.conv3_x(net['t%d_x2'%i])
+                    net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
+                    net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
+
+                    net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
+
+                    x_ = x_.view(-1, n_ch, width, height)
+                    net['t%d_out'%i] = x_ - net['t%d_x4'%i]
+
+                    # update x using CG block
+                    uk_ = uk.permute(4, 0, 1, 2, 3).view(-1, n_ch, width, height)
+                    x0 = net['t%d_out'%i] - uk_/self.lambda_dll2  # (n_seq, 2, nx, ny)
+                    x0_ = torch_channel_concate(x0[None, ...].permute(0, 2, 1, 3, 4)).contiguous()
+                    rhs = x_start + self.lambda_dll2*x0_
+                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
+                            flag_precond=self.flag_precond, precond=self.precond)
+                    x = dc_layer.CG_iter()
+                    if self.echo_cat:
+                        x = torch_channel_concate(x)
+                    Xs.append(x)
+                    x = torch_channel_deconcate(x).permute(0, 2, 1, 3, 4).view(-1, n_ch, width, height) # (n_seq, 2, nx, ny)
+                    
+                    # update dual variable uk
+                    uk = uk_ + self.lambda_dll2*(x - net['t%d_out'%i])
+
+                    x = x[None, ...].permute(0, 2, 3, 4, 1).contiguous()
+                    uk = uk[None, ...].permute(0, 2, 3, 4, 1).contiguous()
+                return Xs
 
         # TV Quasi-newton
         elif self.flag_solver == 2:

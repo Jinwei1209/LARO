@@ -6,8 +6,12 @@ import time
 import torch
 import math
 import argparse
+import cfl
+import sys
 import scipy.io as sio
 import numpy as np
+os.putenv("DEBUG_LEVEL", "5") 
+os.system('ln -fs GERecon.so.python35 GERecon.so')
 
 from IPython.display import clear_output
 from torch.utils import data
@@ -18,6 +22,8 @@ from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
 from fits.fits import fit_R2_LM
+from bart import bart
+from GERecon import Pfile
 
 if __name__ == '__main__':
 
@@ -62,16 +68,53 @@ if __name__ == '__main__':
     K = opt['K']
     norm_last = opt['norm_last']
     flag_temporal_conv = opt['temporal_conv']
-    dataFD = '/data/Jinwei/QSM_raw_CBIC/data_cfl/thanh/{}_opt={}_slices_cc/'.format(int(opt['samplingRatio']*100), opt['loupe']+1)
-    # dataFD_sens = dataFD
-    dataFD_sens = '/data/Jinwei/QSM_raw_CBIC/data_cfl/thanh/{}_opt={}_slices_cc/'.format(10, 0)
+
+    pfile = Pfile('/data/Jinwei/QSM_raw_CBIC/pfiles/alexey/P29184.7')
+    kspace = np.zeros([nslice, nrow, ncol, 32, necho], dtype=np.complex_)
+    for echo in range(1):
+        print('Loading echo #', echo)
+        for slice_num in range(ncol):
+            kspace[:, :, slice_num, :, echo] = pfile.KSpace(slice_num, echo)
+    print('Compressing echo: ', 0)
+    kspace_cc = bart(1, 'cc -p 8 -S', kspace[..., 0])
+    print('Estimating coil sensitivity maps from the first echo')
+    sens_1echo_3d = bart(1, 'ecalib -m1 -I', kspace_cc)
+    del kspace
+    
+    # loading kspace data from pfile directly
+    pfile = Pfile('/data/Jinwei/QSM_raw_CBIC/pfiles/alexey/P28160.7')
+    kspace = np.zeros([nslice, nrow, ncol, 32, necho], dtype=np.complex_)
+    for echo in range(necho):
+        print('Loading echo #', echo)
+        for slice_num in range(ncol):
+            kspace[:, :, slice_num, :, echo] = pfile.KSpace(slice_num, echo)
+    
+    # 3D coil compression and ESPIRiT
+    necho = kspace.shape[-1]
+    ncoil = 8
+    nslice = kspace.shape[0]
+    nrow = kspace.shape[1]
+    ncol = kspace.shape[2]
+    kspace_cc = np.zeros((nslice, nrow, ncol, ncoil, necho), dtype=np.complex_)
+
+    for i in range(necho):
+        print('Compressing echo: ', i)
+        kspace_cc[..., i] = bart(1, 'cc -p 8 -S', kspace[..., i])
+        if i == 0:
+            print('Estimating coil sensitivity maps from the first echo')
+            sens_1echo_3d = bart(1, 'ecalib -m1 -I', kspace_cc[..., i])
+    print('Finish Compression and ESPIRiT')
+    kspace = np.transpose(kspace_cc, (1, 2, 0, 3, 4))
+    kspace_fft_z = np.fft.fftshift(np.fft.ifft(kspace, axis=2), axes=2)
+    print('Finish IFFT along readout direction')
 
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
+    # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
+    rootName = '/data/Jinwei/QSM_raw_CBIC'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if opt['loupe'] == -1:
@@ -117,6 +160,14 @@ if __name__ == '__main__':
         # masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
     else:
         masks = []
+
+    if np.mean(abs(kspace[:, :, 100, 0, 0]) > 0) > 0.3:
+        flag_fully_sampled = 1
+        masks[..., 0] = 1
+        print('Fully sampled scan with sampling ratio:', np.mean(abs(kspace[:, :, 100, 0, 0]) > 0))
+    else:
+        flag_fully_sampled = 0
+        print('Under sampled scan with sampling ratio:', np.mean(abs(kspace[:, :, 100, 0, 0]) > 0))
  
     # flip matrix
     flip = torch.ones([necho, nrow, ncol, 1]) 
@@ -133,6 +184,7 @@ if __name__ == '__main__':
                 input_channels=2*necho,
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
+                ncoil=ncoil,
                 K=K,
                 echo_cat=1,
                 flag_solver=opt['solver'],
@@ -147,6 +199,7 @@ if __name__ == '__main__':
                 input_channels=2,
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
+                ncoil=ncoil,
                 K=K,
                 echo_cat=0,
                 flag_solver=opt['solver'],
@@ -164,15 +217,14 @@ if __name__ == '__main__':
         Recons = []
         with torch.no_grad():
             for idx in range(nslice):
-                kdata = readcfl(dataFD + 'kdata_slice_{}'.format(idx))
+                kdata = kspace_fft_z[:, :, idx, :, :]
                 kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
                 kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
                 kdatas = torch.from_numpy(kdata[np.newaxis, ...])
 
-                csm = readcfl(dataFD_sens + 'sensMaps_slice_{}'.format(idx))
+                csm = np.concatenate((sens_1echo_3d[idx, :, ncol//2:, :], sens_1echo_3d[idx, :, :ncol//2, :]), axis=1)
                 csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
                 csm = np.repeat(csm, necho, axis=1)  # (coil, echo, row, col)
-                # csm = np.transpose(csm, (2, 3, 0, 1))  # (coil, echo, row, col)
                 csm = c2r_kdata(csm) # (coil, echo, row, col, 2) with last dimension real&imag
                 csms = torch.from_numpy(csm[np.newaxis, ...])
 
@@ -181,14 +233,17 @@ if __name__ == '__main__':
                     print('Saving sampling mask: %', np.mean(Mask)*100)
                     save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}_ratio={}.mat' \
                             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
-                if idx == 1:
+                if (idx == 1) and (flag_fully_sampled == 0):
                     print('Sampling ratio: {}%'.format(torch.mean(netG_dc.Mask)*100))
                 if idx % 10 == 0:
                     print('Finish slice #', idx)
                 kdatas = kdatas.to(device)
                 csms = csms.to(device)
 
-                Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
+                if flag_fully_sampled == 1:
+                    Xs_1 = backward_multiEcho(kdatas, csms, masks, flip, opt['echo_cat'])
+                else:
+                    Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
                 if opt['echo_cat']:
                     Xs_1 = torch_channel_deconcate(Xs_1)
                 Recons.append(Xs_1.cpu().detach())
@@ -197,9 +252,9 @@ if __name__ == '__main__':
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['loupe'] == -1:
-                save_mat(rootName+'/results/iField_{}_opt=0.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
+                save_mat(rootName+'/results/iField_{}_opt=0_cc.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
             elif opt['loupe'] == 0:
-                save_mat(rootName+'/results/iField_{}_opt=1.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
+                save_mat(rootName+'/results/iField_{}_opt=1_cc.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
         
 
             # write into .bin file
@@ -217,7 +272,7 @@ if __name__ == '__main__':
             os.system('medi ' + rootName + '/results_QSM_prosp/iField.bin' 
                     + ' --parameter ' + rootName + '/results_QSM_prosp/parameter.txt'
                     + ' --temp ' + rootName +  '/results_QSM_prosp/'
-                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                    # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
                     + ' --CSF ' + ' -of QR')
             
             # read .bin files and save into .mat files
@@ -240,8 +295,8 @@ if __name__ == '__main__':
             adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
             adict['R2star'], adict['Mask'] = R2star, Mask
             if opt['loupe'] == -1:
-                sio.savemat(rootName+'/results/QSM_{}_opt=0.mat'.format(opt['samplingRatio']), adict)
+                sio.savemat(rootName+'/results/QSM_{}_opt=0_cc.mat'.format(opt['samplingRatio']), adict)
             else:
-                sio.savemat(rootName+'/results/QSM_{}_opt=1.mat'.format(opt['samplingRatio']), adict)
+                sio.savemat(rootName+'/results/QSM_{}_opt=1_cc.mat'.format(opt['samplingRatio']), adict)
 
 

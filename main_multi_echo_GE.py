@@ -12,6 +12,7 @@ import numpy as np
 from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
+from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
 from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate
 from utils.loss import lossL1
 from utils.test import Metrices
@@ -31,9 +32,10 @@ if __name__ == '__main__':
     errL2_dc_sum = 0
     PSNRs_val = []
     Validation_loss = []
-    ncoil = 12
+    ncoil = 8
     nrow = 206
     ncol = 80
+    nslice = 200
     necho = 10
     lambda_dll2 = 1e-3
     
@@ -65,7 +67,8 @@ if __name__ == '__main__':
         opt['echo_cat'] = 1
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
+    # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
+    rootName = '/data/Jinwei/QSM_raw_CBIC'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if opt['loupe'] == -1:
@@ -125,7 +128,8 @@ if __name__ == '__main__':
         # memory_pre_alloc(opt['gpu_id'])
         lossl1 = lossL1()
 
-        dataLoader = kdata_multi_echo_GE(
+        # dataLoader = kdata_multi_echo_GE(
+        dataLoader = kdata_multi_echo_CBIC(
             rootDir=rootName,
             contrast='MultiEcho', 
             split='train',
@@ -134,7 +138,8 @@ if __name__ == '__main__':
         )
         trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
-        dataLoader_val = kdata_multi_echo_GE(
+        # dataLoader_val = kdata_multi_echo_GE(
+        dataLoader_val = kdata_multi_echo_CBIC(  
             rootDir=rootName,
             contrast='MultiEcho', 
             split='val',
@@ -148,6 +153,7 @@ if __name__ == '__main__':
                 input_channels=2*necho,
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
+                ncoil=ncoil,
                 K=K,
                 echo_cat=1,
                 flag_solver=opt['solver'],
@@ -155,13 +161,15 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
-                flag_temporal_conv=flag_temporal_conv
+                flag_temporal_conv=flag_temporal_conv,
+                flag_BCRNN=1
             )
         else:
             netG_dc = Resnet_with_DC2(
                 input_channels=2,
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
+                ncoil=ncoil,
                 K=K,
                 echo_cat=0,
                 flag_solver=opt['solver'],
@@ -171,7 +179,7 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}_{}{}.pt'
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}_{}{}_mph.pt'
                         .format(opt['echo_cat'], opt['solver'], opt['samplingRatio'], norm_last, flag_temporal_conv))
             netG_dc.load_state_dict(weights_dict)
 
@@ -285,9 +293,9 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_bcrnn.pt' \
                 .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
-            torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_last.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_bcrnn_last.pt' \
             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
 
     
@@ -298,6 +306,7 @@ if __name__ == '__main__':
                 input_channels=2*necho,
                 filter_channels=32*necho,
                 lambda_dll2=lambda_dll2,
+                ncoil=ncoil,
                 K=K,
                 echo_cat=1,
                 flag_solver=opt['solver'],
@@ -305,13 +314,15 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
-                flag_temporal_conv=flag_temporal_conv
+                flag_temporal_conv=flag_temporal_conv,
+                flag_BCRNN=1    
             )
         else:
             netG_dc = Resnet_with_DC2(
                 input_channels=2,
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
+                ncoil=ncoil,
                 K=K,
                 echo_cat=0,
                 flag_solver=opt['solver'],
@@ -319,10 +330,10 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        if opt['solver'] < 2:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
-            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
-            netG_dc.load_state_dict(weights_dict)
+        # if opt['solver'] < 2:
+        #     weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
+        #     .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
+        #     netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
 
@@ -333,7 +344,8 @@ if __name__ == '__main__':
         Recons = []
         preconds = []
 
-        dataLoader_test = kdata_multi_echo_GE(
+        # dataLoader_test = kdata_multi_echo_GE(
+        dataLoader_test = kdata_multi_echo_CBIC(
             rootDir=rootName,
             contrast='MultiEcho', 
             split='test',
@@ -346,6 +358,7 @@ if __name__ == '__main__':
             for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(testLoader):
                 if idx == 1 and opt['loupe'] > 0:
                     Mask = netG_dc.Mask.cpu().detach().numpy()
+                    # Mask = netG_dc.Pmask.cpu().detach().numpy()
                     print('Saving sampling mask: %', np.mean(Mask)*100)
                     save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}_ratio={}.mat' \
                             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
@@ -392,7 +405,7 @@ if __name__ == '__main__':
             # save_mat(rootName+'/results/water.mat', 'water', water)
 
             # write into .bin file
-            # (200, 2, 10, 206, 80) to (80, 206, 200, 10, 2)
+            # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
             print('iField size is: ', np.concatenate(Recons, axis=0).shape)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
@@ -411,27 +424,27 @@ if __name__ == '__main__':
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
-            QSM = np.transpose(QSM.reshape([80, 206, 200]), [2, 1, 0])
+            QSM = np.transpose(QSM.reshape([80, 206, nslice]), [2, 1, 0])
 
             iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
-            iMag = np.transpose(iMag.reshape([80, 206, 200]), [2, 1, 0])
+            iMag = np.transpose(iMag.reshape([80, 206, nslice]), [2, 1, 0])
 
             RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
-            RDF = np.transpose(RDF.reshape([80, 206, 200]), [2, 1, 0])
+            RDF = np.transpose(RDF.reshape([80, 206, nslice]), [2, 1, 0])
 
             R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
-            R2star = np.transpose(R2star.reshape([80, 206, 200]), [2, 1, 0])
+            R2star = np.transpose(R2star.reshape([80, 206, nslice]), [2, 1, 0])
 
             Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
-            Mask = np.transpose(Mask.reshape([80, 206, 200]), [2, 1, 0]) > 0
+            Mask = np.transpose(Mask.reshape([80, 206, nslice]), [2, 1, 0]) > 0
 
             adict = {}
             adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
             adict['R2star'], adict['Mask'] = R2star, Mask
             if opt['loupe'] == -1:
-                sio.savemat(rootName+'/results/QSM_{}m.mat'.format(opt['samplingRatio']), adict)
+                sio.savemat(rootName+'/results/QSM_{}m_cc.mat'.format(opt['samplingRatio']), adict)
             else:
-                sio.savemat(rootName+'/results/QSM_{}_temporal.mat'.format(opt['samplingRatio']), adict)
+                sio.savemat(rootName+'/results/QSM_{}_cc.mat'.format(opt['samplingRatio']), adict)
             
             
             

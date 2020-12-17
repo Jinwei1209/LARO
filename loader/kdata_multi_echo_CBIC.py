@@ -6,13 +6,13 @@ from utils.loss import *
 from utils.operators import *
 
 
-class kdata_multi_echo_GE(data.Dataset):
+class kdata_multi_echo_CBIC(data.Dataset):
     '''
         Dataloader of multi-echo GRE data from GE scanner (CBIC scanner)
     '''
 
     def __init__(self,
-        rootDir = '/data/Jinwei/QSM_raw_CBIC/data_cfl',
+        rootDir = '/data/Jinwei/QSM_raw_CBIC',
         contrast = 'MultiEcho',
         necho = 10, # number of echos
         split = 'train',
@@ -31,7 +31,9 @@ class kdata_multi_echo_GE(data.Dataset):
         if contrast == 'MultiEcho':
             if split == 'train':
                 self.nsamples = 600
-            elif split == 'val'
+            elif split == 'val':
+                self.nsamples = 200
+            elif split == 'test':
                 self.nsamples = 200
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -57,17 +59,20 @@ class kdata_multi_echo_GE(data.Dataset):
                     idx -= 200
                     subject += 1
             if subject == 0:
-                dataFD = self.rootDir + '/thanh/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/thanh/full_cc_slices/'
             elif subject == 1:
-                dataFD = self.rootDir + '/jinwei/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jinwei/full_cc_slices/'
             elif subject == 2:
-                dataFD = self.rootDir + '/qihao/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/qihao/full_cc_slices/'
 
         elif self.split == 'val':
-            dataFD = self.rootDir + '/jiahao/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
+        
+        elif self.split == 'test':
+            dataFD = self.rootDir + '/data_cfl/qihao/full_cc_slices/'
 
         idx += 30
-        
+
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
             self.augIndex += 1
@@ -78,9 +83,8 @@ class kdata_multi_echo_GE(data.Dataset):
         org = readcfl(dataFD + 'fully_slice_{}'.format(idx))  # (row, col, echo)
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
-        org_gen = self.orgs_gen[idx, ...]
-        org_gen = c2r(org_gen, self.echo_cat)
-        # org_gen = org
+
+        org_gen = org
 
         if self.echo_cat == 0:
             org = np.transpose(org, (0, 3, 1, 2)) # (2, echo, row, col)
