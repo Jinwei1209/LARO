@@ -69,20 +69,20 @@ if __name__ == '__main__':
     norm_last = opt['norm_last']
     flag_temporal_conv = opt['temporal_conv']
 
-    pfile = Pfile('/data/Jinwei/QSM_raw_CBIC/pfiles/alexey/P29184.7')
-    kspace = np.zeros([nslice, nrow, ncol, 32, necho], dtype=np.complex_)
-    for echo in range(1):
-        print('Loading echo #', echo)
-        for slice_num in range(ncol):
-            kspace[:, :, slice_num, :, echo] = pfile.KSpace(slice_num, echo)
-    print('Compressing echo: ', 0)
-    kspace_cc = bart(1, 'cc -p 8 -S', kspace[..., 0])
-    print('Estimating coil sensitivity maps from the first echo')
-    sens_1echo_3d = bart(1, 'ecalib -m1 -I', kspace_cc)
-    del kspace
+    # pfile = Pfile('/data/Jinwei/QSM_raw_CBIC/pfiles/alexey/P27136.7')
+    # kspace = np.zeros([nslice, nrow, ncol, 32, necho], dtype=np.complex_)
+    # for echo in range(1):
+    #     print('Loading echo #', echo)
+    #     for slice_num in range(ncol):
+    #         kspace[:, :, slice_num, :, echo] = pfile.KSpace(slice_num, echo)
+    # print('Compressing echo: ', 0)
+    # kspace_cc = bart(1, 'cc -p 8 -S', kspace[..., 0])
+    # print('Estimating coil sensitivity maps from the first echo')
+    # sens_1echo_3d = bart(1, 'ecalib -m1 -I', kspace_cc)
+    # del kspace
     
     # loading kspace data from pfile directly
-    pfile = Pfile('/data/Jinwei/QSM_raw_CBIC/pfiles/alexey/P28160.7')
+    pfile = Pfile('/data/Jinwei/QSM_raw_CBIC/pfiles/alexey/P29184.7')
     kspace = np.zeros([nslice, nrow, ncol, 32, necho], dtype=np.complex_)
     for echo in range(necho):
         print('Loading echo #', echo)
@@ -192,7 +192,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
-                flag_temporal_conv=flag_temporal_conv
+                flag_temporal_conv=flag_temporal_conv,
+                flag_BCRNN=1
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -208,7 +209,7 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         if opt['solver'] < 2:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_bcrnn_.pt' \
             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
             netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
@@ -272,7 +273,7 @@ if __name__ == '__main__':
             os.system('medi ' + rootName + '/results_QSM_prosp/iField.bin' 
                     + ' --parameter ' + rootName + '/results_QSM_prosp/parameter.txt'
                     + ' --temp ' + rootName +  '/results_QSM_prosp/'
-                    # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
                     + ' --CSF ' + ' -of QR')
             
             # read .bin files and save into .mat files

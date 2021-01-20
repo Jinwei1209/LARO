@@ -9,12 +9,13 @@ import argparse
 import scipy.io as sio
 import numpy as np
 
+from torch.optim.lr_scheduler import MultiStepLR
 from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
 from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate
-from utils.loss import lossL1
+from utils.loss import lossL1, Logger
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
@@ -23,7 +24,7 @@ from fits.fits import fit_R2_LM
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 500
+    niter = 100
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -49,11 +50,11 @@ if __name__ == '__main__':
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  #-1: manually designed mask, 0 fixed learned mask
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
+    parser.add_argument('--samplingRatio', type=float, default=0.2)
+
     parser.add_argument('--norm_last', type=int, default=0)  # 0: norm+relu, 1: relu+norm
     parser.add_argument('--temporal_conv', type=int, default=0) # 0: no temporal, 1: center, 2: begining
     parser.add_argument('--1d_type', type=str, default='shear')  # 'shear' or 'random' sampling type of 1D mask
-    parser.add_argument('--samplingRatio', type=float, default=0.2)
-
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
@@ -152,6 +153,7 @@ if __name__ == '__main__':
             netG_dc = Resnet_with_DC2(
                 input_channels=2*necho,
                 filter_channels=32*necho,
+                necho=necho,
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
@@ -159,10 +161,11 @@ if __name__ == '__main__':
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe'],
+                flag_temporal_pred=0,
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=1
+                flag_BCRNN=0
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -179,12 +182,18 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}_{}{}_mph.pt'
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}_{}{}.pt'
                         .format(opt['echo_cat'], opt['solver'], opt['samplingRatio'], norm_last, flag_temporal_conv))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
+        ms = [0.2, 0.4, 0.6, 0.8]
+        ms = [np.floor(m * niter).astype(int) for m in ms]
+        scheduler = MultiStepLR(optimizerG_dc, milestones = ms, gamma = 0.2)
+
+        # logger
+        logger = Logger(rootName+'/weights', opt)
 
         while epoch < niter:
 
@@ -194,6 +203,8 @@ if __name__ == '__main__':
             netG_dc.train()
             metrices_train = Metrices()
             for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(trainLoader):
+                kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
+                csms = csms[:, :, :necho, ...]  # temporal undersampling
 
                 if torch.sum(brain_masks) == 0:
                     continue
@@ -257,6 +268,7 @@ if __name__ == '__main__':
                 metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
                 gen_iterations += 1
 
+            scheduler.step(epoch)
             
             # validation phase
             netG_dc.eval()
@@ -264,7 +276,8 @@ if __name__ == '__main__':
             loss_total_list = []
             with torch.no_grad():  # to solve memory exploration issue
                 for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(valLoader):
-
+                    kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
+                    csms = csms[:, :, :necho, ...]  # temporal undersampling    
                     if torch.sum(brain_masks) == 0:
                         continue
 
@@ -290,12 +303,18 @@ if __name__ == '__main__':
                 print('\n Validation loss: %f \n' 
                     % (sum(loss_total_list) / float(len(loss_total_list))))
                 Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
+            
+            # save log
+            logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f' 
+            % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs))))
+            logger.print_and_save('Epoch: [%d/%d], PSNR in validation: %.2f, loss in validation: %.10f' 
+            % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_bcrnn.pt' \
+                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
                 .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
-            torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_bcrnn_last.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_last.pt' \
             .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
 
     
@@ -305,6 +324,7 @@ if __name__ == '__main__':
             netG_dc = Resnet_with_DC2(
                 input_channels=2*necho,
                 filter_channels=32*necho,
+                necho=necho,
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
@@ -312,10 +332,11 @@ if __name__ == '__main__':
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe'],
+                flag_temporal_pred=0,
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=1    
+                flag_BCRNN=1
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -330,10 +351,10 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        # if opt['solver'] < 2:
-        #     weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
-        #     .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
-        #     netG_dc.load_state_dict(weights_dict)
+        if opt['solver'] < 2:
+            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_bcrnn.pt' \
+            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
+            netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
 
@@ -356,6 +377,9 @@ if __name__ == '__main__':
 
         with torch.no_grad():
             for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(testLoader):
+                kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
+                csms = csms[:, :, :necho, ...]  # temporal undersampling
+
                 if idx == 1 and opt['loupe'] > 0:
                     Mask = netG_dc.Mask.cpu().detach().numpy()
                     # Mask = netG_dc.Pmask.cpu().detach().numpy()

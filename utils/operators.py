@@ -201,7 +201,8 @@ class Back_forward_multiEcho():
         mask,
         flip,
         lambda_dll2,
-        echo_cat = 1 # flag to concatenate echo dimension into channel
+        echo_cat = 1, # flag to concatenate echo dimension into channel
+        necho=10
     ):
         self.nrows = csm.size()[3]
         self.ncols = csm.size()[4]
@@ -211,6 +212,7 @@ class Back_forward_multiEcho():
         self.lambda_dll2 = lambda_dll2
         self.flip = flip
         self.echo_cat = echo_cat
+        self.necho = necho
 
         # device = self.csm.get_device()   
         # self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
@@ -246,7 +248,7 @@ class Back_forward_multiEcho():
         coilComb = cplx_mlpy(coilComb, self.flip) # for GE kdata
         coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
         if self.echo_cat:
-            coilComb = torch_channel_concate(coilComb) # (batch, 2*echo, row, col)
+            coilComb = torch_channel_concate(coilComb, self.necho) # (batch, 2*echo, row, col)
         if use_dll2 == 1:
             coilComb = coilComb + self.lambda_dll2*img
         elif use_dll2 == 2:
@@ -255,7 +257,7 @@ class Back_forward_multiEcho():
             coilComb = coilComb + self.lambda_dll2*divergence(gradient(img)/torch.sqrt(gradient(img)**2+5e-4))  #1e-4 best, 5e-5 to have consistent result to ADMM
         return coilComb
 
-def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1):
+def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1, necho=10):
     """
     backward operator for multi-echo GE data
     """
@@ -273,7 +275,7 @@ def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1):
     coilComb = cplx_mlpy(coilComb, flip)
     coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
     if echo_cat:
-        coilComb = torch_channel_concate(coilComb) # (batch, 2*echo, row, col)
+        coilComb = torch_channel_concate(coilComb, necho) # (batch, 2*echo, row, col)
     return coilComb
 
 def forward_multiEcho(image, csm, mask, flip, echo_cat=1):

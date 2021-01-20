@@ -77,6 +77,7 @@ class Resnet_with_DC2(nn.Module):
                         # 2 for TV Quasi-newton, 3 for TV ADMM.
         flag_precond=0, # flag to use the preconditioner in the CG layer
         flag_loupe=0, # 1: same mask across echos, 2: mask for each echo
+        flag_temporal_pred=0,  # predict the later echo images from the former echos
         norm_last=0, # put normalization after relu
         flag_temporal_conv=0,
         flag_BCRNN=0,
@@ -98,6 +99,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_solver = flag_solver
         self.flag_precond = flag_precond
         self.flag_loupe = flag_loupe
+        self.flag_temporal_pred = flag_temporal_pred
         self.flag_BCRNN = flag_BCRNN
         self.slope = slope
         self.passSigmoid = passSigmoid
@@ -133,11 +135,11 @@ class Resnet_with_DC2(nn.Module):
 
                 self.bcrnn = BCRNNlayer(n_ch, nf, ks)
                 self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
                 self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
                 self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
                 self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
                 self.relu = nn.ReLU(inplace=True)
                 
@@ -149,6 +151,9 @@ class Resnet_with_DC2(nn.Module):
         elif self.flag_solver == 3:
             self.rho_penalty = nn.Parameter(torch.ones(1)*rho_penalty, requires_grad=False)
             self.lambda_tv = nn.Parameter(torch.ones(1)*lambda_tv, requires_grad=False)
+
+        if self.flag_temporal_pred:
+            self.densenet = DenseBlock(2*necho, 2*(10-necho))
         
         # if self.att == 1:
         #     self.attBlock = daBlock(input_channels, filter_channels//8, \
@@ -227,10 +232,10 @@ class Resnet_with_DC2(nn.Module):
         else:
             self.Mask = masks[0, 0, 0, :, :, 0]
         # input
-        x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat)
+        x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat, self.necho)
         x_start = x
         if self.echo_cat == 0:
-            x_start_ = torch_channel_concate(x_start)
+            x_start_ = torch_channel_concate(x_start, self.necho)
         else:
             x_start_ = x_start
 
@@ -291,7 +296,7 @@ class Resnet_with_DC2(nn.Module):
         elif self.flag_solver == 1:
             if self.flag_BCRNN == 0:
                 A = Back_forward_multiEcho(csms, masks, flip, 
-                                        self.lambda_dll2, self.echo_cat)
+                                        self.lambda_dll2, self.echo_cat, self.necho)
                 Xs = []
                 uk = torch.zeros(x_start.size()).to('cuda')
                 for i in range(self.K):
@@ -300,13 +305,12 @@ class Resnet_with_DC2(nn.Module):
                     v_block1 = x + uk/self.lambda_dll2 - v_block
                     # update x using CG block
                     x0 = v_block1 - uk/self.lambda_dll2
-                    print(x0.shape)
                     rhs = x_start + self.lambda_dll2*x0
                     dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
                             flag_precond=self.flag_precond, precond=self.precond)
                     x = dc_layer.CG_iter()
                     if self.echo_cat:
-                        x = torch_channel_concate(x)
+                        x = torch_channel_concate(x, self.necho)
                     Xs.append(x)
                     # update dual variable uk
                     uk = uk + self.lambda_dll2*(x - v_block1)
@@ -326,7 +330,7 @@ class Resnet_with_DC2(nn.Module):
                     net['t0_x%d'%j]=hid_init
 
                 A = Back_forward_multiEcho(csms, masks, flip, 
-                                        self.lambda_dll2, self.echo_cat)
+                                        self.lambda_dll2, self.echo_cat, self.necho)
                 Xs = []
                 uk = torch.zeros(x.size()).to('cuda')
                 for i in range(1, self.K+1):
@@ -335,19 +339,23 @@ class Resnet_with_DC2(nn.Module):
                     x_ = x_.contiguous()
                     net['t%d_x0'%(i-1)] = net['t%d_x0'%(i-1)].view(n_seq, n_batch, self.nf, width, height)
                     net['t%d_x0'%i] = self.bcrnn(x_, net['t%d_x0'%(i-1)], test)
+                    # net['t%d_x0'%i] = self.bcrnn(x_, test)
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
                     net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
-                    net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
-                    net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
+                    # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
+                    # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
+                    net['t%d_x1'%i] = self.relu(net['t%d_x1'%i])
 
                     net['t%d_x2'%i] = self.conv2_x(net['t%d_x1'%i])
-                    net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
-                    net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
+                    # net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
+                    # net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
+                    net['t%d_x2'%i] = self.relu(net['t%d_x2'%i])
 
                     net['t%d_x3'%i] = self.conv3_x(net['t%d_x2'%i])
-                    net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
-                    net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
+                    # net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
+                    # net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
+                    net['t%d_x3'%i] = self.relu(net['t%d_x3'%i])
 
                     net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
 
@@ -357,14 +365,18 @@ class Resnet_with_DC2(nn.Module):
                     # update x using CG block
                     uk_ = uk.permute(4, 0, 1, 2, 3).view(-1, n_ch, width, height)
                     x0 = net['t%d_out'%i] - uk_/self.lambda_dll2  # (n_seq, 2, nx, ny)
-                    x0_ = torch_channel_concate(x0[None, ...].permute(0, 2, 1, 3, 4)).contiguous()
+                    x0_ = torch_channel_concate(x0[None, ...].permute(0, 2, 1, 3, 4), self.necho).contiguous()
                     rhs = x_start + self.lambda_dll2*x0_
-                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
-                            flag_precond=self.flag_precond, precond=self.precond)
+                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat, necho=self.necho,
+                                                  flag_precond=self.flag_precond, precond=self.precond)
                     x = dc_layer.CG_iter()
                     if self.echo_cat:
-                        x = torch_channel_concate(x)
-                    Xs.append(x)
+                        x = torch_channel_concate(x, self.necho)
+                    if self.flag_temporal_pred:
+                        x_last_echos = self.densenet(x)
+                        Xs.append(torch.cat((x, x_last_echos), 1))
+                    else:
+                        Xs.append(x)
                     x = torch_channel_deconcate(x).permute(0, 2, 1, 3, 4).view(-1, n_ch, width, height) # (n_seq, 2, nx, ny)
                     
                     # update dual variable uk
@@ -415,3 +427,28 @@ class Resnet_with_DC2(nn.Module):
                 # update dual variable etak
                 etak = etak + self.rho_penalty * (gradient(x) - wk)
             return Xs
+
+
+class DenseBlock(nn.Module):
+    def __init__(
+        self,
+        input_channels,  # input_echos*2
+        output_channels,  # output_echos*2
+        filter_channels=32  # channel after each conv
+    ):
+        super(DenseBlock, self).__init__()
+        self.conv1 = nn.Conv2d(input_channels, filter_channels, 3, padding=1)
+        self.conv2 = nn.Conv2d(input_channels+filter_channels, filter_channels, 3, padding=1)
+        self.conv3 = nn.Conv2d(input_channels+2*filter_channels, filter_channels, 3, padding=1)
+        self.conv4 = nn.Conv2d(input_channels+3*filter_channels, filter_channels, 3, padding=1)
+        self.conv5 = nn.Conv2d(input_channels+4*filter_channels, filter_channels, 3, padding=1)
+        self.conv_final = nn.Conv2d(filter_channels, output_channels, 1, padding=0)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x0):
+        x1 = self.relu(self.conv1(x0))
+        x2 = self.relu(self.conv2(torch.cat((x0, x1), 1)))
+        x3 = self.relu(self.conv3(torch.cat((x0, x1, x2), 1)))
+        x4 = self.relu(self.conv4(torch.cat((x0, x1, x2, x3), 1)))
+        x5 = self.relu(self.conv5(torch.cat((x0, x1, x2, x3, x4), 1)))
+        return self.conv_final(x5)

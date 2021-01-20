@@ -142,10 +142,11 @@ class DC_layer_real():
 
 # CG layer for (necho, nrow, ncol) data
 class DC_layer_multiEcho():
-    def __init__(self, A, rhs, echo_cat=1, 
+    def __init__(self, A, rhs, echo_cat=1, necho=10,
                  flag_precond=0, precond=0, use_dll2=1):
         self.AtA = lambda z: A.AtA(z, use_dll2=use_dll2)
         self.echo_cat = echo_cat
+        self.necho = necho
         self.flag_precond = flag_precond
         if self.echo_cat:
             self.rhs = torch_channel_deconcate(rhs) # (batch, 2, echo, row, col)
@@ -158,7 +159,7 @@ class DC_layer_multiEcho():
 
     def CG_body(self, i, rTr, x, r, p):
         if self.echo_cat:
-            Ap = self.AtA(torch_channel_concate(p)) # (batch, 2*echo, row, col)
+            Ap = self.AtA(torch_channel_concate(p, self.necho)) # (batch, 2*echo, row, col)
             Ap = torch_channel_deconcate(Ap) # (batch, 2, echo, row, col)
         else:
             Ap = self.AtA(p)
@@ -174,7 +175,7 @@ class DC_layer_multiEcho():
 
     def precond_CG_body(self, i, rTy, x, r, y, p):
         if self.echo_cat:
-            Ap = self.AtA(torch_channel_concate(p)) # (batch, 2*echo, row, col)
+            Ap = self.AtA(torch_channel_concate(p, self.necho)) # (batch, 2*echo, row, col)
             Ap = torch_channel_deconcate(Ap) # (batch, 2, echo, row, col)
         else:
             Ap = self.AtA(p)
