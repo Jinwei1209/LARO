@@ -69,7 +69,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
         
         elif self.split == 'test':
-            dataFD = self.rootDir + '/data_cfl/jinwei/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
 
         idx += 30
 

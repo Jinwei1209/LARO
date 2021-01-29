@@ -21,18 +21,22 @@ class CRNNcell(nn.Module):
         self.kernel_size = kernel_size
         self.i2h = nn.Conv2d(input_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
         self.h2h = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
+        self.bn_i2h = nn.GroupNorm(hidden_size, hidden_size)
+        self.bn_h2h = nn.GroupNorm(hidden_size, hidden_size)
         # add iteration hidden connection
-        self.ih2ih = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
+        # self.ih2ih = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
         self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, input, hidden_iteration, hidden):
-    # def forward(self, input, hidden):
+    # def forward(self, input, hidden_iteration, hidden):
+    def forward(self, input, hidden):
         in_to_hid = self.i2h(input)
         hid_to_hid = self.h2h(hidden)
-        ih_to_ih = self.ih2ih(hidden_iteration)
+        in_to_hid = self.bn_i2h(in_to_hid)
+        hid_to_hid = self.bn_h2h(hid_to_hid)
+        # ih_to_ih = self.ih2ih(hidden_iteration)
 
-        hidden = self.relu(in_to_hid + hid_to_hid + ih_to_ih)
-        # hidden = self.relu(in_to_hid + hid_to_hid)
+        # hidden = self.relu(in_to_hid + hid_to_hid + ih_to_ih)
+        hidden = self.relu(in_to_hid + hid_to_hid)
 
         return hidden
 
@@ -54,10 +58,11 @@ class BCRNNlayer(nn.Module):
         self.hidden_size = hidden_size
         self.kernel_size = kernel_size
         self.input_size = input_size
+        # self.CRNN_model1 = CRNNcell(self.input_size, self.hidden_size, self.kernel_size)
+        # self.CRNN_model2 = CRNNcell(self.input_size, self.hidden_size, self.kernel_size)
         self.CRNN_model = CRNNcell(self.input_size, self.hidden_size, self.kernel_size)
-
-    def forward(self, input, input_iteration, test=False):
-    # def forward(self, input, test=False):
+    # def forward(self, input, input_iteration, test=False):
+    def forward(self, input, test=False):
         nt, nb, nc, nx, ny = input.shape
         size_h = [nb, self.hidden_size, nx, ny]
         if test:
@@ -71,16 +76,16 @@ class BCRNNlayer(nn.Module):
         # forward
         hidden = hid_init
         for i in range(nt):
-            hidden = self.CRNN_model(input[i], input_iteration[i], hidden)
-            # hidden = self.CRNN_model(input[i], hidden)
+            # hidden = self.CRNN_model(input[i], input_iteration[i], hidden)
+            hidden = self.CRNN_model(input[i], hidden)
             output_f.append(hidden)
         output_f = torch.cat(output_f)
 
         # backward
         hidden = hid_init
         for i in range(nt):
-            hidden = self.CRNN_model(input[nt - i - 1], input_iteration[nt - i -1], hidden)
-            # hidden = self.CRNN_model(input[nt - i - 1], hidden)
+            # hidden = self.CRNN_model(input[nt - i - 1], input_iteration[nt - i -1], hidden)
+            hidden = self.CRNN_model(input[nt - i - 1], hidden)
             output_b.append(hidden)
         output_b = torch.cat(output_b[::-1])
 

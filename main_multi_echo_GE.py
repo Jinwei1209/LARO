@@ -14,8 +14,8 @@ from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
-from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate
-from utils.loss import lossL1, Logger
+from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, Logger
+from utils.loss import lossL1, lossL2, SSIM
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
@@ -44,14 +44,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
-    parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
-                                                          # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  #-1: manually designed mask, 0 fixed learned mask
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
     parser.add_argument('--samplingRatio', type=float, default=0.2)
+    parser.add_argument('--bcrnn', type=int, default=0)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bcrnn2 block
+    parser.add_argument('--loss', type=int, default=1)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
 
+
+    parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
+    parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
+                                                          # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--norm_last', type=int, default=0)  # 0: norm+relu, 1: relu+norm
     parser.add_argument('--temporal_conv', type=int, default=0) # 0: no temporal, 1: center, 2: begining
     parser.add_argument('--1d_type', type=str, default='shear')  # 'shear' or 'random' sampling type of 1D mask
@@ -127,7 +130,12 @@ if __name__ == '__main__':
     # training
     if opt['flag_train'] == 1:
         # memory_pre_alloc(opt['gpu_id'])
-        lossl1 = lossL1()
+        if opt['loss'] == 0:
+            loss = SSIM()
+        elif opt['loss'] == 1:
+            loss = lossL1()
+        elif opt['loss'] == 2:
+            loss = lossL2()
 
         # dataLoader = kdata_multi_echo_GE(
         dataLoader = kdata_multi_echo_CBIC(
@@ -165,7 +173,7 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=0
+                flag_BCRNN=opt['bcrnn']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -182,8 +190,8 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K=2_loupe=1_ratio={}_{}{}.pt'
-                        .format(opt['echo_cat'], opt['solver'], opt['samplingRatio'], norm_last, flag_temporal_conv))
+            weights_dict = torch.load(rootName+'/weights/bcrnn={}_loss={}_K=2_loupe=1_ratio={}.pt'
+                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -214,8 +222,8 @@ if __name__ == '__main__':
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                     % (epoch, niter, idx, 600//batch_size, time.time()-t0))
 
-                    print('echo_cat: {}, solver: {}, K: {}, loupe: {}'.format( \
-                            opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']))
+                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}'.format( \
+                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe']))
                     
                     if opt['loupe'] > 0:
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
@@ -258,7 +266,10 @@ if __name__ == '__main__':
 
                 lossl2_sum = 0
                 for i in range(len(Xs)):
-                    lossl2_sum += lossl1(Xs[i]*brain_masks, targets*brain_masks)
+                    if opt['loss'] == 0:
+                        lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                    else:
+                        lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
                 lossl2_sum.backward()
                 optimizerG_dc.step()
 
@@ -268,7 +279,8 @@ if __name__ == '__main__':
                 metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
                 gen_iterations += 1
 
-            scheduler.step(epoch)
+            if opt['loupe'] < 1:
+                scheduler.step(epoch)
             
             # validation phase
             netG_dc.eval()
@@ -289,15 +301,16 @@ if __name__ == '__main__':
                     Xs = netG_dc(kdatas, csms, masks, flip)
 
                     metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
-                    targets = np.asarray(targets.cpu().detach())
-                    brain_masks = np.asarray(brain_masks.cpu().detach())
-                    temp = 0
+                    # targets = np.asarray(targets.cpu().detach())
+                    # brain_masks = np.asarray(brain_masks.cpu().detach())
+                    # temp = 0
                     # for i in range(len(Xs)):
                     #     X = np.asarray(Xs[i].cpu().detach())
                     #     temp += abs(X - targets) * brain_masks
-                    X = np.asarray(Xs[-1].cpu().detach())
-                    temp += abs(X - targets) * brain_masks
-                    lossl2_sum = np.mean(temp)
+                    # X = np.asarray(Xs[-1].cpu().detach())
+                    # temp += abs(X - targets) * brain_masks
+                    # lossl2_sum = np.mean(temp)
+                    lossl2_sum = loss(Xs[-1]*brain_masks, targets*brain_masks)
                     loss_total_list.append(lossl2_sum)
 
                 print('\n Validation loss: %f \n' 
@@ -312,10 +325,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}.pt' \
-                .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
-            torch.save(netG_dc.state_dict(), rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_last.pt' \
-            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
+                torch.save(netG_dc.state_dict(), rootName+'/weights/bcrnn={}_loss={}_K={}_loupe={}_ratio={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']))
+            torch.save(netG_dc.state_dict(), rootName+'/weights/bcrnn={}_loss={}_K={}_loupe={}_ratio={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']))
 
     
     # for test
@@ -336,7 +349,7 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=1
+                flag_BCRNN=opt['bcrnn']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -352,8 +365,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         if opt['solver'] < 2:
-            weights_dict = torch.load(rootName+'/weights/echo_cat={}_solver={}_K={}_loupe={}_ratio={}_{}{}_bcrnn.pt' \
-            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio'], norm_last, flag_temporal_conv))
+            weights_dict = torch.load(rootName+'/weights/bcrnn={}_loss={}_K={}_loupe={}_ratio={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']))
             netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -383,9 +396,9 @@ if __name__ == '__main__':
                 if idx == 1 and opt['loupe'] > 0:
                     Mask = netG_dc.Mask.cpu().detach().numpy()
                     # Mask = netG_dc.Pmask.cpu().detach().numpy()
-                    print('Saving sampling mask: %', np.mean(Mask)*100)
-                    save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}_ratio={}.mat' \
-                            .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
+                    # print('Saving sampling mask: %', np.mean(Mask)*100)
+                    # save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}_ratio={}.mat' \
+                    #         .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
                 if idx == 1:
                     print('Sampling ratio: {}%'.format(torch.mean(netG_dc.Mask)*100))
                 if idx % 10 == 0:

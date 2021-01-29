@@ -334,8 +334,9 @@ class Logger():
         self.logName = 'logs'
         self.rootName = rootName
 
+        bcrnn = opt['bcrnn']
+        loss = opt['loss']
         K = opt['K']
-        solver = opt['solver']
         loupe = opt['loupe']
         ratio = opt['samplingRatio']
 
@@ -346,7 +347,7 @@ class Logger():
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'Solver={0}_K={1}_loupe={2}_ratio={3}'.format(solver, K, loupe, ratio) + '.log'
+        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}'.format(bcrnn, loss, K, loupe, ratio) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 
         if self.flagSave:
