@@ -90,6 +90,7 @@ class BCRNNlayer(nn.Module):
         output_b = torch.cat(output_b[::-1])
 
         output = output_f + output_b
+        # output = output_f
 
         if nb == 1:
             output = output.view(nt, 1, self.hidden_size, nx, ny)

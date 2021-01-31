@@ -170,13 +170,13 @@ class Resnet_with_DC2(nn.Module):
             self.preconditioner = Unet(2*self.necho, 2*self.necho, num_filters=[2**i for i in range(4, 8)])
 
         # flag for mask learning strategy
-        if self.flag_loupe < 2:
-            temp = (torch.rand(self.nrow, self.ncol)-0.5)*30
-            temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
-            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
-        elif self.flag_loupe == 2:
-            temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30
+        if self.flag_loupe == 2 or -2:
+            temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30  # (necho, nrow, ncol)
             temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+        elif self.flag_loupe < 2:
+            temp = (torch.rand(self.nrow, self.ncol)-0.5)*30  # (nrow, ncol)
+            temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
             self.weight_parameters = nn.Parameter(temp, requires_grad=True)
 
     def generateMask(self, weight_parameters):
@@ -188,30 +188,50 @@ class Resnet_with_DC2(nn.Module):
             Pmask_rescaled = self.rescalePmask(Pmask, self.samplingRatio)
         else:
             Pmask_rescaled = Pmask
-
-        masks = self.samplingPmask(Pmask_rescaled)[:, :, None] # (nrow, ncol, 1)
-        # keep central calibration region to 1
-        masks[self.nrow//2-13:self.nrow//2+12, self.ncol//2-13:self.ncol//2+12, :] = 1
-        # to complex data
-        masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (nrow, ncol, 2)
-        # add echo dimension
-        masks = masks[None, ...] # (1, nrow, ncol, 2)
-        masks = torch.cat(self.necho*[masks]) # (necho, nrow, ncol, 2)
-        # add coil dimension
-        masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
-        masks = torch.cat(self.ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
-        # add batch dimension
-        masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
-        return masks
+        
+        if self.flag_loupe == 1:
+            masks = self.samplingPmask(Pmask_rescaled)[:, :, None] # (nrow, ncol, 1)
+            # keep central calibration region to 1
+            masks[self.nrow//2-13:self.nrow//2+12, self.ncol//2-13:self.ncol//2+12, :] = 1
+            # to complex data
+            masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (nrow, ncol, 2)
+            # add echo dimension
+            masks = masks[None, ...] # (1, nrow, ncol, 2)
+            masks = torch.cat(self.necho*[masks]) # (necho, nrow, ncol, 2)
+            # add coil dimension
+            masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+            masks = torch.cat(self.ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+            # add batch dimension
+            masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+            return masks
+        elif self.flag_loupe == 2:
+            masks = self.samplingPmask(Pmask_rescaled)[..., None] # (necho, nrow, ncol, 1)
+            # keep central calibration region to 1
+            masks[:, self.nrow//2-13:self.nrow//2+12, self.ncol//2-13:self.ncol//2+12, :] = 1
+            # to complex data
+            masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (necho, nrow, ncol, 2)
+            # add coil dimension
+            masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+            masks = torch.cat(self.ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+            # add batch dimension
+            masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+            return masks
 
     def rescalePmask(self, Pmask, samplingRatio):
-        xbar = torch.mean(Pmask)
-        r = samplingRatio / xbar
-        beta = (1-samplingRatio) / (1-xbar)
-        # le = (r<=1).to('cuda', dtype=torch.float32)
-        le = (r<=1).float()
-        return le * Pmask * r + (1-le) * (1 - (1-Pmask) * beta)
-
+        if self.flag_loupe == 1:
+            xbar = torch.mean(Pmask)
+            r = samplingRatio / xbar
+            beta = (1-samplingRatio) / (1-xbar)
+            # le = (r<=1).to('cuda', dtype=torch.float32)
+            le = (r<=1).float()
+            return le * Pmask * r + (1-le) * (1 - (1-Pmask) * beta)
+        elif self.flag_loupe == 2:
+            xbar = torch.mean(Pmask, dim=[1,2])
+            r = samplingRatio / xbar
+            beta = (1-samplingRatio) / (1-xbar)
+            le = (r<=1).float()
+            return le[:, None, None] * Pmask * r[:, None, None] + (1-le[:, None, None]) * (1 - (1-Pmask) * beta[:, None, None])
+    
     def samplingPmask(self, Pmask_rescaled):
         if self.stochasticSampling:
             Mask = bernoulliSample.apply(Pmask_rescaled)
@@ -227,9 +247,7 @@ class Resnet_with_DC2(nn.Module):
             self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters))
             self.Mask = masks[0, 0, 0, :, :, 0]
         elif self.flag_loupe == 2:
-            masks = torch.zeros(1, self.ncoil, self.necho, self.nrow, self.ncol, 2).to('cuda')
-            for echo in range(self.necho):
-                masks[:, :, echo, ...] = self.generateMask(self.weight_parameters[echo, ...])[:, :, echo, ...]
+            masks = self.generateMask(self.weight_parameters)
             self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters)).permute(1, 2, 0)
             self.Mask = masks[0, 0, :, :, :, 0].permute(1, 2, 0)
         else:

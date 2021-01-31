@@ -45,7 +45,8 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
-    parser.add_argument('--loupe', type=int, default=0)  #-1: manually designed mask, 0 fixed learned mask
+    parser.add_argument('--loupe', type=int, default=0)  # -2: fixed learned mask across echos
+                                                         # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
     parser.add_argument('--samplingRatio', type=float, default=0.2)
     parser.add_argument('--bcrnn', type=int, default=0)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bcrnn2 block
@@ -82,8 +83,11 @@ if __name__ == '__main__':
     elif opt['loupe'] == 0:
         # load fixed loupe optimized mask
         masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
+    elif opt['loupe'] == -2:
+        # load fixed loupe optimized mask across echos
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
         
-    if opt['loupe'] < 1:
+    if opt['loupe'] < 1 and opt['loupe'] > -2:
         # for 2D random sampling 
         masks = masks[..., np.newaxis] # (nrow, ncol, 1)
         
@@ -116,6 +120,16 @@ if __name__ == '__main__':
         # masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
         # # add batch dimension
         # masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+    elif opt['loupe'] == -2:
+        masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
+        masks = torch.tensor(masks, device=device).float()
+        # to complex data
+        masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (necho, nrow, ncol, 2)
+        # add coil dimension
+        masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+        masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+        # add batch dimension
+        masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
     else:
         masks = []
  
@@ -189,8 +203,12 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         netG_dc.to(device)
-        if opt['loupe'] < 1:
+        if opt['loupe'] < 1 and opt['loupe'] > -2:
             weights_dict = torch.load(rootName+'/weights/bcrnn={}_loss={}_K=2_loupe=1_ratio={}.pt'
+                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio']))
+            netG_dc.load_state_dict(weights_dict)
+        elif opt['loupe'] == -2:
+            weights_dict = torch.load(rootName+'/weights/bcrnn={}_loss={}_K=2_loupe=2_ratio={}.pt'
                         .format(opt['bcrnn'], opt['loss'], opt['samplingRatio']))
             netG_dc.load_state_dict(weights_dict)
 
@@ -396,9 +414,9 @@ if __name__ == '__main__':
                 if idx == 1 and opt['loupe'] > 0:
                     Mask = netG_dc.Mask.cpu().detach().numpy()
                     # Mask = netG_dc.Pmask.cpu().detach().numpy()
-                    # print('Saving sampling mask: %', np.mean(Mask)*100)
-                    # save_mat(rootName+'/results/Mask_echo_cat={}_solver={}_K={}_loupe={}_ratio={}.mat' \
-                    #         .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
+                    print('Saving sampling mask: %', np.mean(Mask)*100)
+                    save_mat(rootName+'/results/Mask_bcrnn={}_loss={}_K={}_loupe={}_ratio={}.mat' \
+                            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
                 if idx == 1:
                     print('Sampling ratio: {}%'.format(torch.mean(netG_dc.Mask)*100))
                 if idx % 10 == 0:
