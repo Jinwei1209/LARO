@@ -170,7 +170,7 @@ class Resnet_with_DC2(nn.Module):
             self.preconditioner = Unet(2*self.necho, 2*self.necho, num_filters=[2**i for i in range(4, 8)])
 
         # flag for mask learning strategy
-        if self.flag_loupe == 2 or -2:
+        if self.flag_loupe == 2 or self.flag_loupe == -2:
             temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30  # (necho, nrow, ncol)
             temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
             self.weight_parameters = nn.Parameter(temp, requires_grad=True)

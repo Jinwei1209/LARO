@@ -24,7 +24,7 @@ from fits.fits import fit_R2_LM
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 100
+    niter = 500
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -345,9 +345,7 @@ if __name__ == '__main__':
             if Validation_loss[-1] == min(Validation_loss):
                 torch.save(netG_dc.state_dict(), rootName+'/weights/bcrnn={}_loss={}_K={}_loupe={}_ratio={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']))
-            torch.save(netG_dc.state_dict(), rootName+'/weights/bcrnn={}_loss={}_K={}_loupe={}_ratio={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']))
-
+    
     
     # for test
     if opt['flag_train'] == 0:
@@ -448,7 +446,7 @@ if __name__ == '__main__':
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['loupe'] == -1:
                 save_mat(rootName+'/results/iField_{}m.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
-            elif opt['loupe'] == 0:
+            else:
                 save_mat(rootName+'/results/iField_{}.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
 
             # # write R2s into .mat file
