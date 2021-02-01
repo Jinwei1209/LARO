@@ -206,6 +206,16 @@ def torch_channel_deconcate(img):
     return out
 
 
+def torch_channel_to_complex(img):
+    """
+        convert multi-echo images with concatenated echos as channels to the complex images
+    """
+    real = img[:, 0::2, ...]
+    imag = img[:, 1::2, ...]
+    out = torch.complex(real, imag)
+    return out
+    
+
 def cplx_mlpy(a, b):
     """
     multiply two 'complex' tensors (with the last dim = 2, representing real and imaginary parts)
