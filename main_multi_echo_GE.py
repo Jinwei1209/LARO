@@ -24,7 +24,7 @@ from fits.fits import fit_R2_LM
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 500
+    niter = 100
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -49,7 +49,7 @@ if __name__ == '__main__':
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
     parser.add_argument('--samplingRatio', type=float, default=0.2)
-    parser.add_argument('--bcrnn', type=int, default=0)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bcrnn2 block
+    parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bcrnn2 block
     parser.add_argument('--loss', type=int, default=1)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
 
 
@@ -82,7 +82,7 @@ if __name__ == '__main__':
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_{}'.format(opt['samplingRatio'], opt['1d_type'])))
     elif opt['loupe'] == 0:
         # load fixed loupe optimized mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
         masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
