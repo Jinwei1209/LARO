@@ -24,7 +24,6 @@ from fits.fits import fit_R2_LM
 if __name__ == '__main__':
 
     lrG_dc = 1e-3
-    niter = 100
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -48,14 +47,15 @@ if __name__ == '__main__':
     parser.add_argument('--loupe', type=int, default=0)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
-    parser.add_argument('--samplingRatio', type=float, default=0.2)
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bcrnn2 block
-    parser.add_argument('--loss', type=int, default=1)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
+    parser.add_argument('--samplingRatio', type=float, default=0.2)
 
 
-    parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
+    parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
+    parser.add_argument('--weights_dir', type=str, default='weights_ablation')
+    parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--norm_last', type=int, default=0)  # 0: norm+relu, 1: relu+norm
     parser.add_argument('--temporal_conv', type=int, default=0) # 0: no temporal, 1: center, 2: begining
     parser.add_argument('--1d_type', type=str, default='shear')  # 'shear' or 'random' sampling type of 1D mask
@@ -70,6 +70,10 @@ if __name__ == '__main__':
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
+    if opt['loupe'] > 0:
+        niter = 500
+    else:
+        niter = 100
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
@@ -143,7 +147,7 @@ if __name__ == '__main__':
 
     # training
     if opt['flag_train'] == 1:
-        # memory_pre_alloc(opt['gpu_id'])
+        memory_pre_alloc(opt['gpu_id'])
         if opt['loss'] == 0:
             loss = SSIM()
         elif opt['loss'] == 1:
@@ -204,12 +208,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/weights/bcrnn={}_loss={}_K=2_loupe=1_ratio={}.pt'
-                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
+                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/weights/bcrnn={}_loss={}_K=2_loupe=2_ratio={}.pt'
-                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
+                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -219,7 +223,7 @@ if __name__ == '__main__':
         scheduler = MultiStepLR(optimizerG_dc, milestones = ms, gamma = 0.2)
 
         # logger
-        logger = Logger(rootName+'/weights', opt)
+        logger = Logger(rootName+'/'+opt['weights_dir'], opt)
 
         while epoch < niter:
 
@@ -240,8 +244,8 @@ if __name__ == '__main__':
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                     % (epoch, niter, idx, 600//batch_size, time.time()-t0))
 
-                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}'.format( \
-                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe']))
+                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}'.format( \
+                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver']))
                     
                     if opt['loupe'] > 0:
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
@@ -343,8 +347,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/weights/bcrnn={}_loss={}_K={}_loupe={}_ratio={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
     
     
     # for test
@@ -381,8 +387,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         if opt['solver'] < 2:
-            weights_dict = torch.load(rootName+'/weights/bcrnn={}_loss={}_K={}_loupe={}_ratio={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
