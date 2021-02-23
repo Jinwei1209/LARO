@@ -16,6 +16,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         contrast = 'MultiEcho',
         necho = 10, # number of echos
         split = 'train',
+        subject = 0,  # 0: junghun, 1: chao, 2: alexey
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
@@ -35,6 +36,13 @@ class kdata_multi_echo_CBIC(data.Dataset):
                 self.nsamples = 200
             elif split == 'test':
                 self.nsamples = 200
+                if subject == 0:
+                    self.subject = 'junghun'
+                elif subject == 1:
+                    self.subject = 'chao'
+                elif subject == 2:
+                    self.subject = 'alexey'
+                print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
         self.augSize = len(self.augmentations)
@@ -69,7 +77,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
         
         elif self.split == 'test':
-            dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
 
         idx += 30
 

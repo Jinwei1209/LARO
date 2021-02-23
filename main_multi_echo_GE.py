@@ -43,16 +43,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
+    parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bcrnn2 block
-    parser.add_argument('--samplingRatio', type=float, default=0.2)
-
-
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
+    
+    
+    parser.add_argument('--samplingRatio', type=float, default=0.2)
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -386,10 +387,9 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        if opt['solver'] < 2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
-            netG_dc.load_state_dict(weights_dict)
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+        netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
 
@@ -405,6 +405,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='test',
+            subject=opt['test_sub'],
             normalization=opt['normalization'],
             echo_cat=opt['echo_cat']
         )
@@ -419,8 +420,8 @@ if __name__ == '__main__':
                     Mask = netG_dc.Mask.cpu().detach().numpy()
                     # Mask = netG_dc.Pmask.cpu().detach().numpy()
                     print('Saving sampling mask: %', np.mean(Mask)*100)
-                    save_mat(rootName+'/results/Mask_bcrnn={}_loss={}_K={}_loupe={}_ratio={}.mat' \
-                            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio']), 'Mask', Mask)
+                    save_mat(rootName+'/results/Mask_bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.mat' \
+                            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']), 'Mask', Mask)
                 if idx == 1:
                     print('Sampling ratio: {}%'.format(torch.mean(netG_dc.Mask)*100))
                 if idx % 10 == 0:
@@ -450,10 +451,8 @@ if __name__ == '__main__':
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
-            if opt['loupe'] == -1:
-                save_mat(rootName+'/results/iField_{}m.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
-            else:
-                save_mat(rootName+'/results/iField_{}.mat'.format(opt['samplingRatio']), 'Recons', Recons_)
+            save_mat(rootName+'/results_ablation/iField_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
+                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
 
             # # write R2s into .mat file
             # R2s = np.concatenate(R2s, axis=0)
@@ -500,10 +499,8 @@ if __name__ == '__main__':
             adict = {}
             adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
             adict['R2star'], adict['Mask'] = R2star, Mask
-            if opt['loupe'] == -1:
-                sio.savemat(rootName+'/results/QSM_{}m_cc.mat'.format(opt['samplingRatio']), adict)
-            else:
-                sio.savemat(rootName+'/results/QSM_{}_cc.mat'.format(opt['samplingRatio']), adict)
+            sio.savemat(rootName+'/results_ablation/QSM_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
+                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
             
             
             
