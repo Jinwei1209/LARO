@@ -48,12 +48,12 @@ if __name__ == '__main__':
     parser.add_argument('--loupe', type=int, default=0)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
-    parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bcrnn2 block
+    parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    
-    
-    parser.add_argument('--samplingRatio', type=float, default=0.2)
+    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
+
+
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -148,7 +148,7 @@ if __name__ == '__main__':
 
     # training
     if opt['flag_train'] == 1:
-        memory_pre_alloc(opt['gpu_id'])
+        # memory_pre_alloc(opt['gpu_id'])
         if opt['loss'] == 0:
             loss = SSIM()
         elif opt['loss'] == 1:
@@ -468,6 +468,7 @@ if __name__ == '__main__':
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
             iField[..., 1] = - iField[..., 1]
+            print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
                 os.remove(rootName+'/results_QSM/iField.bin')
             iField.tofile(rootName+'/results_QSM/iField.bin')

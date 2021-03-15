@@ -14,6 +14,7 @@ from models.fa import faBlockNew
 from models.unet import *
 from models.straight_through_layers import *
 from models.BCRNN import BCRNNlayer
+from models.BCLSTM import BCLSTMlayer
 from utils.data import *
 from utils.operators import *
 
@@ -122,8 +123,8 @@ class Resnet_with_DC2(nn.Module):
                     self.resnet_block.append(layer)
                 self.resnet_block = nn.Sequential(*self.resnet_block)
                 self.resnet_block.apply(init_weights)
-            elif self.flag_BCRNN == 1:
-                print('Use BCRNN')
+
+            elif self.flag_BCRNN > 0:
                 n_ch = 2  # number of channels
                 nd = 5  # number of CRNN/BCRNN/CNN layers in each iteration
                 nf = 64  # number of filters
@@ -132,8 +133,16 @@ class Resnet_with_DC2(nn.Module):
                 self.nd = nd
                 self.nf = nf
                 self.ks = ks
+                if self.flag_BCRNN == 1:
+                    print('Use BCRNN')
+                    self.bcrnn = BCRNNlayer(n_ch, nf, ks)
+                elif self.flag_BCRNN == 2:
+                    nf_lstm = 32 # number of filters in BCLSTM
+                    nf = 32
+                    self.nf = nf  # number of filters
+                    print('Use BCLSTM')
+                    self.bcrnn = BCLSTMlayer(n_ch, nf_lstm, ks)
 
-                self.bcrnn = BCRNNlayer(n_ch, nf, ks)
                 self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
                 self.bn1_x = nn.GroupNorm(nf, nf)
                 # self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
@@ -336,7 +345,7 @@ class Resnet_with_DC2(nn.Module):
                     # update dual variable uk
                     uk = uk + self.lambda_dll2*(x - v_block1)
                 return Xs
-            elif self.flag_BCRNN == 1:
+            elif self.flag_BCRNN > 0:
                 x = torch_channel_deconcate(x).permute(0, 1, 3, 4, 2)  # (n, 2, nx, ny, n_seq)
                 x = x.contiguous()
                 net = {}
