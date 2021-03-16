@@ -192,7 +192,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=opt['bcrnn']
+                flag_BCRNN=opt['bcrnn'],
+                flag_att=opt['att']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -372,7 +373,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=opt['bcrnn']
+                flag_BCRNN=opt['bcrnn'],
+                flag_att=opt['att']
             )
         else:
             netG_dc = Resnet_with_DC2(

@@ -87,7 +87,7 @@ class Resnet_with_DC2(nn.Module):
         stochasticSampling=1,
         rescale=1,
         samplingRatio=0.2, # sparsity level of the sampling mask
-        # att=0, # flag to use attention-based denoiser
+        flag_att=0, # flag to use attention after temporal feature fusion
         # random=0, # flag to multiply the input data with a random complex number
     ):
         super(Resnet_with_DC2, self).__init__()
@@ -107,7 +107,7 @@ class Resnet_with_DC2(nn.Module):
         self.stochasticSampling = stochasticSampling
         self.rescale = rescale
         self.samplingRatio = samplingRatio
-        # self.att = att
+        self.flag_att = flag_att
         # self.random = random
 
         if self.flag_solver <= 1:
@@ -167,9 +167,9 @@ class Resnet_with_DC2(nn.Module):
         if self.flag_temporal_pred:
             self.densenet = DenseBlock(2*necho, 2*(10-necho))
         
-        # if self.att == 1:
-        #     self.attBlock = daBlock(input_channels, filter_channels//8, \
-        #                             out_channels=input_channels, use_norm=2)
+        if self.flag_att == 1:
+            print('Use Folded Attention')
+            self.attBlock = faBlockNew(self.nf)
 
         self.K = K
 
@@ -370,6 +370,10 @@ class Resnet_with_DC2(nn.Module):
                     # net['t%d_x0'%(i-1)] = net['t%d_x0'%(i-1)].view(n_seq, n_batch, self.nf, width, height)
                     # net['t%d_x0'%i] = self.bcrnn(x_, net['t%d_x0'%(i-1)], test)
                     net['t%d_x0'%i] = self.bcrnn(x_, test)
+                    if self.flag_att == 1:
+                        net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 2, 0, 3, 4)  # (nt, 1, nf, nx, ny) to (1, nf, nt, nx, ny)
+                        net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
+                        net['t%d_x0'%i] = net['t%d_x0'%i].permute(2, 0, 1, 3, 4)  # (1, nf, nt, nx, ny) to (nt, 1, nf, nx, ny)
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
                     net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
