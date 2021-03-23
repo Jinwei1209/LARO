@@ -88,5 +88,28 @@ def ssim(img1, img2, window_size = 11, size_average = True):
     
     return _ssim(img1, img2, window, window_size, channel, size_average)
 
+
+def snr_gain(r2s, te, weighting=0):
+    '''
+        SNR gain from multi-echo acquisition with or without weighted combination (not helping)
+    '''
+    tmp = torch.zeros(r2s.size()).to('cuda')
+
+    if weighting == 0:
+        N = len(te)
+        for i in range(N):
+            tmp += 1 / (te[i] * torch.exp(-r2s*te[i]))**2
+        snr =  N * r2s / 0.37 / torch.sqrt(tmp)
+
+    elif weighting == 1:
+        N = len(te)
+        for i in range(N):
+            tmp += te[i] * torch.exp(-r2s*te[i])
+        snr = tmp * r2s / 0.37 / np.sqrt(N)
+    
+    snr[torch.isnan(snr)] = 0
+    snr[torch.isinf(snr)] = 0
+    return snr.mean()
+
     
 

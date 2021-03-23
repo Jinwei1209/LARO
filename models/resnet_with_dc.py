@@ -17,6 +17,7 @@ from models.BCRNN import BCRNNlayer
 from models.BCLSTM import BCLSTMlayer
 from utils.data import *
 from utils.operators import *
+from torch.utils.checkpoint import checkpoint
 
 
 class Resnet_with_DC(nn.Module):
@@ -89,6 +90,7 @@ class Resnet_with_DC2(nn.Module):
         samplingRatio=0.2, # sparsity level of the sampling mask
         flag_att=0, # flag to use attention after temporal feature fusion
         # random=0, # flag to multiply the input data with a random complex number
+        flag_cp=0,
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
@@ -109,6 +111,7 @@ class Resnet_with_DC2(nn.Module):
         self.samplingRatio = samplingRatio
         self.flag_att = flag_att
         # self.random = random
+        self.flag_cp = flag_cp
 
         if self.flag_solver <= 1:
             if self.flag_BCRNN == 0:
@@ -376,7 +379,10 @@ class Resnet_with_DC2(nn.Module):
                         net['t%d_x0'%i] = net['t%d_x0'%i].permute(2, 0, 1, 3, 4)  # (1, nf, nt, nx, ny) to (nt, 1, nf, nx, ny)
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
-                    net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
+                    if net['t%d_x0'%i].requires_grad and self.flag_cp:
+                        net['t%d_x1'%i] = checkpoint(self.conv1_x, net['t%d_x0'%i])
+                    else:
+                        net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
                     net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
                     # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
                     # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])

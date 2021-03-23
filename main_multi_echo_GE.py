@@ -15,11 +15,11 @@ from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
 from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, Logger
-from utils.loss import lossL1, lossL2, SSIM
+from utils.loss import lossL1, lossL2, SSIM, snr_gain
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
-from fits.fits import fit_R2_LM
+from fits.fits import fit_R2_LM, arlo, fit_complex
 
 if __name__ == '__main__':
 
@@ -38,7 +38,8 @@ if __name__ == '__main__':
     nslice = 200
     necho = 10
     lambda_dll2 = 1e-3
-    
+    TEs = [0.001972, 0.005356, 0.008740, 0.012124, 0.015508, 0.018892, 0.022276, 0.025660, 0.029044, 0.032428]
+
     # typein parameters
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
@@ -54,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
 
 
+    parser.add_argument('--lambda1', type=float, default=1.0)  # weighting of r2s reconstruction loss
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -68,6 +70,7 @@ if __name__ == '__main__':
     K = opt['K']
     norm_last = opt['norm_last']
     flag_temporal_conv = opt['temporal_conv']
+    lambda1 = opt['lambda1']  #
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -193,7 +196,8 @@ if __name__ == '__main__':
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=opt['bcrnn'],
-                flag_att=opt['att']
+                flag_att=opt['att'],
+                flag_cp=0
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -288,10 +292,22 @@ if __name__ == '__main__':
                 optimizerG_dc.zero_grad()
                 Xs = netG_dc(kdatas, csms, masks, flip)
 
+                # compute r2s label
+                tmp = torch_channel_deconcate(targets)
+                mags = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
+                r2s_targets = arlo(TEs, mags)
+
                 lossl2_sum = 0
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
+                        # ssim loss
                         lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        # compute r2s
+                        Xsi = torch_channel_deconcate(Xs[i])
+                        mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
+                        r2s = arlo(TEs, mags)
+                        # snr gain loss
+                        lossl2_sum -= lambda1 * loss(r2s*brain_masks, r2s_targets*brain_masks)
                     else:
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
                 lossl2_sum.backward()
@@ -389,8 +405,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['lambda1']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -442,11 +458,14 @@ if __name__ == '__main__':
                     # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
                     # y = fit_R2_LM(targets)
+                    mags = torch.sqrt(Xs_1[:, 0, ...]**2 + Xs_1[:, 1, ...]**2).permute(0, 2, 3, 1)
+                    # y = arlo(TEs, mags)
+                    y = fit_complex(Xs_1.permute(0, 3, 4, 1, 2))
 
                 # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
-                # R2s.append(y[:, 0, ...].cpu().detach())
+                R2s.append(y.cpu().detach())
                 # water.append(y[:, 2, ...].cpu().detach())
                 # preconds.append(precond.cpu().detach())
 
@@ -456,9 +475,9 @@ if __name__ == '__main__':
             save_mat(rootName+'/results_ablation/iField_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
 
-            # # write R2s into .mat file
-            # R2s = np.concatenate(R2s, axis=0)
-            # save_mat(rootName+'/results/R2s.mat', 'R2s', R2s)
+            # write R2s into .mat file
+            R2s = np.concatenate(R2s, axis=0)
+            save_mat(rootName+'/results_ablation/R2s.mat', 'R2s', R2s)
 
             # # write water into .mat file
             # water = np.concatenate(water, axis=0)
