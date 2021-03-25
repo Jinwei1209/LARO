@@ -372,17 +372,17 @@ class Resnet_with_DC2(nn.Module):
                     x_ = x_.contiguous()
                     # net['t%d_x0'%(i-1)] = net['t%d_x0'%(i-1)].view(n_seq, n_batch, self.nf, width, height)
                     # net['t%d_x0'%i] = self.bcrnn(x_, net['t%d_x0'%(i-1)], test)
-                    net['t%d_x0'%i] = self.bcrnn(x_, test)
+                    if x_.requires_grad and self.flag_cp:
+                        net['t%d_x0'%i] = checkpoint(self.bcrnn, x_)
+                    else:
+                        net['t%d_x0'%i] = self.bcrnn(x_, test)
                     if self.flag_att == 1:
                         net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 2, 0, 3, 4)  # (nt, 1, nf, nx, ny) to (1, nf, nt, nx, ny)
                         net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
                         net['t%d_x0'%i] = net['t%d_x0'%i].permute(2, 0, 1, 3, 4)  # (1, nf, nt, nx, ny) to (nt, 1, nf, nx, ny)
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
-                    if net['t%d_x0'%i].requires_grad and self.flag_cp:
-                        net['t%d_x1'%i] = checkpoint(self.conv1_x, net['t%d_x0'%i])
-                    else:
-                        net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
+                    net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
                     net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
                     # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
                     # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])

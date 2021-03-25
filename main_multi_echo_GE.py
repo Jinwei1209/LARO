@@ -56,6 +56,7 @@ if __name__ == '__main__':
 
 
     parser.add_argument('--lambda1', type=float, default=1.0)  # weighting of r2s reconstruction loss
+    parser.add_argument('--lambda2', type=float, default=1.0)  # weighting of p1 reconstruction loss
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -70,7 +71,8 @@ if __name__ == '__main__':
     K = opt['K']
     norm_last = opt['norm_last']
     flag_temporal_conv = opt['temporal_conv']
-    lambda1 = opt['lambda1']  #
+    lambda1 = opt['lambda1']
+    lambda2 = opt['lambda2']
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -197,7 +199,7 @@ if __name__ == '__main__':
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=opt['bcrnn'],
                 flag_att=opt['att'],
-                flag_cp=0
+                flag_cp=1
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -294,8 +296,9 @@ if __name__ == '__main__':
 
                 # compute r2s label
                 tmp = torch_channel_deconcate(targets)
-                mags = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
-                r2s_targets = arlo(TEs, mags)
+                mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
+                r2s_targets = arlo(TEs, mags_target)
+                p1_targets = fit_complex(tmp.permute(0, 3, 4, 1, 2))
 
                 lossl2_sum = 0
                 for i in range(len(Xs)):
@@ -306,8 +309,10 @@ if __name__ == '__main__':
                         Xsi = torch_channel_deconcate(Xs[i])
                         mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
                         r2s = arlo(TEs, mags)
-                        # snr gain loss
-                        lossl2_sum -= lambda1 * loss(r2s*brain_masks, r2s_targets*brain_masks)
+                        p1 = fit_complex(Xsi.permute(0, 3, 4, 1, 2))
+                        # parameter estimation loss
+                        lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks[:, 0:1, ...])
+                        lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks[:, 0:1, ...])
                     else:
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
                 lossl2_sum.backward()
@@ -365,10 +370,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}_lambda2={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}_lambda2={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
     
     
     # for test
@@ -413,7 +418,7 @@ if __name__ == '__main__':
 
         Inputs = []
         Targets = []
-        R2s = []
+        R2s, R2s_target = [], []
         water = []
         Recons = []
         preconds = []
@@ -457,17 +462,16 @@ if __name__ == '__main__':
                     targets = torch_channel_deconcate(targets)
                     # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
-                    # y = fit_R2_LM(targets)
                     mags = torch.sqrt(Xs_1[:, 0, ...]**2 + Xs_1[:, 1, ...]**2).permute(0, 2, 3, 1)
                     # y = arlo(TEs, mags)
                     y = fit_complex(Xs_1.permute(0, 3, 4, 1, 2))
+                    y_target = fit_complex(targets.permute(0, 3, 4, 1, 2))
 
                 # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
                 R2s.append(y.cpu().detach())
-                # water.append(y[:, 2, ...].cpu().detach())
-                # preconds.append(precond.cpu().detach())
+                R2s_target.append(y_target.cpu().detach())
 
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
@@ -478,10 +482,8 @@ if __name__ == '__main__':
             # write R2s into .mat file
             R2s = np.concatenate(R2s, axis=0)
             save_mat(rootName+'/results_ablation/R2s.mat', 'R2s', R2s)
-
-            # # write water into .mat file
-            # water = np.concatenate(water, axis=0)
-            # save_mat(rootName+'/results/water.mat', 'water', water)
+            R2s_target = np.concatenate(R2s_target, axis=0)
+            save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
 
             # write into .bin file
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)

@@ -115,9 +115,8 @@ def fit_complex(M):
         fit_ppm_complex, M: (batch, height, width, 2, nechos)
     '''
     pi = 3.14159265358979323846
-    M[:, :, :, 1, :] =  - M[:, :, :, 1, :]
+    # M[:, :, :, 1, :] =  - M[:, :, :, 1, :]
     s0 = M.size()
-    L_s0 = len(s0)
     nechos = s0[-1]
 
     M = M.view(-1, 2, nechos)
@@ -145,7 +144,7 @@ def fit_complex(M):
     dp1 = p1
     tol = torch.mean(p1**2) * 1e-4
     idx_iter = 0
-    max_iter = 5
+    max_iter = 30  # 1 better?
 
     # weigthed least square, calculation of WA'*WA
     v1 = torch.ones((1, nechos)).to('cuda')
@@ -163,20 +162,26 @@ def fit_complex(M):
     ai12 = -a12/d
     ai22 = a11/d
 
+    tmp1 = torch.matmul(tmp, v1)[:, None, :]
+    tmp1 = torch.cat((tmp1, torch.zeros(tmp1.size()).to('cuda')), dim=1)  # (nvoxel, 2, necho)
+    tmp2 = torch.matmul(tmp, v2)[:, None, :]
+    tmp2 = torch.cat((tmp2, torch.zeros(tmp2.size()).to('cuda')), dim=1)  # (nvoxel, 2, necho)
+
+    abs_M = abs_M[:, None, :]
+
     while torch.mean(dp1**2) > tol and idx_iter < max_iter:
         idx_iter += 1
         W_phase = torch.matmul(p0[:, None], v1) + torch.matmul(p1[:, None], v2)
         W_phase = W_phase[:, None, :]
-        abs_M = abs_M[:, None, :]
+        # abs_M = abs_M[:, None, :]
         W = torch.cat((abs_M*torch.cos(W_phase), abs_M*torch.sin(W_phase)), dim=1)  # (nvoxel, 2, necho)
         conj_1iW = torch.cat((-abs_M*torch.sin(W_phase), -abs_M*torch.cos(W_phase)), dim=1)  # (nvoxel, 2, necho)
 
         # projection
-        tmp1 = torch.matmul(tmp, v1)[:, None, :]
-        tmp1 = torch.cat((tmp1, torch.zeros(tmp1.size()).to('cuda')), dim=1)  # (nvoxel, 2, necho)
-        print(tmp1.shape)
-        tmp2 = torch.matmul(tmp, v2)
-        tmp2 = torch.cat((tmp2, torch.zeros(tmp2.size()).to('cuda')), dim=1)  # (nvoxel, 2, necho)
+        # tmp1 = torch.matmul(tmp, v1)[:, None, :]
+        # tmp1 = torch.cat((tmp1, torch.zeros(tmp1.size()).to('cuda')), dim=1)  # (nvoxel, 2, necho)
+        # tmp2 = torch.matmul(tmp, v2)[:, None, :]
+        # tmp2 = torch.cat((tmp2, torch.zeros(tmp2.size()).to('cuda')), dim=1)  # (nvoxel, 2, necho)
         pr1 = torch.sum(mlpy_in_cg(mlpy_in_cg(conj_1iW, tmp1), M-W), dim=2)  # (nvoxel, 2)
         pr2 = torch.sum(mlpy_in_cg(mlpy_in_cg(conj_1iW, tmp2), M-W), dim=2)  # (nvoxel, 2)
 
@@ -189,11 +194,8 @@ def fit_complex(M):
         p0 = p0 + dp0
         p1 = p1 + dp1
 
-    # error propagation (skip here)
-    # relative residual (skip here)
-
     p1[p1>pi] = torch.fmod(p1[p1>pi] + pi, 2*pi) - pi
     p1[p1<-pi] = torch.fmod(p1[p1<-pi] + pi, 2*pi) - pi
-    p1 = ip[1, :].view(s0[0], s0[1], s0[2])
+    p1 = p1.view(s0[0], s0[1], s0[2])
     return p1
 
