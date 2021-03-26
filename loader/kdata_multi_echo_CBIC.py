@@ -108,14 +108,18 @@ class kdata_multi_echo_CBIC(data.Dataset):
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
         brain_mask = np.real(readcfl(dataFD + 'mask_slice_{}'.format(idx)))  # (row, col)
+        brain_mask_erode = np.real(readcfl(dataFD + 'mask_erode_slice_{}'.format(idx)))  # (row, col)
         if self.echo_cat:
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
+            brain_mask_erode = np.repeat(brain_mask_erode[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
         else:
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], 2, axis=0) # (2, row, col)
             brain_mask = np.repeat(brain_mask[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
+            brain_mask_erode = np.repeat(brain_mask_erode[np.newaxis, ...], 2, axis=0) # (2, row, col)
+            brain_mask_erode = np.repeat(brain_mask_erode[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
         
         if self.normalization == 0:
-            return kdata, org, org_gen, csm, brain_mask
+            return kdata, org, org_gen, csm, brain_mask, brain_mask_erode
 
 
 

@@ -240,7 +240,7 @@ if __name__ == '__main__':
             # training phase
             netG_dc.train()
             metrices_train = Metrices()
-            for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(trainLoader):
+            for idx, (kdatas, targets, targets_gen, csms, brain_masks, brain_masks_erode) in enumerate(trainLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
 
@@ -286,6 +286,7 @@ if __name__ == '__main__':
                 targets = targets.to(device)
                 csms = csms.to(device)
                 brain_masks = brain_masks.to(device)
+                brain_masks_erode = brain_masks_erode.to(device)
 
                 # operator = Back_forward_multiEcho(csms, masks, 0)
                 # test_image = operator.AtA(targets, 0).cpu().detach().numpy()
@@ -311,8 +312,8 @@ if __name__ == '__main__':
                         r2s = arlo(TEs, mags)
                         p1 = fit_complex(Xsi.permute(0, 3, 4, 1, 2))
                         # parameter estimation loss
-                        lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks[:, 0:1, ...])
-                        lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks[:, 0:1, ...])
+                        lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                     else:
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
                 lossl2_sum.backward()
@@ -332,7 +333,7 @@ if __name__ == '__main__':
             metrices_val = Metrices()
             loss_total_list = []
             with torch.no_grad():  # to solve memory exploration issue
-                for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(valLoader):
+                for idx, (kdatas, targets, targets_gen, csms, brain_masks, brain_masks_erode) in enumerate(valLoader):
                     kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                     csms = csms[:, :, :necho, ...]  # temporal undersampling    
                     if torch.sum(brain_masks) == 0:
@@ -410,8 +411,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['lambda1']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}_lambda2={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -435,7 +436,7 @@ if __name__ == '__main__':
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
         with torch.no_grad():
-            for idx, (kdatas, targets, targets_gen, csms, brain_masks) in enumerate(testLoader):
+            for idx, (kdatas, targets, targets_gen, csms, brain_masks, brain_masks_erode) in enumerate(testLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
 

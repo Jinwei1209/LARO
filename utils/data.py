@@ -74,7 +74,7 @@ def readcfl(name):
 
     # load data and reshape into dims
     d = open(name + ".cfl", "r")
-    a = np.fromfile(d, dtype=np.complex64, count=n);
+    a = np.fromfile(d, dtype=np.complex64, count=n)
     d.close()
     return a.reshape(dims, order='F') # column-major
 
