@@ -14,12 +14,12 @@ from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
-from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, Logger
+from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
 from utils.loss import lossL1, lossL2, SSIM, snr_gain
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
-from fits.fits import fit_R2_LM, arlo, fit_complex
+from fits.fits import fit_R2_LM, arlo, fit_complex, low_rank_approx
 
 if __name__ == '__main__':
 
@@ -55,8 +55,10 @@ if __name__ == '__main__':
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
 
 
-    parser.add_argument('--lambda1', type=float, default=1.0)  # weighting of r2s reconstruction loss
-    parser.add_argument('--lambda2', type=float, default=1.0)  # weighting of p1 reconstruction loss
+    parser.add_argument('--lambda0', type=float, default=5.0)  # weighting of low rank approximation loss
+    parser.add_argument('--rank', type=int, default=10)  #  rank of low rank approximation loss
+    parser.add_argument('--lambda1', type=float, default=0.0)  # weighting of r2s reconstruction loss
+    parser.add_argument('--lambda2', type=float, default=0.0)  # weighting of p1 reconstruction loss
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -71,8 +73,10 @@ if __name__ == '__main__':
     K = opt['K']
     norm_last = opt['norm_last']
     flag_temporal_conv = opt['temporal_conv']
+    lambda0 = opt['lambda0']
     lambda1 = opt['lambda1']
     lambda2 = opt['lambda2']
+    rank = opt['rank']
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -217,11 +221,11 @@ if __name__ == '__main__':
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
-                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio'], opt['solver']))
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
-                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio'], opt['solver']))
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -240,7 +244,7 @@ if __name__ == '__main__':
             # training phase
             netG_dc.train()
             metrices_train = Metrices()
-            for idx, (kdatas, targets, targets_gen, csms, brain_masks, brain_masks_erode) in enumerate(trainLoader):
+            for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(trainLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
 
@@ -285,6 +289,7 @@ if __name__ == '__main__':
                 kdatas = kdatas.to(device)
                 targets = targets.to(device)
                 csms = csms.to(device)
+                csm_lowres = csm_lowres.to(device)
                 brain_masks = brain_masks.to(device)
                 brain_masks_erode = brain_masks_erode.to(device)
 
@@ -299,23 +304,34 @@ if __name__ == '__main__':
                 tmp = torch_channel_deconcate(targets)
                 mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
                 r2s_targets = arlo(TEs, mags_target)
-                p1_targets = fit_complex(tmp.permute(0, 3, 4, 1, 2))
+                p1_targets = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=0)
 
                 lossl2_sum = 0
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
                         # ssim loss
                         lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
-                        # compute r2s
-                        Xsi = torch_channel_deconcate(Xs[i])
-                        mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
-                        r2s = arlo(TEs, mags)
-                        p1 = fit_complex(Xsi.permute(0, 3, 4, 1, 2))
-                        # parameter estimation loss
-                        lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
+                        # # compute r2s and field
+                        # Xsi = torch_channel_deconcate(Xs[i])
+                        # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
+                        # r2s = arlo(TEs, mags)
+                        # p1 = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=0)
+                        # # parameter estimation loss
+                        # lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        # lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                     else:
+                        # L1 or L2 loss
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
+                        lossl2_sum += lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
+                        # # compute r2s and field
+                        # Xsi = torch_channel_deconcate(Xs[i])
+                        # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
+                        # r2s = arlo(TEs, mags)
+                        # p1 = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=0)
+                        # # parameter estimation loss
+                        # lossl2_sum += lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        # lossl2_sum += lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                 lossl2_sum.backward()
                 optimizerG_dc.step()
 
@@ -333,7 +349,7 @@ if __name__ == '__main__':
             metrices_val = Metrices()
             loss_total_list = []
             with torch.no_grad():  # to solve memory exploration issue
-                for idx, (kdatas, targets, targets_gen, csms, brain_masks, brain_masks_erode) in enumerate(valLoader):
+                for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(valLoader):
                     kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                     csms = csms[:, :, :necho, ...]  # temporal undersampling    
                     if torch.sum(brain_masks) == 0:
@@ -371,10 +387,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}_lambda2={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}_lambda2={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda0={}_rank={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda0, rank))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda0={}_rank={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda0, rank))
     
     
     # for test
@@ -411,8 +427,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda1={}_lambda2={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda0={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda0))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -436,9 +452,10 @@ if __name__ == '__main__':
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
         with torch.no_grad():
-            for idx, (kdatas, targets, targets_gen, csms, brain_masks, brain_masks_erode) in enumerate(testLoader):
+            for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(testLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
+                csm_lowres = csm_lowres[:, :, :necho, ...]  # temporal undersampling
 
                 if idx == 1 and opt['loupe'] > 0:
                     Mask = netG_dc.Mask.cpu().detach().numpy()
@@ -453,6 +470,7 @@ if __name__ == '__main__':
                 kdatas = kdatas.to(device)
                 targets = targets.to(device)
                 csms = csms.to(device)
+                csm_lowres = csm_lowres.to(device)
                 brain_masks = brain_masks.to(device)
 
                 # inputs = backward_multiEcho(kdatas, csms, masks, flip,
@@ -464,15 +482,17 @@ if __name__ == '__main__':
                     # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
                     mags = torch.sqrt(Xs_1[:, 0, ...]**2 + Xs_1[:, 1, ...]**2).permute(0, 2, 3, 1)
-                    # y = arlo(TEs, mags)
-                    y = fit_complex(Xs_1.permute(0, 3, 4, 1, 2))
-                    y_target = fit_complex(targets.permute(0, 3, 4, 1, 2))
+                    y = arlo(TEs, mags)
+                    # y = fit_complex(Xs_1.permute(0, 3, 4, 1, 2))
+                    # y_target = fit_complex(targets.permute(0, 3, 4, 1, 2))
+                    # y = low_rank_approx(torch_channel_concate(Xs_1), kdatas, csm_lowres, k=20)
+                    # y = torch_channel_deconcate(y)
 
                 # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
                 R2s.append(y.cpu().detach())
-                R2s_target.append(y_target.cpu().detach())
+                # R2s_target.append(y_target.cpu().detach())
 
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
@@ -481,10 +501,12 @@ if __name__ == '__main__':
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
 
             # write R2s into .mat file
+            # R2s = np.squeeze(r2c(np.concatenate(R2s, axis=0), opt['echo_cat']))
+            # R2s = np.transpose(R2s, [0, 2, 3, 1])
             R2s = np.concatenate(R2s, axis=0)
             save_mat(rootName+'/results_ablation/R2s.mat', 'R2s', R2s)
-            R2s_target = np.concatenate(R2s_target, axis=0)
-            save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
+            # R2s_target = np.concatenate(R2s_target, axis=0)
+            # save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
 
             # write into .bin file
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)

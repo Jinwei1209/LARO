@@ -97,16 +97,25 @@ class kdata_multi_echo_CBIC(data.Dataset):
         if self.echo_cat == 0:
             org = np.transpose(org, (0, 3, 1, 2)) # (2, echo, row, col)
             org_gen = np.transpose(org_gen, (0, 3, 1, 2))
-            
+        
+        # Coil sensitivity maps
         csm = readcfl(dataFD + 'sensMaps_slice_{}'.format(idx))
         csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
         csm = np.repeat(csm, self.necho, axis=1)  # (coil, echo, row, col)
         csm = c2r_kdata(csm) # (coil, echo, row, col, 2) with last dimension real&imag
 
+        # Coil sensitivity maps from central kspace data
+        csm_lowres = readcfl(dataFD + 'sensMaps_lowres_slice_{}'.format(idx))
+        csm_lowres = np.transpose(csm_lowres, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
+        csm_lowres = np.repeat(csm_lowres, self.necho, axis=1)  # (coil, echo, row, col)
+        csm_lowres = c2r_kdata(csm_lowres) # (coil, echo, row, col, 2) with last dimension real&imag
+
+        # Fully sampled kspace data
         kdata = readcfl(dataFD + 'kdata_slice_{}'.format(idx))
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
+        # brain tissue mask
         brain_mask = np.real(readcfl(dataFD + 'mask_slice_{}'.format(idx)))  # (row, col)
         brain_mask_erode = np.real(readcfl(dataFD + 'mask_erode_slice_{}'.format(idx)))  # (row, col)
         if self.echo_cat:
@@ -119,7 +128,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             brain_mask_erode = np.repeat(brain_mask_erode[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
         
         if self.normalization == 0:
-            return kdata, org, org_gen, csm, brain_mask, brain_mask_erode
+            return kdata, org, org_gen, csm, csm_lowres, brain_mask, brain_mask_erode
 
 
 
