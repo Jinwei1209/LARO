@@ -5,58 +5,64 @@ from models.dc_blocks import mlpy_in_cg, conj_in_cg, dvd_in_cg
 from utils.operators import backward_multiEcho    
 
 
-def fit_R2_LM(s0, max_iter=10, tol=1e-2):
+def fit_R2_LM(M, max_iter=10, tol=1e-2):
     '''
-        nonlinear fitting to get R2s and water (wrong implementation)
+        nonlinear fitting to get R2s and water,
+        M: (batch, height, width, 2, nechos)
     '''
-    nsamples = s0.size()[0]
-    nechos = s0.size()[2]
-    nrows = s0.size()[3]
-    ncols = s0.size()[4]
+    matrix_size = M.size()
+    nechos = matrix_size[-1]
+    s0 = M.view(-1, 2, nechos).permute(2, 1, 0)  # (nechos, 2, nvoxels)
+    numvox = s0.size()[-1]
+
     # s0[s0==0] = 1e-8
-    tr = torch.arange(0, nechos)[None, None, :, None, None]  # 1st dimen: real = 1
-    tr = tr.repeat(nsamples, 1, 1, nrows, ncols).to('cuda')  # echo time
-    tc = torch.cat((tr, torch.zeros(tr.size()).to('cuda')), dim=1) # complex t
+    tr = torch.arange(0, nechos)[:, None, None]  # 1st dim: real = 1
+    tr = tr.repeat(1, 1, numvox).to('cuda')  # echo time
+    tc = torch.cat((tr, torch.zeros(tr.size()).to('cuda')), dim=1) # complex t, (nechos, 2, nvoxels)
 
-    y = torch.zeros(nsamples, 4, nrows, ncols).to('cuda')  # 1st dimension: 0:2 for R2s, 2:4 for water
-    y[:, 2, ...] = torch.sqrt(s0[:, 0, 0, ...]**2 + s0[:, 1, 0, ...]**2)
+    y = torch.zeros(4, numvox).to('cuda')  # 0st dimension: 0:2 for R2s, 2:4 for water
+    y[2, :] = torch.sqrt(s0[0, 0, :]**2 + s0[0, 1, :]**2)
 
-    P_mag = torch.exp(y[:, 0:1, None, ...].repeat(1, 1, nechos, 1, 1) * tr) 
-    P_phase = y[:, 1:2, None, ...].repeat(1, 1, nechos, 1, 1) * tr
+    y_times_t = mlpy_in_cg(y[None, 0:2, :].repeat(nechos, 1, 1), tc)
+    P_mag = torch.exp(y_times_t[:, 0:1, :])
+    P_phase = y_times_t[:, 1:2, :]
     P = torch.cat((P_mag * torch.cos(P_phase),  P_mag * torch.sin(P_phase)), dim=1) # signal decay
 
     i = 0
-    angles = torch.atan(s0[:, 1:2, ...] / s0[:, 0:1, ...])
+    angles = torch.atan2(s0[:, 1:2, :], s0[:, 0:1, :])
     expi_angles = torch.cat((torch.cos(angles), torch.sin(angles)), dim=1)
     while (i<max_iter):
-        sn = mlpy_in_cg(mlpy_in_cg(P, y[:, 2:4, None, ...].repeat(1, 1, nechos, 1, 1)), expi_angles)
+        sn = mlpy_in_cg(mlpy_in_cg(P, y[None, 2:4, :].repeat(nechos, 1, 1)), expi_angles)
         sr = s0 - sn
 
         Bcol01 = mlpy_in_cg(tc, sn)
         Bcol02 = mlpy_in_cg(P, expi_angles)
         dy = invB(Bcol01, Bcol02, sr)
 
+        # print(y.size())
+        # print(dy.size())
         y += dy
         i += 1
-        P_mag = torch.exp(y[:, 0:1, None, ...].repeat(1, 1, nechos, 1, 1) * tr) 
-        P_phase = y[:, 1:2, None, ...].repeat(1, 1, nechos, 1, 1) * tr
-        P = torch.cat((P_mag * torch.cos(P_phase), P_mag * torch.sin(P_phase)), dim=1) # signal decay
 
-
-        update = dy[:, 0, ...]
-        update[torch.isnan(update)] = 0
-        update[torch.isinf(update)] = 0
-
-    y[torch.isnan(y)] = 0
-    y[torch.isinf(y)] = 0
-    return y
+        y_times_t = mlpy_in_cg(y[None, 0:2, :].repeat(nechos, 1, 1), tc)
+        P_mag = torch.exp(y_times_t[:, 0:1, :])
+        P_phase = y_times_t[:, 1:2, :]
+        P = torch.cat((P_mag * torch.cos(P_phase),  P_mag * torch.sin(P_phase)), dim=1) # signal decay
+    
+    R2s = - y[0, :].view(matrix_size[0], matrix_size[1], matrix_size[2])
+    water = y[2, :].view(matrix_size[0], matrix_size[1], matrix_size[2])
+    R2s[torch.isnan(R2s)] = 0
+    R2s[torch.isinf(R2s)] = 0
+    water[torch.isnan(R2s)] = 0
+    water[torch.isinf(R2s)] = 0
+    return [R2s, water]
 
 
 def invB(col1, col2, y):
     # assemble A^H*A
-    b11 = torch.sum(mlpy_in_cg(conj_in_cg(col1), col1), dim=2)
-    b12 = torch.sum(mlpy_in_cg(conj_in_cg(col1), col2), dim=2)
-    b22 = torch.sum(mlpy_in_cg(conj_in_cg(col2), col2), dim=2)
+    b11 = torch.sum(mlpy_in_cg(conj_in_cg(col1), col1), dim=0, keepdim=True)  # (1, 2, nvoxels)
+    b12 = torch.sum(mlpy_in_cg(conj_in_cg(col1), col2), dim=0, keepdim=True)
+    b22 = torch.sum(mlpy_in_cg(conj_in_cg(col2), col2), dim=0, keepdim=True)
 
     # inversion of A^H*A
     d = (mlpy_in_cg(b11, b22) - mlpy_in_cg(b12, conj_in_cg(b12)))
@@ -65,19 +71,19 @@ def invB(col1, col2, y):
     ib22 = dvd_in_cg(b11, d)
 
     # y project onto A^H
-    py1 = torch.sum(mlpy_in_cg(conj_in_cg(col1), y), dim=2)
-    py2 = torch.sum(mlpy_in_cg(conj_in_cg(col2), y), dim=2)
+    py1 = torch.sum(mlpy_in_cg(conj_in_cg(col1), y), dim=0, keepdim=True)
+    py2 = torch.sum(mlpy_in_cg(conj_in_cg(col2), y), dim=0, keepdim=True)
 
     # calculate dy
     dy1 = mlpy_in_cg(ib11, py1) + mlpy_in_cg(ib12, py2)
     dy2 = mlpy_in_cg(conj_in_cg(ib12), py1) + mlpy_in_cg(ib22, py2)
 
-    return torch.cat((dy1, dy2), dim=1)
+    return torch.cat((dy1[0, ...], dy2[0, ...]), dim=0)
 
 
-def arlo(te, y):
+def arlo(te, y, flag_water=0):
     '''
-        arlo for R2s estimation
+        arlo for R2s estimation, y: (batch, height, width, nechos)
     '''
     nte = len(te)
     if nte < 2:
@@ -108,7 +114,13 @@ def arlo(te, y):
     r2 =  (yx + beta_xx) / (beta_yx + yy)
     r2[torch.isnan(r2)] = 0
     r2[torch.isinf(r2)] = 0
-    return r2
+
+    if flag_water:
+        A = torch.exp(-r2[..., None] * torch.tensor(np.array(te)[None, None, None, :]).to('cuda'))
+        water = torch.sum(A * y, dim=-1) / torch.sum(A * A, dim=-1)
+        return [r2, water]
+    else:
+        return r2
 
 
 def fit_complex(M, max_iter=30):
@@ -197,7 +209,8 @@ def fit_complex(M, max_iter=30):
     p1[p1>pi] = torch.fmod(p1[p1>pi] + pi, 2*pi) - pi
     p1[p1<-pi] = torch.fmod(p1[p1<-pi] + pi, 2*pi) - pi
     p1 = p1.view(s0[0], s0[1], s0[2])
-    return p1
+    p0 = p0.view(s0[0], s0[1], s0[2])
+    return [p1, p0]
 
 
 def low_rank_approx(img, kdata, csm, k=10):

@@ -9,7 +9,7 @@ from models.dc_blocks import *
 from models.unet_blocks import *
 from models.initialization import *
 from models.resBlocks import *
-from models.danet import daBlock  
+from models.danet import daBlock, CAM_Module  
 from models.fa import faBlockNew
 from models.unet import *
 from models.straight_through_layers import *
@@ -171,8 +171,8 @@ class Resnet_with_DC2(nn.Module):
             self.densenet = DenseBlock(2*necho, 2*(10-necho))
         
         if self.flag_att == 1:
-            print('Use Folded Attention')
-            self.attBlock = faBlockNew(self.nf)
+            print('Use Temporal Attention')
+            self.attBlock = CAM_Module(self.nf)
 
         self.K = K
 
@@ -377,9 +377,14 @@ class Resnet_with_DC2(nn.Module):
                     else:
                         net['t%d_x0'%i] = self.bcrnn(x_, test)
                     if self.flag_att == 1:
-                        net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 2, 0, 3, 4)  # (nt, 1, nf, nx, ny) to (1, nf, nt, nx, ny)
+                        # net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 2, 0, 3, 4)  # (nt, 1, nf, nx, ny) to (1, nf, nt, nx, ny)
+                        # net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
+                        # net['t%d_x0'%i] = net['t%d_x0'%i].permute(2, 0, 1, 3, 4)  # (1, nf, nt, nx, ny) to (nt, 1, nf, nx, ny)
+                        
+                        net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 0, 2, 3, 4).view(n_batch, n_seq, self.nf, width*height)  # (nt, 1, nf, nx, ny) to (1, nt, nf, nx*ny)
                         net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
-                        net['t%d_x0'%i] = net['t%d_x0'%i].permute(2, 0, 1, 3, 4)  # (1, nf, nt, nx, ny) to (nt, 1, nf, nx, ny)
+                        net['t%d_x0'%i].view(n_batch, n_seq, self.nf, width, height).permute(1, 0, 2, 3, 4)
+
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
                     net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])

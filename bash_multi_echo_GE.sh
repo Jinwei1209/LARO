@@ -12,5 +12,6 @@ for id in "${IDs[@]}";do
 
     # python main_multi_echo_GE.py --gpu_id=$gpu_id --flag_train=0 --test_sub=$id --loupe=-2 --bcrnn=0 --solver=0
     # python main_multi_echo_GE.py --gpu_id=$gpu_id --flag_train=0 --test_sub=$id --loupe=-1 --bcrnn=0 --solver=0
-    python main_multi_echo_GE.py --gpu_id=$gpu_id --flag_train=0 --test_sub=$id --loupe=0 --bcrnn=0 --solver=0
-done
+    # python main_multi_echo_GE.py --gpu_id=$gpu_id --flag_train=0 --test_sub=$id --loupe=0  --bcrnn=0 --solver=0
+    python main_multi_echo_GE.py --gpu_id=$gpu_id --flag_train=0 --test_sub=$id --loupe=0 --bcrnn=1 --solver=1 --loss=1
+    done 
