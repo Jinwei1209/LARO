@@ -37,6 +37,7 @@ if __name__ == '__main__':
     ncol = 80
     nslice = 200
     necho = 10
+    necho_pred = 10 - necho
     lambda_dll2 = 1e-3
     TEs = [0.001972, 0.005356, 0.008740, 0.012124, 0.015508, 0.018892, 0.022276, 0.025660, 0.029044, 0.032428]
 
@@ -52,13 +53,12 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
+    parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
-
-
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
     parser.add_argument('--rank', type=int, default=10)  #  rank of low rank approximation loss
-    parser.add_argument('--lambda1', type=float, default=1.0)  # weighting of r2s reconstruction loss
-    parser.add_argument('--lambda2', type=float, default=1.0)  # weighting of p1 reconstruction loss
+    parser.add_argument('--lambda1', type=float, default=0.0)  # weighting of r2s reconstruction loss
+    parser.add_argument('--lambda2', type=float, default=0.0)  # weighting of p1 reconstruction loss
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -77,6 +77,8 @@ if __name__ == '__main__':
     lambda1 = opt['lambda1']
     lambda2 = opt['lambda2']
     rank = opt['rank']
+    necho = opt['necho']
+    necho_pred = 10 - necho
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -191,6 +193,7 @@ if __name__ == '__main__':
                 input_channels=2*necho,
                 filter_channels=32*necho,
                 necho=necho,
+                necho_pred=necho_pred,
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
@@ -248,6 +251,8 @@ if __name__ == '__main__':
             for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(trainLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
+                targets = targets[:, :2*necho, ...]  # temporal undersampling
+                brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
 
                 if torch.sum(brain_masks) == 0:
                     continue
@@ -328,7 +333,7 @@ if __name__ == '__main__':
                     else:
                         # L1 or L2 loss
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
-                        lossl2_sum += lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
+                        # lossl2_sum += lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
                         # # compute r2s and field
                         # Xsi = torch_channel_deconcate(Xs[i])
                         # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
@@ -356,7 +361,10 @@ if __name__ == '__main__':
             with torch.no_grad():  # to solve memory exploration issue
                 for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(valLoader):
                     kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
-                    csms = csms[:, :, :necho, ...]  # temporal undersampling    
+                    csms = csms[:, :, :necho, ...]  # temporal undersampling
+                    targets = targets[:, :2*necho, ...]  # temporal undersampling
+                    brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
+
                     if torch.sum(brain_masks) == 0:
                         continue
 
@@ -392,10 +400,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda0={}_att={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda0, opt['att']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda0={}_att={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda0, opt['att']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho))
     
     
     # for test
@@ -405,6 +413,7 @@ if __name__ == '__main__':
                 input_channels=2*necho,
                 filter_channels=32*necho,
                 necho=necho,
+                necho_pred=necho_pred,
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
@@ -432,7 +441,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}___.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
@@ -463,8 +472,8 @@ if __name__ == '__main__':
                 csm_lowres = csm_lowres[:, :, :necho, ...]  # temporal undersampling
 
                 if idx == 1 and opt['loupe'] > 0:
-                    Mask = netG_dc.Mask.cpu().detach().numpy()
-                    # Mask = netG_dc.Pmask.cpu().detach().numpy()
+                    # Mask = netG_dc.Mask.cpu().detach().numpy()
+                    Mask = netG_dc.Pmask.cpu().detach().numpy()
                     print('Saving sampling mask: %', np.mean(Mask)*100)
                     save_mat(rootName+'/results/Mask_bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.mat' \
                             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']), 'Mask', Mask)
@@ -481,6 +490,7 @@ if __name__ == '__main__':
                 # inputs = backward_multiEcho(kdatas, csms, masks, flip,
                                             # opt['echo_cat'])
                 Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
+                Xs_1 = netG_dc(kdatas, csms, masks, flip, x_input=Xs_1)[-1]
                 precond = netG_dc.precond
                 if opt['echo_cat']:
                     targets = torch_channel_deconcate(targets)

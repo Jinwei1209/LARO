@@ -15,6 +15,7 @@ from models.unet import *
 from models.straight_through_layers import *
 from models.BCRNN import BCRNNlayer
 from models.BCLSTM import BCLSTMlayer
+from fits.fits import fit_R2_LM, fit_complex, arlo
 from utils.data import *
 from utils.operators import *
 from torch.utils.checkpoint import checkpoint
@@ -69,10 +70,12 @@ class Resnet_with_DC2(nn.Module):
         lambda_dll2, # initializing lambda_dll2
         lambda_tv=1e-3,
         rho_penalty=1e-2,
-        necho=10, # number of echos in the data
+        necho=10, # number of echos of input
+        necho_pred=0,  # number of echos to predict
         nrow=206,
         ncol=80,
         ncoil=12,
+        delta_TE=0.003384,
         K=1,  # number of unrolls
         echo_cat=1, # flag to concatenate echo dimension into channel
         flag_solver=0,  # 0 for deep Quasi-newton, 1 for deep ADMM,
@@ -95,6 +98,8 @@ class Resnet_with_DC2(nn.Module):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
         self.necho = necho
+        self.necho_pred_value = necho_pred
+        self.delta_TE = delta_TE
         self.nrow = nrow
         self.ncol = ncol
         self.ncoil = ncoil
@@ -252,7 +257,7 @@ class Resnet_with_DC2(nn.Module):
             Mask = 1/(1+torch.exp(-12*(Pmask_rescaled-thresh)))
         return Mask
 
-    def forward(self, kdatas, csms, masks, flip, test=False):
+    def forward(self, kdatas, csms, masks, flip, test=False, x_input=None):
         # generate sampling mask
         if self.flag_loupe == 1:
             masks = self.generateMask(self.weight_parameters)
@@ -272,6 +277,14 @@ class Resnet_with_DC2(nn.Module):
         else:
             x_start_ = x_start
 
+        if x_input is not None:
+            x = x_input
+            self.necho_pred = self.necho_pred_value
+            # print('Echo prediction')
+        else:
+            self.necho_pred = 0
+            # print('No prediction')
+
         # generate preconditioner
         if self.flag_precond == 1:
             precond = 3 / (1 + torch.exp(-0.1 * self.preconditioner(x_start_))) + 1
@@ -283,48 +296,126 @@ class Resnet_with_DC2(nn.Module):
 
         # Deep Quasi-newton
         if self.flag_solver == 0:
-            A = Back_forward_multiEcho(csms, masks, flip, 
-                                    self.lambda_dll2, self.echo_cat)
-            Xs = []
-            for i in range(self.K):
-                # if self.random:
-                #     mag = (1 + torch.randn(1)/3).to(device)
-                #     phase = (torch.rand(1) * 3.14/2 - 3.14/4).to(device)
-                #     factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None, None]
+            if self.flag_BCRNN == 0:
+                A = Back_forward_multiEcho(csms, masks, flip, 
+                                        self.lambda_dll2, self.echo_cat)
+                Xs = []
+                for i in range(self.K):
+                    # if self.random:
+                    #     mag = (1 + torch.randn(1)/3).to(device)
+                    #     phase = (torch.rand(1) * 3.14/2 - 3.14/4).to(device)
+                    #     factor = torch.cat((mag*torch.cos(phase), mag*torch.sin(phase)), 0)[None, :, None, None, None]
 
-                #     if self.echo_cat == 0:
-                #         x = mlpy_in_cg(x, factor)  # for echo_cat=0
-                #     elif self.echo_cat == 1:
-                #         x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))  # for echo_cat=1
+                    #     if self.echo_cat == 0:
+                    #         x = mlpy_in_cg(x, factor)  # for echo_cat=0
+                    #     elif self.echo_cat == 1:
+                    #         x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))  # for echo_cat=1
 
-                # if i != self.K // 2:
-                #     x_block = self.resnet_block(x)
-                # else:
-                #     if self.att == 1:
-                #         x_block = self.attBlock(x)
-                #     else:
-                #         x_block = self.resnet_block(x)
+                    # if i != self.K // 2:
+                    #     x_block = self.resnet_block(x)
+                    # else:
+                    #     if self.att == 1:
+                    #         x_block = self.attBlock(x)
+                    #     else:
+                    #         x_block = self.resnet_block(x)
 
-                x_block = self.resnet_block(x)
-                x_block1 = x - x_block
+                    x_block = self.resnet_block(x)
+                    x_block1 = x - x_block
 
-                # if self.random:
-                #     factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None, None]
-                #     if self.echo_cat == 0:
-                #         x = mlpy_in_cg(x, factor)  # for echo_cat=0
-                #     elif self.echo_cat == 1:
-                #         x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))  # for echo_cat=1
+                    # if self.random:
+                    #     factor = torch.cat((1/mag*torch.cos(phase), -1/mag*torch.sin(phase)), 0)[None, :, None, None, None]
+                    #     if self.echo_cat == 0:
+                    #         x = mlpy_in_cg(x, factor)  # for echo_cat=0
+                    #     elif self.echo_cat == 1:
+                    #         x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))  # for echo_cat=1
 
-                rhs = x_start + self.lambda_dll2*x_block1
-                dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
-                        flag_precond=self.flag_precond, precond=self.precond)
-                x = dc_layer.CG_iter()
+                    rhs = x_start + self.lambda_dll2*x_block1
+                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
+                            flag_precond=self.flag_precond, precond=self.precond)
+                    x = dc_layer.CG_iter()
 
-                if self.echo_cat:
-                    x = torch_channel_concate(x)
-                Xs.append(x)
-            return Xs
+                    if self.echo_cat:
+                        x = torch_channel_concate(x)
+                    Xs.append(x)
+                return Xs
+            elif self.flag_BCRNN > 0:
+                x = torch_channel_deconcate(x).permute(0, 1, 3, 4, 2)  # (n, 2, nx, ny, n_seq)
+                x = x.contiguous()
+                net = {}
+                n_batch, n_ch, width, height, n_seq = x.size()
+                size_h = [n_seq*n_batch, self.nf, width, height]
+                if test:
+                    with torch.no_grad():
+                        hid_init = Variable(torch.zeros(size_h)).cuda()
+                else:
+                    hid_init = Variable(torch.zeros(size_h)).cuda()
+                for j in range(self.nd-1):
+                    net['t0_x%d'%j]=hid_init
 
+                A = Back_forward_multiEcho(csms, masks, flip, 
+                                        self.lambda_dll2, self.echo_cat, self.necho)
+                Xs = []
+                for i in range(1, self.K+1):
+                    # update auxiliary variable x0
+                    x_ = x.permute(4, 0, 1, 2, 3) # (n_seq, n, 2, nx, ny)
+                    x_ = x_.contiguous()
+                    # net['t%d_x0'%(i-1)] = net['t%d_x0'%(i-1)].view(n_seq, n_batch, self.nf, width, height)
+                    # net['t%d_x0'%i] = self.bcrnn(x_, net['t%d_x0'%(i-1)], test)
+                    if x_.requires_grad and self.flag_cp:
+                        net['t%d_x0'%i] = checkpoint(self.bcrnn, x_)
+                    else:
+                        net['t%d_x0'%i] = self.bcrnn(x_, test)
+                    if self.flag_att == 1:
+                        # net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 2, 0, 3, 4)  # (nt, 1, nf, nx, ny) to (1, nf, nt, nx, ny)
+                        # net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
+                        # net['t%d_x0'%i] = net['t%d_x0'%i].permute(2, 0, 1, 3, 4)  # (1, nf, nt, nx, ny) to (nt, 1, nf, nx, ny)
+                        
+                        net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 0, 2, 3, 4).view(n_batch, n_seq, self.nf, width*height)  # (nt, 1, nf, nx, ny) to (1, nt, nf, nx*ny)
+                        net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
+                        net['t%d_x0'%i].view(n_batch, n_seq, self.nf, width, height).permute(1, 0, 2, 3, 4)
+
+                    net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
+
+                    net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
+                    net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
+                    # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
+                    # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
+                    net['t%d_x1'%i] = self.relu(net['t%d_x1'%i])
+
+                    net['t%d_x2'%i] = self.conv2_x(net['t%d_x1'%i])
+                    net['t%d_x2'%i] = self.bn2_x(net['t%d_x2'%i])
+                    # net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
+                    # net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
+                    net['t%d_x2'%i] = self.relu(net['t%d_x2'%i])
+
+                    net['t%d_x3'%i] = self.conv3_x(net['t%d_x2'%i])
+                    net['t%d_x3'%i] = self.bn3_x(net['t%d_x3'%i])
+                    # net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
+                    # net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
+                    net['t%d_x3'%i] = self.relu(net['t%d_x3'%i])
+
+                    net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
+
+                    x_ = x_.view(-1, n_ch, width, height)
+                    net['t%d_out'%i] = x_ - net['t%d_x4'%i]
+
+                    # update x using CG block
+                    x0 = net['t%d_out'%i] # (n_seq, 2, nx, ny)
+                    x0_ = torch_channel_concate(x0[None, ...].permute(0, 2, 1, 3, 4), self.necho).contiguous()
+                    rhs = x_start + self.lambda_dll2*x0_
+                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat, necho=self.necho,
+                                                  flag_precond=self.flag_precond, precond=self.precond)
+                    x = dc_layer.CG_iter()
+                    if self.echo_cat:
+                        x = torch_channel_concate(x, self.necho)
+                    if self.flag_temporal_pred:
+                        x_last_echos = self.densenet(x)
+                        Xs.append(torch.cat((x, x_last_echos), 1))
+                    else:
+                        Xs.append(x)
+                    x = torch_channel_deconcate(x).permute(0, 2, 1, 3, 4).view(-1, n_ch, width, height) # (n_seq, 2, nx, ny)
+                    x = x[None, ...].permute(0, 2, 3, 4, 1).contiguous()
+                return Xs
         # Deep ADMM
         elif self.flag_solver == 1:
             if self.flag_BCRNN == 0:
@@ -350,9 +441,25 @@ class Resnet_with_DC2(nn.Module):
                 return Xs
             elif self.flag_BCRNN > 0:
                 x = torch_channel_deconcate(x).permute(0, 1, 3, 4, 2)  # (n, 2, nx, ny, n_seq)
+                if self.necho_pred > 0:
+                    with torch.no_grad():
+                        x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
+                        x_pred = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_pred).to('cuda')
+                        [_, water] = fit_R2_LM(x_under)
+                        r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2))
+                        [p1, p0] = fit_complex(x_under)
+                        water = water[0, ...]
+                        r2s = r2s[0, ...]
+                        p1 = p1[0, ...]
+                        p0 = p0[0, ...]
+                        for echo in range(self.necho, self.necho+self.necho_pred):
+                            x_pred[0, 0, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+                            x_pred[0, 1, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+                    x = torch.cat((x[..., :self.necho], x_pred), dim=-1)
                 x = x.contiguous()
                 net = {}
                 n_batch, n_ch, width, height, n_seq = x.size()
+                n_seq = self.necho + self.necho_pred
                 size_h = [n_seq*n_batch, self.nf, width, height]
                 if test:
                     with torch.no_grad():
@@ -365,8 +472,26 @@ class Resnet_with_DC2(nn.Module):
                 A = Back_forward_multiEcho(csms, masks, flip, 
                                         self.lambda_dll2, self.echo_cat, self.necho)
                 Xs = []
-                uk = torch.zeros(x.size()).to('cuda')
+                uk = torch.zeros(n_batch, n_ch, width, height, n_seq).to('cuda')
                 for i in range(1, self.K+1):
+                    # predict later echos using the first several echos
+                    if self.necho_pred > 0:
+                        with torch.no_grad():
+                            x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
+                            x_pred = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_pred).to('cuda')
+                            [_, water] = fit_R2_LM(x_under)
+                            r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2)) 
+                            [p1, p0] = fit_complex(x_under)
+                            water = water[0, ...]
+                            r2s = r2s[0, ...]
+                            p1 = p1[0, ...]
+                            p0 = p0[0, ...]
+                            for echo in range(self.necho, self.necho+self.necho_pred):
+                                x_pred[0, 0, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+                                x_pred[0, 1, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+                        x = torch.cat((x[..., :self.necho], x_pred), dim=-1)
+                        x[torch.isnan(x)] = 0
+                        x[x > 1] = 0
                     # update auxiliary variable v
                     x_ = (x+uk/self.lambda_dll2).permute(4, 0, 1, 2, 3) # (n_seq, n, 2, nx, ny)
                     x_ = x_.contiguous()
@@ -413,20 +538,23 @@ class Resnet_with_DC2(nn.Module):
                     # update x using CG block
                     uk_ = uk.permute(4, 0, 1, 2, 3).view(-1, n_ch, width, height)
                     x0 = net['t%d_out'%i] - uk_/self.lambda_dll2  # (n_seq, 2, nx, ny)
-                    x0_ = torch_channel_concate(x0[None, ...].permute(0, 2, 1, 3, 4), self.necho).contiguous()
-                    rhs = x_start + self.lambda_dll2*x0_
+                    x0_ = torch_channel_concate(x0[None, ...].permute(0, 2, 1, 3, 4), self.necho+self.necho_pred).contiguous()
+                    rhs = x_start + self.lambda_dll2*x0_[:, :self.necho*2, ...]
                     dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat, necho=self.necho,
                                                   flag_precond=self.flag_precond, precond=self.precond)
                     x = dc_layer.CG_iter()
+                    if self.necho_pred > 0:
+                        x = torch.cat((x, net['t%d_out'%i][None, self.necho:, ...].permute(0, 2, 1, 3, 4)), dim=2)
                     if self.echo_cat:
-                        x = torch_channel_concate(x, self.necho)
+                        x = torch_channel_concate(x, self.necho+self.necho_pred)
                     if self.flag_temporal_pred:
                         x_last_echos = self.densenet(x)
                         Xs.append(torch.cat((x, x_last_echos), 1))
                     else:
                         Xs.append(x)
+                        # Xs.append(x0_)
+                        # Xs.append(torch_channel_concate(net['t%d_out'%i][None, ...].permute(0, 2, 1, 3, 4), self.necho+self.necho_pred))
                     x = torch_channel_deconcate(x).permute(0, 2, 1, 3, 4).view(-1, n_ch, width, height) # (n_seq, 2, nx, ny)
-                    
                     # update dual variable uk
                     uk = uk_ + self.lambda_dll2*(x - net['t%d_out'%i])
 
