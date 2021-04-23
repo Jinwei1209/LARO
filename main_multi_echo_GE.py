@@ -36,8 +36,6 @@ if __name__ == '__main__':
     nrow = 206
     ncol = 80
     nslice = 200
-    necho = 10
-    necho_pred = 10 - necho
     lambda_dll2 = 1e-3
     TEs = [0.001972, 0.005356, 0.008740, 0.012124, 0.015508, 0.018892, 0.022276, 0.025660, 0.029044, 0.032428]
 
@@ -54,6 +52,8 @@ if __name__ == '__main__':
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
+    parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
+    
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
     parser.add_argument('--rank', type=int, default=10)  #  rank of low rank approximation loss
@@ -224,11 +224,16 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            netG_dc.load_state_dict(weights_dict)
+
+        if opt['temporal_pred'] == 1:
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
 
@@ -248,11 +253,13 @@ if __name__ == '__main__':
             # training phase
             netG_dc.train()
             metrices_train = Metrices()
-            for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(trainLoader):
+            for idx, (kdatas, targets, recon_input, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(trainLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
-                targets = targets[:, :2*necho, ...]  # temporal undersampling
-                brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
+                recon_input = recon_input[:, :2*necho, ...]  # temporal undersampling
+                if opt['temporal_pred'] == 0:
+                    targets = targets[:, :2*necho, ...]  # temporal undersampling
+                    brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
 
                 if torch.sum(brain_masks) == 0:
                     continue
@@ -262,8 +269,8 @@ if __name__ == '__main__':
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                     % (epoch, niter, idx, 600//batch_size, time.time()-t0))
 
-                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}'.format( \
-                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver']))
+                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, necho: {}'.format( \
+                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], necho))
                     
                     if opt['loupe'] > 0:
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
@@ -288,12 +295,9 @@ if __name__ == '__main__':
 
                     errL2_dc_sum = 0
 
-                # # check target and target_gen
-                # save_mat(rootName+'/results/targets.mat', 'targets', targets.numpy())
-                # save_mat(rootName+'/results/targets_gen.mat', 'targets_gen', targets_gen.numpy())
-                
                 kdatas = kdatas.to(device)
                 targets = targets.to(device)
+                recon_input = recon_input.to(device)
                 csms = csms.to(device)
                 csm_lowres = csm_lowres.to(device)
                 brain_masks = brain_masks.to(device)
@@ -304,7 +308,10 @@ if __name__ == '__main__':
                 # save_mat(rootName+'/results/test_image.mat', 'test_image', test_image)
 
                 optimizerG_dc.zero_grad()
-                Xs = netG_dc(kdatas, csms, masks, flip)
+                if opt['temporal_pred'] == 1:
+                    Xs = netG_dc(kdatas, csms, masks, flip, x_input=recon_input)
+                else:
+                    Xs = netG_dc(kdatas, csms, masks, flip)
 
                 # # compute paremeters label
                 # tmp = torch_channel_deconcate(targets)
@@ -359,21 +366,27 @@ if __name__ == '__main__':
             metrices_val = Metrices()
             loss_total_list = []
             with torch.no_grad():  # to solve memory exploration issue
-                for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(valLoader):
+                for idx, (kdatas, targets, recon_input, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(valLoader):
                     kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                     csms = csms[:, :, :necho, ...]  # temporal undersampling
-                    targets = targets[:, :2*necho, ...]  # temporal undersampling
-                    brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
+                    recon_input = recon_input[:, :2*necho, ...]  # temporal undersampling
+                    if opt['temporal_pred'] == 0:
+                        targets = targets[:, :2*necho, ...]  # temporal undersampling
+                        brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
 
                     if torch.sum(brain_masks) == 0:
                         continue
 
                     kdatas = kdatas.to(device)
                     targets = targets.to(device)
+                    recon_input = recon_input.to(device)
                     csms = csms.to(device)
                     brain_masks = brain_masks.to(device)
 
-                    Xs = netG_dc(kdatas, csms, masks, flip)
+                    if opt['temporal_pred'] == 1:
+                        Xs = netG_dc(kdatas, csms, masks, flip, x_input=recon_input)
+                    else:
+                        Xs = netG_dc(kdatas, csms, masks, flip)
 
                     metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
                     # targets = np.asarray(targets.cpu().detach())
@@ -400,10 +413,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
     
     
     # for test
@@ -443,6 +456,10 @@ if __name__ == '__main__':
             )
         weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+        if opt['temporal_pred'] == 1:
+            print('Temporal Prediction with {} Echos'.format(necho))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -466,10 +483,11 @@ if __name__ == '__main__':
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
         with torch.no_grad():
-            for idx, (kdatas, targets, targets_gen, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(testLoader):
+            for idx, (kdatas, targets, recon_input, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(testLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
                 csm_lowres = csm_lowres[:, :, :necho, ...]  # temporal undersampling
+                recon_input = recon_input[:, :2*necho, ...]  # temporal undersampling
 
                 if idx == 1 and opt['loupe'] > 0:
                     # Mask = netG_dc.Mask.cpu().detach().numpy()
@@ -485,12 +503,15 @@ if __name__ == '__main__':
                 targets = targets.to(device)
                 csms = csms.to(device)
                 csm_lowres = csm_lowres.to(device)
+                recon_input = recon_input.to(device)
                 brain_masks = brain_masks.to(device)
 
                 # inputs = backward_multiEcho(kdatas, csms, masks, flip,
                                             # opt['echo_cat'])
-                Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
-                Xs_1 = netG_dc(kdatas, csms, masks, flip, x_input=Xs_1)[-1]
+                if opt['temporal_pred'] == 1:
+                    Xs_1 = netG_dc(kdatas, csms, masks, flip, x_input=recon_input)[-1]
+                else:
+                    Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
                 precond = netG_dc.precond
                 if opt['echo_cat']:
                     targets = torch_channel_deconcate(targets)

@@ -456,6 +456,8 @@ class Resnet_with_DC2(nn.Module):
                             x_pred[0, 0, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
                             x_pred[0, 1, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
                     x = torch.cat((x[..., :self.necho], x_pred), dim=-1)
+                    x[torch.isnan(x)] = 0
+                    x[x > 1] = 0
                 x = x.contiguous()
                 net = {}
                 n_batch, n_ch, width, height, n_seq = x.size()
@@ -474,24 +476,24 @@ class Resnet_with_DC2(nn.Module):
                 Xs = []
                 uk = torch.zeros(n_batch, n_ch, width, height, n_seq).to('cuda')
                 for i in range(1, self.K+1):
-                    # predict later echos using the first several echos
-                    if self.necho_pred > 0:
-                        with torch.no_grad():
-                            x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
-                            x_pred = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_pred).to('cuda')
-                            [_, water] = fit_R2_LM(x_under)
-                            r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2)) 
-                            [p1, p0] = fit_complex(x_under)
-                            water = water[0, ...]
-                            r2s = r2s[0, ...]
-                            p1 = p1[0, ...]
-                            p0 = p0[0, ...]
-                            for echo in range(self.necho, self.necho+self.necho_pred):
-                                x_pred[0, 0, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
-                                x_pred[0, 1, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
-                        x = torch.cat((x[..., :self.necho], x_pred), dim=-1)
-                        x[torch.isnan(x)] = 0
-                        x[x > 1] = 0
+                    # # predict later echos using the first several echos
+                    # if self.necho_pred > 0:
+                    #     with torch.no_grad():
+                    #         x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
+                    #         x_pred = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_pred).to('cuda')
+                    #         [_, water] = fit_R2_LM(x_under)
+                    #         r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2)) 
+                    #         [p1, p0] = fit_complex(x_under)
+                    #         water = water[0, ...]
+                    #         r2s = r2s[0, ...]
+                    #         p1 = p1[0, ...]
+                    #         p0 = p0[0, ...]
+                    #         for echo in range(self.necho, self.necho+self.necho_pred):
+                    #             x_pred[0, 0, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+                    #             x_pred[0, 1, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+                    #     x = torch.cat((x[..., :self.necho], x_pred), dim=-1)
+                    #     x[torch.isnan(x)] = 0
+                    #     x[x > 1] = 0
                     # update auxiliary variable v
                     x_ = (x+uk/self.lambda_dll2).permute(4, 0, 1, 2, 3) # (n_seq, n, 2, nx, ny)
                     x_ = x_.contiguous()

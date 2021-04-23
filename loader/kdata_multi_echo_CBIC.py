@@ -15,6 +15,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
         rootDir = '/data/Jinwei/QSM_raw_CBIC',
         contrast = 'MultiEcho',
         necho = 10, # number of echos
+        nrow = 206,
+        ncol = 80,
         split = 'train',
         subject = 0,  # 0: junghun, 1: chao, 2: alexey
         normalization = 0,  # flag to normalize the data
@@ -29,6 +31,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.normalization = normalization
         self.echo_cat = echo_cat
         self.split = split
+        self.nrow = nrow
+        self.ncol = ncol
         if contrast == 'MultiEcho':
             if split == 'train':
                 self.nsamples = 600
@@ -49,6 +53,15 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.augIndex = 0
         self.batchSize = batchSize
         self.batchIndex = 0
+        self.recon_inputs = np.zeros((self.nsamples, self.nrow, self.ncol, self.necho)) + 1j * np.zeros((self.nsamples, self.nrow, self.ncol, self.necho))
+        if split == 'train':
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_train.mat', 'Recons')
+            self.recon_inputs[200:400, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=1_train.mat', 'Recons')
+            self.recon_inputs[400:600, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=2_train.mat', 'Recons')
+        elif split == 'val':
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_val.mat', 'Recons')
+        elif split == 'test':
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub={}_test.mat'.format(subject), 'Recons')
 
 
     def __len__(self):
@@ -57,6 +70,9 @@ class kdata_multi_echo_CBIC(data.Dataset):
 
 
     def __getitem__(self, idx):
+        recon_input = self.recon_inputs[idx, ...]
+        recon_input =  c2r(recon_input, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
+                                        # echo_cat == 0: (2, row, col, echo)
 
         if self.split == 'train':
             subject = 0
@@ -92,11 +108,9 @@ class kdata_multi_echo_CBIC(data.Dataset):
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 
-        org_gen = org
-
         if self.echo_cat == 0:
             org = np.transpose(org, (0, 3, 1, 2)) # (2, echo, row, col)
-            org_gen = np.transpose(org_gen, (0, 3, 1, 2))
+            recon_input = np.transpose(recon_input, (0, 3, 1, 2))
         
         # Coil sensitivity maps
         csm = readcfl(dataFD + 'sensMaps_slice_{}'.format(idx))
@@ -128,7 +142,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             brain_mask_erode = np.repeat(brain_mask_erode[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
         
         if self.normalization == 0:
-            return kdata, org, org_gen, csm, csm_lowres, brain_mask, brain_mask_erode
+            return kdata, org, recon_input, csm, csm_lowres, brain_mask, brain_mask_erode
 
 
 
