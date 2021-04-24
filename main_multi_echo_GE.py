@@ -48,12 +48,12 @@ if __name__ == '__main__':
     parser.add_argument('--loupe', type=int, default=0)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
+    parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
+    parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
+    parser.add_argument('--necho_ghost', type=int, default=0)  # number of ghost echos to append for better denoising
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
-    parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
-    
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
     parser.add_argument('--rank', type=int, default=10)  #  rank of low rank approximation loss
@@ -79,6 +79,7 @@ if __name__ == '__main__':
     rank = opt['rank']
     necho = opt['necho']
     necho_pred = 10 - necho
+    necho_ghost = opt['necho_ghost']
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -194,6 +195,7 @@ if __name__ == '__main__':
                 filter_channels=32*necho,
                 necho=necho,
                 necho_pred=necho_pred,
+                necho_ghost=necho_ghost,
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
@@ -269,8 +271,8 @@ if __name__ == '__main__':
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
                     % (epoch, niter, idx, 600//batch_size, time.time()-t0))
 
-                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, necho: {}'.format( \
-                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], necho))
+                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, necho: {}, temporal: {}'.format( \
+                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], necho, opt['temporal_pred']))
                     
                     if opt['loupe'] > 0:
                         print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
@@ -413,10 +415,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
     
     
     # for test
@@ -427,6 +429,7 @@ if __name__ == '__main__':
                 filter_channels=32*necho,
                 necho=necho,
                 necho_pred=necho_pred,
+                necho_ghost=necho_ghost,
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
@@ -454,12 +457,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
-        if opt['temporal_pred'] == 1:
-            print('Temporal Prediction with {} Echos'.format(necho))
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -556,7 +555,7 @@ if __name__ == '__main__':
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
             print('iField size is: ', np.concatenate(Recons, axis=0).shape)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
-            iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
+            # iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
             iField[..., 1] = - iField[..., 1]
             print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
@@ -565,14 +564,24 @@ if __name__ == '__main__':
             print('Successfully save iField.bin')
 
             # run MEDIN
-            os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                    + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-                    + ' --temp ' + rootName +  '/results_QSM/'
-                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                    + ' --CSF ' + ' -of QR')
+            if opt['temporal_pred'] == 0 and necho == 6:
+                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                        + ' --parameter ' + rootName + '/results_QSM/parameter_temporal.txt'
+                        + ' --temp ' + rootName +  '/results_QSM/'
+                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                        + ' --CSF ' + ' -of QR')
+            else:
+                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                        + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                        + ' --temp ' + rootName +  '/results_QSM/'
+                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                        + ' --CSF ' + ' -of QR')
             
             # read .bin files and save into .mat files
-            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
+            if opt['temporal_pred'] == 0 and necho == 6:
+                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_06.bin', 'f4')
+            else:
+                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
             QSM = np.transpose(QSM.reshape([80, 206, nslice]), [2, 1, 0])
 
             iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')

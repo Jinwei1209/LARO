@@ -14,7 +14,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
     def __init__(self,
         rootDir = '/data/Jinwei/QSM_raw_CBIC',
         contrast = 'MultiEcho',
-        necho = 10, # number of echos
+        necho = 10, # number of echos of predictions
+        necho_input = 6, # number of echos of inputs
         nrow = 206,
         ncol = 80,
         split = 'train',
@@ -41,11 +42,11 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'junghun'
+                    self.subject = 'junghun2'
                 elif subject == 1:
-                    self.subject = 'chao'
+                    self.subject = 'chao2'
                 elif subject == 2:
-                    self.subject = 'alexey'
+                    self.subject = 'alexey2'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -53,15 +54,15 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.augIndex = 0
         self.batchSize = batchSize
         self.batchIndex = 0
-        self.recon_inputs = np.zeros((self.nsamples, self.nrow, self.ncol, self.necho)) + 1j * np.zeros((self.nsamples, self.nrow, self.ncol, self.necho))
+        self.recon_inputs = np.zeros((self.nsamples, self.nrow, self.ncol, necho_input)) + 1j * np.zeros((self.nsamples, self.nrow, self.ncol, necho_input))
         if split == 'train':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_train.mat', 'Recons')
-            self.recon_inputs[200:400, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=1_train.mat', 'Recons')
-            self.recon_inputs[400:600, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=2_train.mat', 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_train2.mat', 'Recons')
+            self.recon_inputs[200:400, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=1_train2.mat', 'Recons')
+            self.recon_inputs[400:600, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=2_train2.mat', 'Recons')
         elif split == 'val':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_val.mat', 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_val2.mat', 'Recons')
         elif split == 'test':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub={}_test.mat'.format(subject), 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2.mat'.format(subject), 'Recons')
 
 
     def __len__(self):
@@ -83,14 +84,14 @@ class kdata_multi_echo_CBIC(data.Dataset):
                     idx -= 200
                     subject += 1
             if subject == 0:
-                dataFD = self.rootDir + '/data_cfl/thanh/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/thanh2/full_cc_slices/'
             elif subject == 1:
-                dataFD = self.rootDir + '/data_cfl/jinwei/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jinwei2/full_cc_slices/'
             elif subject == 2:
-                dataFD = self.rootDir + '/data_cfl/qihao/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/qihao2/full_cc_slices/'
 
         elif self.split == 'val':
-            dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
         
         elif self.split == 'test':
             dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
