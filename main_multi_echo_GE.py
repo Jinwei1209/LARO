@@ -326,7 +326,8 @@ if __name__ == '__main__':
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
                         # ssim loss
-                        lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        # lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        lossl2_sum -= loss(Xs[i][:, necho*2:, ...]*brain_masks[:, necho*2:, ...], targets[:, necho*2:, ...]*brain_masks[:, necho*2:, ...])
                         # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
                         # # compute parameters
                         # Xsi = torch_channel_deconcate(Xs[i])
@@ -509,6 +510,7 @@ if __name__ == '__main__':
                                             # opt['echo_cat'])
                 if opt['temporal_pred'] == 1:
                     Xs_1 = netG_dc(kdatas, csms, masks, flip, x_input=recon_input)[-1]
+                    # Xs_1 = torch.cat((recon_input, Xs_1[:, necho*2:, ...]), dim=1)
                 else:
                     Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
                 precond = netG_dc.precond
