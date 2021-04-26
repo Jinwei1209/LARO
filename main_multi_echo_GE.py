@@ -225,17 +225,17 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         netG_dc.to(device)
-        if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho))
-            netG_dc.load_state_dict(weights_dict)
-        elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
-            netG_dc.load_state_dict(weights_dict)
+        # if opt['loupe'] < 1 and opt['loupe'] > -2:
+        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt'
+        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
+        #     netG_dc.load_state_dict(weights_dict)
+        # elif opt['loupe'] == -2:
+        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
+        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+        #     netG_dc.load_state_dict(weights_dict)
 
         if opt['temporal_pred'] == 1:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=20_loupe=0_ratio={}_solver={}_echo=6_temporal=1_ghost=0.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
 
@@ -415,9 +415,9 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}_.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}_.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
     
     
@@ -517,9 +517,9 @@ if __name__ == '__main__':
                     # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
                     # mags = torch.sqrt(Xs_1[:, 0, ...]**2 + Xs_1[:, 1, ...]**2).permute(0, 2, 3, 1)
-                    mags_target = torch.sqrt(targets[:, 0, ...]**2 + targets[:, 1, ...]**2).permute(0, 2, 3, 1)
+                    # mags_target = torch.sqrt(targets[:, 0, ...]**2 + targets[:, 1, ...]**2).permute(0, 2, 3, 1)
                     
-                    [y1_target, y2_target] = arlo(TEs, mags_target, flag_water=1)
+                    # [y1_target, y2_target] = arlo(TEs, mags_target, flag_water=1)
                     # y = fit_complex(Xs_1.permute(0, 3, 4, 1, 2))
                     # y_target = fit_complex(targets.permute(0, 3, 4, 1, 2))
                     # [y1_target, y2_target] = fit_R2_LM(targets.permute(0, 3, 4, 1, 2))
@@ -530,8 +530,8 @@ if __name__ == '__main__':
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
                 # R2s.append(y.cpu().detach())
-                R2s_target.append(y1_target.cpu().detach())
-                water_target.append(y2_target.cpu().detach())
+                # R2s_target.append(y1_target.cpu().detach())
+                # water_target.append(y2_target.cpu().detach())
 
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
@@ -546,10 +546,10 @@ if __name__ == '__main__':
             # R2s = np.concatenate(R2s, axis=0)
             # save_mat(rootName+'/results_ablation/R2s.mat', 'R2s', R2s)
 
-            R2s_target = np.concatenate(R2s_target, axis=0)
-            save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
-            water_target = np.concatenate(water_target, axis=0)
-            save_mat(rootName+'/results_ablation/water_target.mat', 'water_target', water_target)
+            # R2s_target = np.concatenate(R2s_target, axis=0)
+            # save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
+            # water_target = np.concatenate(water_target, axis=0)
+            # save_mat(rootName+'/results_ablation/water_target.mat', 'water_target', water_target)
 
             # write into .bin file
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
