@@ -93,7 +93,7 @@ class Resnet_with_DC2(nn.Module):
         rescale=1,
         samplingRatio=0.2, # sparsity level of the sampling mask
         flag_att=0, # flag to use attention after temporal feature fusion
-        # random=0, # flag to multiply the input data with a random complex number
+        random=0, # flag to do phase cycling
         flag_cp=0,
     ):
         super(Resnet_with_DC2, self).__init__()
@@ -117,7 +117,7 @@ class Resnet_with_DC2(nn.Module):
         self.rescale = rescale
         self.samplingRatio = samplingRatio
         self.flag_att = flag_att
-        # self.random = random
+        self.random = random
         self.flag_cp = flag_cp
 
         if self.flag_solver <= 1:
@@ -444,6 +444,27 @@ class Resnet_with_DC2(nn.Module):
                 return Xs
             elif self.flag_BCRNN > 0:
                 x = torch_channel_deconcate(x).permute(0, 1, 3, 4, 2)  # (n, 2, nx, ny, n_seq)
+                # # ghost echo prediction
+                # if self.necho_ghost > 0:
+                #     with torch.no_grad():
+                #         x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
+                #         x_ghost_l = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
+                #         x_ghost_r = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
+                #         [_, water] = fit_R2_LM(x_under)
+                #         r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2)) 
+                #         [p1, p0] = fit_complex(x_under)
+                #         water = water[0, ...]
+                #         r2s = r2s[0, ...]
+                #         p1 = p1[0, ...]
+                #         p0 = p0[0, ...]
+                #         for echo in range(-self.necho_ghost, 0):
+                #             x_ghost_l[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+                #             x_ghost_l[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+                #             x_ghost_r[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.cos(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
+                #             x_ghost_r[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.sin(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
+                #     x = torch.cat((x_ghost_l, x, x_ghost_r), dim=-1)  # left x includes ghost echos, right x not
+                #     x[torch.isnan(x)] = 0
+                #     x[x > 1] = 0
                 if self.necho_pred > 0:
                     with torch.no_grad():
                         x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
@@ -493,6 +514,11 @@ class Resnet_with_DC2(nn.Module):
                     x_ = x_.contiguous()
                     # net['t%d_x0'%(i-1)] = net['t%d_x0'%(i-1)].view(n_seq, n_batch, self.nf, width, height)
                     # net['t%d_x0'%i] = self.bcrnn(x_, net['t%d_x0'%(i-1)], test)
+
+                    if self.random:
+                        p = (torch.rand(1) * 3.14/2 - 3.14/4).to('cuda')
+                        x_ = torch.cat((x_[:, :, 0:1, ...]*torch.cos(p) - x_[:, :, 1:2, ...]*torch.sin(p), 
+                                        x_[:, :, 1:2, ...]*torch.cos(p) + x_[:, :, 0:1, ...]*torch.sin(p)), dim=2)
                     if x_.requires_grad and self.flag_cp:
                         # net['t%d_x0'%i] = checkpoint(self.bcrnn, x_[self.necho_ghost:self.necho_ghost+self.necho+self.necho_pred])
                         net['t%d_x0'%i] = checkpoint(self.bcrnn, x_)
@@ -510,18 +536,11 @@ class Resnet_with_DC2(nn.Module):
 
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
-                    # concatenate feature dims of adjacent echos
-                    if self.necho_ghost == 1:
-                        # net['t%d_x0'%i] = torch.cat((net['t%d_x0'%i][0:self.necho+self.necho_pred, ...], 
-                        #                              net['t%d_x0'%i][1:self.necho+self.necho_pred+1, ...], 
-                        #                              net['t%d_x0'%i][2:self.necho+self.necho_pred+2, ...]), dim=1)
+                    if self.necho_ghost > 0:
+                        # # without temporal averaging
+                        # net['t%d_x0'%i] = net['t%d_x0'%i][self.necho_ghost:self.necho+self.necho_pred+self.necho_ghost, ...]
+                        # with temporal averaging
                         net['t%d_x0'%i] = (net['t%d_x0'%i][0:self.necho+self.necho_pred, ...] + net['t%d_x0'%i][1:self.necho+self.necho_pred+1, ...] + net['t%d_x0'%i][2:self.necho+self.necho_pred+2, ...])/3
-                    elif self.necho_ghost == 2:
-                        net['t%d_x0'%i] = torch.cat((net['t%d_x0'%i][0:self.necho+self.necho_pred, ...], 
-                                                     net['t%d_x0'%i][1:self.necho+self.necho_pred+1, ...], 
-                                                     net['t%d_x0'%i][2:self.necho+self.necho_pred+2, ...],
-                                                     net['t%d_x0'%i][3:self.necho+self.necho_pred+3, ...],
-                                                     net['t%d_x0'%i][4:self.necho+self.necho_pred+4, ...],), dim=1)
 
                     net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
                     net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
@@ -545,6 +564,10 @@ class Resnet_with_DC2(nn.Module):
 
                     x_ = x_.view(-1, n_ch, width, height)[self.necho_ghost:self.necho+self.necho_pred+self.necho_ghost, ...]
                     net['t%d_out'%i] = x_ - net['t%d_x4'%i]
+
+                    if self.random:
+                        net['t%d_out'%i] = torch.cat((net['t%d_out'%i][:, 0:1, ...]*torch.cos(p) + net['t%d_out'%i][:, 1:2, ...]*torch.sin(p), 
+                                                      net['t%d_out'%i][:, 1:2, ...]*torch.cos(p) - net['t%d_out'%i][:, 0:1, ...]*torch.sin(p)), dim=1)
 
                     # update x using CG block
                     uk_ = uk.permute(4, 0, 1, 2, 3).view(-1, n_ch, width, height)[self.necho_ghost:self.necho+self.necho_pred+self.necho_ghost, ...]
@@ -572,28 +595,28 @@ class Resnet_with_DC2(nn.Module):
                     x = x[None, ...].permute(0, 2, 3, 4, 1).contiguous()
                     uk = uk[None, ...].permute(0, 2, 3, 4, 1).contiguous()
                 
-                    # ghost echo prediction
-                    if self.necho_ghost > 0:
-                        uk = torch.cat((torch.zeros(x_ghost_l.size()).to('cuda'), uk, torch.zeros(x_ghost_r.size()).to('cuda')), dim=-1)
-                        with torch.no_grad():
-                            x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
-                            x_ghost_l = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
-                            x_ghost_r = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
-                            [_, water] = fit_R2_LM(x_under)
-                            r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2)) 
-                            [p1, p0] = fit_complex(x_under)
-                            water = water[0, ...]
-                            r2s = r2s[0, ...]
-                            p1 = p1[0, ...]
-                            p0 = p0[0, ...]
-                            for echo in range(-self.necho_ghost, 0):
-                                x_ghost_l[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
-                                x_ghost_l[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
-                                x_ghost_r[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.cos(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
-                                x_ghost_r[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.sin(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
-                        x = torch.cat((x_ghost_l, x, x_ghost_r), dim=-1)  # left x includes ghost echos, right x not
-                        x[torch.isnan(x)] = 0
-                        x[x > 1] = 0
+                    # # ghost echo prediction
+                    # if self.necho_ghost > 0:
+                    #     uk = torch.cat((torch.zeros(x_ghost_l.size()).to('cuda'), uk, torch.zeros(x_ghost_r.size()).to('cuda')), dim=-1)
+                    #     with torch.no_grad():
+                    #         x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
+                    #         x_ghost_l = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
+                    #         x_ghost_r = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
+                    #         [_, water] = fit_R2_LM(x_under)
+                    #         r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2)) 
+                    #         [p1, p0] = fit_complex(x_under)
+                    #         water = water[0, ...]
+                    #         r2s = r2s[0, ...]
+                    #         p1 = p1[0, ...]
+                    #         p0 = p0[0, ...]
+                    #         for echo in range(-self.necho_ghost, 0):
+                    #             x_ghost_l[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+                    #             x_ghost_l[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+                    #             x_ghost_r[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.cos(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
+                    #             x_ghost_r[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.sin(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
+                    #     x = torch.cat((x_ghost_l, x, x_ghost_r), dim=-1)  # left x includes ghost echos, right x not
+                    #     x[torch.isnan(x)] = 0
+                    #     x[x > 1] = 0
 
                     if self.necho_pred > 0:
                         with torch.no_grad():

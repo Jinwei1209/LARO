@@ -209,6 +209,7 @@ if __name__ == '__main__':
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=opt['bcrnn'],
                 flag_att=opt['att'],
+                random=opt['random'],
                 flag_cp=1
             )
         else:
@@ -225,19 +226,18 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         netG_dc.to(device)
-        # if opt['loupe'] < 1 and opt['loupe'] > -2:
-        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt'
-        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
-        #     netG_dc.load_state_dict(weights_dict)
-        # elif opt['loupe'] == -2:
-        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
-        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
-        #     netG_dc.load_state_dict(weights_dict)
-
-        if opt['temporal_pred'] == 1:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=20_loupe=0_ratio={}_solver={}_echo=6_temporal=1_ghost=0.pt'
+        if opt['loupe'] < 1 and opt['loupe'] > -2:
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
+            netG_dc.load_state_dict(weights_dict)
+        elif opt['loupe'] == -2:
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
+
+        # weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo=10_temporal=0_ghost=0.pt'
+        #             .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+        # netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -311,6 +311,7 @@ if __name__ == '__main__':
 
                 optimizerG_dc.zero_grad()
                 if opt['temporal_pred'] == 1:
+                # if opt['necho_ghost'] > 0:
                     Xs = netG_dc(kdatas, csms, masks, flip, x_input=recon_input)
                 else:
                     Xs = netG_dc(kdatas, csms, masks, flip)
@@ -326,8 +327,8 @@ if __name__ == '__main__':
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
                         # ssim loss
-                        # lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
-                        lossl2_sum -= loss(Xs[i][:, necho*2:, ...]*brain_masks[:, necho*2:, ...], targets[:, necho*2:, ...]*brain_masks[:, necho*2:, ...])
+                        lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        # lossl2_sum -= loss(Xs[i][:, necho*2:, ...]*brain_masks[:, necho*2:, ...], targets[:, necho*2:, ...]*brain_masks[:, necho*2:, ...])
                         # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
                         # # compute parameters
                         # Xsi = torch_channel_deconcate(Xs[i])
@@ -387,6 +388,7 @@ if __name__ == '__main__':
                     brain_masks = brain_masks.to(device)
 
                     if opt['temporal_pred'] == 1:
+                    # if opt['necho_ghost'] > 0:
                         Xs = netG_dc(kdatas, csms, masks, flip, x_input=recon_input)
                     else:
                         Xs = netG_dc(kdatas, csms, masks, flip)
@@ -416,9 +418,9 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}_.pt' \
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}_.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
     
     
@@ -443,7 +445,8 @@ if __name__ == '__main__':
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=opt['bcrnn'],
-                flag_att=opt['att']
+                flag_att=opt['att'],
+                random=opt['random']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -509,8 +512,8 @@ if __name__ == '__main__':
                 # inputs = backward_multiEcho(kdatas, csms, masks, flip,
                                             # opt['echo_cat'])
                 if opt['temporal_pred'] == 1:
+                # if opt['necho_ghost'] > 0:
                     Xs_1 = netG_dc(kdatas, csms, masks, flip, x_input=recon_input)[-1]
-                    # Xs_1 = torch.cat((recon_input, Xs_1[:, necho*2:, ...]), dim=1)
                 else:
                     Xs_1 = netG_dc(kdatas, csms, masks, flip)[-1]
                 precond = netG_dc.precond
