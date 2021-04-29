@@ -383,6 +383,7 @@ if __name__ == '__main__':
                     targets = targets.to(device)
                     recon_input = recon_input.to(device)
                     csms = csms.to(device)
+                    csm_lowres = csm_lowres.to(device)
                     brain_masks = brain_masks.to(device)
 
                     if opt['temporal_pred'] == 1:
