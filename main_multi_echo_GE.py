@@ -174,6 +174,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='train',
+            ratio=opt['samplingRatio'],
             normalization=opt['normalization'],
             echo_cat=opt['echo_cat']
         )
@@ -184,6 +185,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='val',
+            ratio=opt['samplingRatio'],
             normalization=opt['normalization'],
             echo_cat=opt['echo_cat']
         )
@@ -226,18 +228,18 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         netG_dc.to(device)
-        if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
-            netG_dc.load_state_dict(weights_dict)
-        elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
-            netG_dc.load_state_dict(weights_dict)
+        # if opt['loupe'] < 1 and opt['loupe'] > -2:
+        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt'
+        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
+        #     netG_dc.load_state_dict(weights_dict)
+        # elif opt['loupe'] == -2:
+        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
+        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+        #     netG_dc.load_state_dict(weights_dict)
 
-        # weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo=10_temporal=0_ghost=0.pt'
-        #             .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
-        # netG_dc.load_state_dict(weights_dict)
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo=10_temporal=0_ghost=0.pt'
+                    .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+        netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -329,7 +331,7 @@ if __name__ == '__main__':
                         # ssim loss
                         lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
                         # lossl2_sum -= loss(Xs[i][:, necho*2:, ...]*brain_masks[:, necho*2:, ...], targets[:, necho*2:, ...]*brain_masks[:, necho*2:, ...])
-                        # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
+                        lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
                         # # compute parameters
                         # Xsi = torch_channel_deconcate(Xs[i])
                         # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
@@ -418,9 +420,9 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}_.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}_.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
     
     
@@ -461,7 +463,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_echo={}_temporal={}_ghost={}_.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred'], necho_ghost))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
@@ -479,6 +481,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='test',
+            ratio=opt['samplingRatio'],
             subject=opt['test_sub'],
             normalization=opt['normalization'],
             echo_cat=opt['echo_cat']

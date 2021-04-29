@@ -245,6 +245,7 @@ def low_rank_approx(img, kdata, csm, k=10):
     low_res_img = low_res_img.view(-1, M)  # (N * M) with N voxels (samples) and M echos (features) 
     (_, _, V) = torch.pca_lowrank(low_res_img.cpu().detach(), q=k)  # V: (M * k) matrix
     V = V.to('cuda')
+    print(torch.matmul(V.permute(1, 0), V))
 
     # row rank approximation of full resolution img
     tmp = torch.matmul(V.permute(1, 0), img)  # (k * M) * (M * N) => (k * N)

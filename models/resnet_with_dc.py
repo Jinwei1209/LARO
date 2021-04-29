@@ -618,30 +618,30 @@ class Resnet_with_DC2(nn.Module):
                     #     x[torch.isnan(x)] = 0
                     #     x[x > 1] = 0
 
-                    if self.necho_pred > 0:
-                        with torch.no_grad():
-                            x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
-                            x_pred = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_pred).to('cuda')
-                            x_ghost_l = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
-                            x_ghost_r = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
-                            [_, water] = fit_R2_LM(x_under)
-                            r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2))
-                            [p1, p0] = fit_complex(x_under)
-                            water = water[0, ...]
-                            r2s = r2s[0, ...]
-                            p1 = p1[0, ...]
-                            p0 = p0[0, ...]
-                            for echo in range(self.necho, self.necho+self.necho_pred):
-                                x_pred[0, 0, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
-                                x_pred[0, 1, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
-                            for echo in range(-self.necho_ghost, 0):
-                                x_ghost_l[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
-                                x_ghost_l[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
-                                x_ghost_r[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.cos(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
-                                x_ghost_r[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.sin(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
-                        x = torch.cat((x_ghost_l, x[..., :self.necho], x_pred, x_ghost_r), dim=-1)  # left x includes ghost echos, right x not
-                        x[torch.isnan(x)] = 0
-                        x[x > 1] = 0
+                    # if self.necho_pred > 0:
+                    #     with torch.no_grad():
+                    #         x_under = x.contiguous().permute(0, 2, 3, 1, 4)[..., :self.necho]
+                    #         x_pred = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_pred).to('cuda')
+                    #         x_ghost_l = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
+                    #         x_ghost_r = torch.zeros(1, 2, self.nrow, self.ncol, self.necho_ghost).to('cuda')
+                    #         [_, water] = fit_R2_LM(x_under)
+                    #         r2s = arlo(range(self.necho), torch.sqrt(x_under[:, :, :, 0, :]**2 + x_under[:, :, :, 1, :]**2))
+                    #         [p1, p0] = fit_complex(x_under)
+                    #         water = water[0, ...]
+                    #         r2s = r2s[0, ...]
+                    #         p1 = p1[0, ...]
+                    #         p0 = p0[0, ...]
+                    #         for echo in range(self.necho, self.necho+self.necho_pred):
+                    #             x_pred[0, 0, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+                    #             x_pred[0, 1, :, :, echo-self.necho] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+                    #         for echo in range(-self.necho_ghost, 0):
+                    #             x_ghost_l[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+                    #             x_ghost_l[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+                    #             x_ghost_r[0, 0, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.cos(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
+                    #             x_ghost_r[0, 1, :, :, echo+self.necho_ghost] = water * torch.exp(-r2s * (echo+self.necho_ghost+self.necho+self.necho_pred)) * torch.sin(p0 + p1*(echo+self.necho_ghost+self.necho+self.necho_pred))
+                    #     x = torch.cat((x_ghost_l, x[..., :self.necho], x_pred, x_ghost_r), dim=-1)  # left x includes ghost echos, right x not
+                    #     x[torch.isnan(x)] = 0
+                    #     x[x > 1] = 0
                 return Xs
 
         # TV Quasi-newton

@@ -15,10 +15,11 @@ class kdata_multi_echo_CBIC(data.Dataset):
         rootDir = '/data/Jinwei/QSM_raw_CBIC',
         contrast = 'MultiEcho',
         necho = 10, # number of echos of predictions
-        necho_input = 10, # number of echos of inputs
+        necho_input = 6, # number of echos of inputs
         nrow = 206,
         ncol = 80,
         split = 'train',
+        ratio = 0.36,
         subject = 0,  # 0: junghun, 1: chao, 2: alexey
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
@@ -56,13 +57,13 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.batchIndex = 0
         self.recon_inputs = np.zeros((self.nsamples, self.nrow, self.ncol, necho_input)) + 1j * np.zeros((self.nsamples, self.nrow, self.ncol, necho_input))
         if split == 'train':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_train2_.mat', 'Recons')
-            self.recon_inputs[200:400, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=1_train2_.mat', 'Recons')
-            self.recon_inputs[400:600, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=2_train2_.mat', 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/{}%train2/iField_bcrnn=1_loupe=0_solver=1_sub=0_train2.mat'.format(int(ratio*100)), 'Recons')
+            self.recon_inputs[200:400, ...] = load_mat(rootDir+'/data_cfl/{}%train2/iField_bcrnn=1_loupe=0_solver=1_sub=1_train2.mat'.format(int(ratio*100)), 'Recons')
+            self.recon_inputs[400:600, ...] = load_mat(rootDir+'/data_cfl/{}%train2/iField_bcrnn=1_loupe=0_solver=1_sub=2_train2.mat'.format(int(ratio*100)), 'Recons')
         elif split == 'val':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_val2_.mat', 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/{}%train2/iField_bcrnn=1_loupe=0_solver=1_sub=0_val2.mat'.format(int(ratio*100)), 'Recons')
         elif split == 'test':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2_.mat'.format(subject), 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/{}%train2/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2.mat'.format(int(ratio*100), subject), 'Recons')
 
 
     def __len__(self):
