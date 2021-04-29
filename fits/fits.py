@@ -2,7 +2,6 @@ import torch
 import numpy as np
 
 from models.dc_blocks import mlpy_in_cg, conj_in_cg, dvd_in_cg
-from utils.operators import backward_multiEcho    
 
 
 def fit_R2_LM(M, max_iter=10, tol=1e-2):
@@ -211,46 +210,5 @@ def fit_complex(M, max_iter=30):
     p1 = p1.view(s0[0], s0[1], s0[2])
     p0 = p0.view(s0[0], s0[1], s0[2])
     return [p1, p0]
-
-
-def low_rank_approx(img, kdata, csm, k=10):
-    '''
-        Compute PCA from 25*25 central kspace "training data" and apply low rank approximation of the whole image
-        img: full resolution multi-echo image to do low rank approximation (batch, 2*echo, row, col)
-        kdata: auto-calibrated undersampled data (batch, coil, echo, row, col, 2)
-        csm: low resolution sensitivity maps (batch, coil, echo, row, col, 2)
-        k: rank (number of principle directions)
-    '''
-    img = img.permute(0, 2, 3, 1)  # (batch, row, col, 2*echo)
-    s0 = img.size()
-    M = s0[-1]  # M different contrast weighted images
-    img = img.view(-1, M).permute(1, 0) # (M * N) with N voxels (samples) and M echos (features) 
-
-    nrow, ncol = kdata.size()[3], kdata.size()[4]
-    kdata = kdata[:, :, :, nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, :]  # central fully sampled kspace
-    ncoil, necho, nrow, ncol = kdata.size()[1], kdata.size()[2], kdata.size()[3], kdata.size()[4]
-    # flip matrix
-    flip = torch.ones([necho, nrow, ncol, 1]) 
-    flip = torch.cat((flip, torch.zeros(flip.shape)), -1).to('cuda')
-    flip[:, ::2, ...] = - flip[:, ::2, ...] 
-    flip[:, :, ::2, ...] = - flip[:, :, ::2, ...]
-    flip = flip[None, ...] # (1, necho, nrow, ncol, 2)
-    # sampling mask (all ones)
-    mask = torch.ones([ncoil, necho, nrow, ncol, 2]).to('cuda')
-    mask[..., 1] = 0
-    mask = mask[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
-
-    # generate low res fully sampled image
-    low_res_img = backward_multiEcho(kdata, csm, mask, flip).permute(0, 2, 3, 1)  # (batch, row, col, 2*echo)
-    low_res_img = low_res_img.view(-1, M)  # (N * M) with N voxels (samples) and M echos (features) 
-    (_, _, V) = torch.pca_lowrank(low_res_img.cpu().detach(), q=k)  # V: (M * k) matrix
-    V = V.to('cuda')
-
-    # row rank approximation of full resolution img
-    tmp = torch.matmul(V.permute(1, 0), img)  # (k * M) * (M * N) => (k * N)
-    tmp = torch.matmul(V, tmp)  # (M * k) * (k * N) => (M * N)
-    tmp = tmp.permute(1, 0).view(s0[0], s0[1], s0[2], s0[3])  # (N * M) => (batch, row, col, 2*echo)
-    img_low_rank = tmp.permute(0, 3, 1, 2)  # (batch, 2*echo, row, col)
-    return img_low_rank
     
 

@@ -53,15 +53,15 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.augIndex = 0
         self.batchSize = batchSize
         self.batchIndex = 0
-        self.recon_inputs = np.zeros((self.nsamples, self.nrow, self.ncol, self.necho)) + 1j * np.zeros((self.nsamples, self.nrow, self.ncol, self.necho))
+        self.recon_inputs = np.zeros((self.nsamples, self.nrow, self.ncol, 6)) + 1j * np.zeros((self.nsamples, self.nrow, self.ncol, 6))
         if split == 'train':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_train.mat', 'Recons')
-            self.recon_inputs[200:400, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=1_train.mat', 'Recons')
-            self.recon_inputs[400:600, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=2_train.mat', 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=0_train2.mat', 'Recons')
+            self.recon_inputs[200:400, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=1_train2.mat', 'Recons')
+            self.recon_inputs[400:600, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=2_train2.mat', 'Recons')
         elif split == 'val':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub=0_val.mat', 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=0_val2.mat', 'Recons')
         elif split == 'test':
-            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/iField_bcrnn=1_loupe=0_solver=1_sub={}_test.mat'.format(subject), 'Recons')
+            self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2.mat'.format(subject), 'Recons')
 
 
     def __len__(self):

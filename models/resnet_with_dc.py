@@ -77,6 +77,7 @@ class Resnet_with_DC2(nn.Module):
         ncoil=12,
         delta_TE=0.003384,
         K=1,  # number of unrolls
+        rank=0,  # rank > 0 if apply low rank regularization in the unrolling
         echo_cat=1, # flag to concatenate echo dimension into channel
         flag_solver=0,  # 0 for deep Quasi-newton, 1 for deep ADMM,
                         # 2 for TV Quasi-newton, 3 for TV ADMM.
@@ -180,6 +181,11 @@ class Resnet_with_DC2(nn.Module):
             self.attBlock = CAM_Module(self.nf)
 
         self.K = K
+        self.rank = rank
+        if self.rank > 0:
+            self.lambda_lowrank = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+        elif self.rank == 0:
+            self.lambda_lowrank = 0
 
         # flag for using preconditioning:
         if self.flag_precond == 1:
@@ -257,7 +263,7 @@ class Resnet_with_DC2(nn.Module):
             Mask = 1/(1+torch.exp(-12*(Pmask_rescaled-thresh)))
         return Mask
 
-    def forward(self, kdatas, csms, masks, flip, test=False, x_input=None):
+    def forward(self, kdatas, csms, csm_lowres, masks, flip, test=False, x_input=None):
         # generate sampling mask
         if self.flag_loupe == 1:
             masks = self.generateMask(self.weight_parameters)
@@ -471,8 +477,9 @@ class Resnet_with_DC2(nn.Module):
                 for j in range(self.nd-1):
                     net['t0_x%d'%j]=hid_init
 
-                A = Back_forward_multiEcho(csms, masks, flip, 
-                                        self.lambda_dll2, self.echo_cat, self.necho)
+                A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
+                                           self.lambda_lowrank, self.echo_cat, self.necho,
+                                           kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
                 Xs = []
                 uk = torch.zeros(n_batch, n_ch, width, height, n_seq).to('cuda')
                 for i in range(1, self.K+1):
