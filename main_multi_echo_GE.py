@@ -15,7 +15,7 @@ from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
 from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
-from utils.loss import lossL1, lossL2, SSIM, snr_gain
+from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
@@ -57,9 +57,10 @@ if __name__ == '__main__':
     
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
-    parser.add_argument('--rank', type=int, default=0)  #  rank of low rank approximation loss (10 default)
+    parser.add_argument('--rank', type=int, default=0)  #  rank of low rank approximation loss (e.g. 10)
     parser.add_argument('--lambda1', type=float, default=0.0)  # weighting of r2s reconstruction loss
     parser.add_argument('--lambda2', type=float, default=0.0)  # weighting of p1 reconstruction loss
+    parser.add_argument('--lambda_maskbce', type=float, default=0.0)  # weighting of Maximal cross entropy in masks
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
@@ -77,6 +78,7 @@ if __name__ == '__main__':
     lambda0 = opt['lambda0']
     lambda1 = opt['lambda1']
     lambda2 = opt['lambda2']
+    lambda_maskbce = opt['lambda_maskbce']  # 0.01 too large
     rank = opt['rank']
     necho = opt['necho']
     necho_pred = 10 - necho
@@ -169,6 +171,8 @@ if __name__ == '__main__':
         elif opt['loss'] == 2:
             loss = lossL2()
 
+        loss_cem = CrossEntropyMask(radius=30)  # cross entropy loss for mask
+
         # dataLoader = kdata_multi_echo_GE(
         dataLoader = kdata_multi_echo_CBIC(
             rootDir=rootName,
@@ -226,8 +230,8 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_echo={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
@@ -315,31 +319,31 @@ if __name__ == '__main__':
                 else:
                     Xs = netG_dc(kdatas, csms, csm_lowres, masks, flip)
 
-                # # compute paremeters label
-                # tmp = torch_channel_deconcate(targets)
-                # mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
-                # [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
-                # # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-                # [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-
+                # compute paremeters label
+                tmp = torch_channel_deconcate(targets)
+                mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
+                [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
+                # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
+                [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
                 lossl2_sum = 0
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
-                        # ssim loss
-                        lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        # # ssim loss
+                        # lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        # # low rank loss
                         # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
-                        # # compute parameters
-                        # Xsi = torch_channel_deconcate(Xs[i])
-                        # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
-                        # [r2s, water] = arlo(TEs, mags, flag_water=1)
-                        # # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        # [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        # # parameter estimation loss
-                        # lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        # compute parameters
+                        Xsi = torch_channel_deconcate(Xs[i])
+                        mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
+                        [r2s, water] = arlo(TEs, mags, flag_water=1)
+                        # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                        [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                        # parameter estimation loss
+                        lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                         # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                         # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                    else:
+                    elif opt['loss'] > 0:
                         # L1 or L2 loss
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
                         # lossl2_sum += lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
@@ -351,6 +355,9 @@ if __name__ == '__main__':
                         # # parameter estimation loss
                         # lossl2_sum += lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                         # lossl2_sum += lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                
+                # # maximal cross entropy mask loss
+                # lossl2_sum -= lambda_maskbce * loss_cem(netG_dc.Pmask_rescaled)
                 lossl2_sum.backward()
                 optimizerG_dc.step()
 
@@ -416,10 +423,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_rank={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['rank']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_rank={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['rank']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
     
     
     # for test
@@ -458,12 +465,12 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
-        if opt['temporal_pred'] == 1:
-            print('Temporal Prediction with {} Echos'.format(necho))
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+        # if opt['temporal_pred'] == 1:
+        #     print('Temporal Prediction with {} Echos'.format(necho))
+        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
+        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], necho, opt['temporal_pred']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()

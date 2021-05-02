@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from math import exp
 from utils.data import *
+from fits.fits import *
 
 
 def lossL1():
@@ -20,6 +21,72 @@ def lossL2():
     return nn.MSELoss()
 
 
+class CrossEntropyMask(torch.nn.Module):
+    def __init__(self, necho=10, nrow=206, ncol=80, radius=30):
+        super(CrossEntropyMask, self).__init__()
+        self.necho = necho
+        self.nrow = nrow
+        self.ncol = ncol
+        self.non_calib = torch.tensor(self.gen_pattern(radius=radius)).to('cuda')
+
+
+    def gen_pattern(self, num_row=206, num_col=80, radius=30):
+        M_c = int(num_row/2)  # center of kspace
+        N_c = int(num_col/2)  # center of kspace
+        p_pattern = np.ones((num_row, num_col)).flatten()
+        indices = np.array(np.meshgrid(range(num_row), range(num_col))).T.reshape(-1,2)  # row first
+        distances = np.sqrt((indices[:, 0] - M_c)**2 * 0.5 + (indices[:, 1] - N_c)**2)
+        distances_orders = distances // radius  # get the order of the distances
+        p_pattern[distances_orders == 0] = 0
+        p_pattern = p_pattern.reshape(num_row, num_col)
+        return p_pattern
+
+
+    def forward(self, pmask):
+        loss = 0
+        for i in range(self.necho):
+            for j in range(self.necho):
+                if j == i:
+                    continue
+                else:
+                    a = torch.clamp(pmask[i][self.non_calib==1], min=1e-12, max=1-1e-12)
+                    b = pmask[j][self.non_calib==1]
+                    loss -= torch.sum(b*torch.log(a+1e-9)) / b.size()[0]
+        return loss
+
+
+class FittingError(torch.nn.Module):
+    # not working
+    def __init__(self, necho=10, nrow=206, ncol=80):
+        super(FittingError, self).__init__()
+        self.necho = necho
+        self.nrow = nrow
+        self.ncol = ncol
+        self.loss = nn.MSELoss()
+
+    def forward(self, x):
+        x = torch_channel_deconcate(x)
+        # compute parameters
+        x_ = x.clone().detach().permute(0, 3, 4, 1, 2)
+        x_pred = torch.zeros((1, 2, self.necho, self.nrow, self.ncol), requires_grad=True).to('cuda')
+        with torch.no_grad():
+            [_, water] = fit_R2_LM(x_)
+            r2s = arlo(range(self.necho), torch.sqrt(x_[:, :, :, 0, :]**2 + x_[:, :, :, 1, :]**2))
+            [p1, p0] = fit_complex(x_)
+            water = water[0, ...].clone().detach()
+            r2s = r2s[0, ...].clone().detach()
+            p1 = p1[0, ...].clone().detach()
+            p0 = p0[0, ...].clone().detach()
+        for echo in range(self.necho):
+            x_pred[0, 0, echo, :, :] = water * torch.exp(-r2s * echo) * torch.cos(p0 + p1*echo)
+            x_pred[0, 1, echo, :, :] = water * torch.exp(-r2s * echo) * torch.sin(p0 + p1*echo)
+        x_pred[torch.isnan(x_pred)] = 0
+        x_pred[x_pred > 1] = 0
+        loss = torch.mean((x - x_pred)**2)
+        return loss
+
+                    
+            
 def gaussian(window_size, sigma):
     gauss = torch.Tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
     return gauss/gauss.sum()

@@ -209,8 +209,10 @@ class Resnet_with_DC2(nn.Module):
             Pmask = 1 / (1 + torch.exp(-self.slope * weight_parameters))
         if self.rescale:
             Pmask_rescaled = self.rescalePmask(Pmask, self.samplingRatio)
+            self.Pmask_rescaled = Pmask_rescaled
         else:
             Pmask_rescaled = Pmask
+            self.Pmask_rescaled = Pmask_rescaled
         
         if self.flag_loupe == 1:
             masks = self.samplingPmask(Pmask_rescaled)[:, :, None] # (nrow, ncol, 1)
@@ -425,8 +427,9 @@ class Resnet_with_DC2(nn.Module):
         # Deep ADMM
         elif self.flag_solver == 1:
             if self.flag_BCRNN == 0:
-                A = Back_forward_multiEcho(csms, masks, flip, 
-                                        self.lambda_dll2, self.echo_cat, self.necho)
+                A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
+                                           self.lambda_lowrank, self.echo_cat, self.necho,
+                                           kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
                 Xs = []
                 uk = torch.zeros(x_start.size()).to('cuda')
                 for i in range(self.K):

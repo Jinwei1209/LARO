@@ -222,6 +222,7 @@ class Back_forward_multiEcho():
         self.kdata = kdata
         self.csm_lowres = csm_lowres
         self.rank = rank
+        self.V = compute_V(self.kdata, self.csm_lowres, self.rank)
 
         # device = self.csm.get_device()   
         # self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
@@ -262,27 +263,35 @@ class Back_forward_multiEcho():
             if self.rank == 0:
                 coilComb = coilComb + self.lambda_dll2 * img
             elif self.rank > 0:
-                coilComb = coilComb + self.lambda_dll2 * img + self.lambda_lowrank * (img - low_rank_approx(img, self.kdata, self.csm_lowres, self.rank))
+                coilComb = coilComb + self.lambda_dll2 * img + self.lambda_lowrank * (img - self.low_rank_approx(img))
         elif use_dll2 == 2:
             coilComb = coilComb + self.lambda_dll2 * divergence(gradient(img))
         elif use_dll2 == 3:
             coilComb = coilComb + self.lambda_dll2 * divergence(gradient(img) / torch.sqrt(gradient(img)**2+5e-4))  #1e-4 best, 5e-5 to have consistent result to ADMM
         return coilComb
 
-def low_rank_approx(img, kdata, csm, k=10):
+    def low_rank_approx(self, img):
+        img = img.permute(0, 2, 3, 1)  # (batch, row, col, 2*echo)
+        s0 = img.size()
+        M = s0[-1]  # M different contrast weighted images
+        img = img.view(-1, M).permute(1, 0) # (M * N) with N voxels (samples) and M echos (features) 
+
+        # row rank approximation of full resolution img
+        tmp = torch.matmul(self.V.permute(1, 0), img)  # (k * M) * (M * N) => (k * N)
+        tmp = torch.matmul(self.V, tmp)  # (M * k) * (k * N) => (M * N)
+        tmp = tmp.permute(1, 0).view(s0[0], s0[1], s0[2], s0[3])  # (N * M) => (batch, row, col, 2*echo)
+        img_low_rank = tmp.permute(0, 3, 1, 2)  # (batch, 2*echo, row, col)
+        return img_low_rank
+
+def compute_V(kdata, csm, k=10):
     '''
         Compute PCA from 25*25 central kspace "training data" and apply low rank approximation of the whole image
-        img: full resolution multi-echo image to do low rank approximation (batch, 2*echo, row, col)
         kdata: auto-calibrated undersampled data (batch, coil, echo, row, col, 2)
         csm: low resolution sensitivity maps (batch, coil, echo, row, col, 2)
         k: rank (number of principle directions)
     '''
-    img = img.permute(0, 2, 3, 1)  # (batch, row, col, 2*echo)
-    s0 = img.size()
-    M = s0[-1]  # M different contrast weighted images
-    img = img.view(-1, M).permute(1, 0) # (M * N) with N voxels (samples) and M echos (features) 
-
     nrow, ncol = kdata.size()[3], kdata.size()[4]
+    M = 2 * kdata.size()[2]
     kdata = kdata[:, :, :, nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, :]  # central fully sampled kspace
     ncoil, necho, nrow, ncol = kdata.size()[1], kdata.size()[2], kdata.size()[3], kdata.size()[4]
     # flip matrix
@@ -301,6 +310,22 @@ def low_rank_approx(img, kdata, csm, k=10):
     low_res_img = low_res_img.view(-1, M)  # (N * M) with N voxels (samples) and M echos (features) 
     (_, _, V) = torch.pca_lowrank(low_res_img.cpu().detach(), q=k)  # V: (M * k) matrix
     V = V.to('cuda')
+    return V
+
+def low_rank_approx(img, kdata, csm, k=10):
+    '''
+        Compute PCA from 25*25 central kspace "training data" and apply low rank approximation of the whole image
+        img: full resolution multi-echo image to do low rank approximation (batch, 2*echo, row, col)
+        kdata: auto-calibrated undersampled data (batch, coil, echo, row, col, 2)
+        csm: low resolution sensitivity maps (batch, coil, echo, row, col, 2)
+        k: rank (number of principle directions)
+    '''
+    img = img.permute(0, 2, 3, 1)  # (batch, row, col, 2*echo)
+    s0 = img.size()
+    M = s0[-1]  # M different contrast weighted images
+    img = img.view(-1, M).permute(1, 0) # (M * N) with N voxels (samples) and M echos (features) 
+
+    V = compute_V(kdata, csm, k=k)
 
     # row rank approximation of full resolution img
     tmp = torch.matmul(V.permute(1, 0), img)  # (k * M) * (M * N) => (k * N)
