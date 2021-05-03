@@ -41,11 +41,11 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'junghun'
+                    self.subject = 'junghun2'
                 elif subject == 1:
-                    self.subject = 'chao'
+                    self.subject = 'chao2'
                 elif subject == 2:
-                    self.subject = 'alexey'
+                    self.subject = 'alexey2'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]

@@ -531,7 +531,7 @@ if __name__ == '__main__':
                     # mags = torch.sqrt(Xs_1[:, 0, ...]**2 + Xs_1[:, 1, ...]**2).permute(0, 2, 3, 1)
                     mags_target = torch.sqrt(targets[:, 0, ...]**2 + targets[:, 1, ...]**2).permute(0, 2, 3, 1)
                     
-                    [y1_target, y2_target] = arlo(TEs, mags_target, flag_water=1)
+                    # [y1_target, y2_target] = arlo(TEs, mags_target, flag_water=1)
                     # y = fit_complex(Xs_1.permute(0, 3, 4, 1, 2))
                     # y_target = fit_complex(targets.permute(0, 3, 4, 1, 2))
                     # [y1_target, y2_target] = fit_R2_LM(targets.permute(0, 3, 4, 1, 2))
@@ -542,15 +542,18 @@ if __name__ == '__main__':
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
                 # R2s.append(y.cpu().detach())
-                R2s_target.append(y1_target.cpu().detach())
-                water_target.append(y2_target.cpu().detach())
+                # R2s_target.append(y1_target.cpu().detach())
+                # water_target.append(y2_target.cpu().detach())
 
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
-            save_mat(rootName+'/results_ablation/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
-                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
-
+            if opt['lambda1'] == 1:
+                save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
+                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
+            elif opt['lambda1'] == 0:
+                save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
+                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
             # write R2s into .mat file
             # R2s = np.squeeze(r2c(np.concatenate(R2s, axis=0), opt['echo_cat']))
             # R2s = np.transpose(R2s, [0, 2, 3, 1])
@@ -558,10 +561,10 @@ if __name__ == '__main__':
             # R2s = np.concatenate(R2s, axis=0)
             # save_mat(rootName+'/results_ablation/R2s.mat', 'R2s', R2s)
 
-            R2s_target = np.concatenate(R2s_target, axis=0)
-            save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
-            water_target = np.concatenate(water_target, axis=0)
-            save_mat(rootName+'/results_ablation/water_target.mat', 'water_target', water_target)
+            # R2s_target = np.concatenate(R2s_target, axis=0)
+            # save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
+            # water_target = np.concatenate(water_target, axis=0)
+            # save_mat(rootName+'/results_ablation/water_target.mat', 'water_target', water_target)
 
             # write into .bin file
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
@@ -601,9 +604,12 @@ if __name__ == '__main__':
             adict = {}
             adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
             adict['R2star'], adict['Mask'] = R2star, Mask
-            sio.savemat(rootName+'/results_ablation/QSM_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
-                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
-            
+            if opt['lambda1'] == 1:
+                sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
+                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
+            elif opt['lambda1'] == 0:
+                sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
+                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
             
             
             # # # write into .mat file
