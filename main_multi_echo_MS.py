@@ -25,7 +25,7 @@ from utils.operators import low_rank_approx
 
 if __name__ == '__main__':
 
-    lrG_dc = 1e-3
+    lrG_dc = 1e-2
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
     if opt['loupe'] > 0:
-        niter = 500
+        niter = 2000
     else:
         niter = 100
 
@@ -153,9 +153,7 @@ if __name__ == '__main__':
         # add batch dimension
         masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
     else:
-        # masks = []
-        masks = torch.ones([1, ncoil, necho, nrow, ncol, 1]).to('cuda')
-        masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (1, ncoil, necho, nrow, ncol, 2)
+        masks = []
  
     # flip matrix
     flip = torch.ones([1, necho, nrow, ncol, 1]) 
@@ -173,15 +171,15 @@ if __name__ == '__main__':
 
         loss_cem = CrossEntropyMask(radius=30)  # cross entropy loss for mask
 
-        # # dataLoader = kdata_multi_echo_GE(
-        # dataLoader = kdata_multi_echo_MS(
-        #     rootDir=rootName,
-        #     contrast='MultiEcho', 
-        #     split='train',
-        #     normalization=opt['normalization'],
-        #     echo_cat=opt['echo_cat']
-        # )
-        # trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
+        # dataLoader = kdata_multi_echo_GE(
+        dataLoader = kdata_multi_echo_MS(
+            rootDir=rootName,
+            contrast='MultiEcho', 
+            split='train',
+            normalization=opt['normalization'],
+            echo_cat=opt['echo_cat']
+        )
+        trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
         # dataLoader_val = kdata_multi_echo_GE(
         dataLoader_val = kdata_multi_echo_MS(  
@@ -193,8 +191,7 @@ if __name__ == '__main__':
         )
         valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
 
-        trainLoader = valLoader
-        
+
         if opt['echo_cat'] == 1:
             netG_dc = Resnet_with_DC2(
                 input_channels=2*necho,
@@ -238,11 +235,11 @@ if __name__ == '__main__':
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_lambda12={}{}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], lamdba1, lambda2))
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], 0.0, 0.0))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_lambda12={}{}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], 0.0, 0.0))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -323,30 +320,33 @@ if __name__ == '__main__':
                 else:
                     Xs = netG_dc(kdatas, csms, csm_lowres, masks, flip)
 
-                # # compute paremeters label
-                # tmp = torch_channel_deconcate(targets)
-                # mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
-                # [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
-                # # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-                # [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
+                if lambda1 == 1:
+                    # compute paremeters label
+                    tmp = torch_channel_deconcate(targets)
+                    mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
+                    [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
+                    # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
+                    [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
                 lossl2_sum = 0
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
-                        # ssim loss
-                        lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        if lambda1 == 0:
+                            # ssim loss
+                            lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
                         # # low rank loss
                         # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
-                        # # compute parameters
-                        # Xsi = torch_channel_deconcate(Xs[i])
-                        # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
-                        # [r2s, water] = arlo(TEs, mags, flag_water=1)
-                        # # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        # [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        # # parameter estimation loss
-                        # lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        elif lambda1 == 1:
+                            # compute parameters
+                            Xsi = torch_channel_deconcate(Xs[i])
+                            mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
+                            [r2s, water] = arlo(TEs, mags, flag_water=1)
+                            # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                            [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                            # parameter estimation loss
+                            lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                            # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                            lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                            # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                     elif opt['loss'] > 0:
                         # L1 or L2 loss
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
@@ -429,7 +429,7 @@ if __name__ == '__main__':
             if Validation_loss[-1] == min(Validation_loss):
                 torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_last.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
     
     
@@ -442,6 +442,8 @@ if __name__ == '__main__':
                 necho=necho,
                 necho_pred=necho_pred,
                 lambda_dll2=lambda_dll2,
+                nrow=nrow,
+                ncol=ncol,
                 ncoil=ncoil,
                 K=K,
                 rank=opt['rank'],
@@ -488,7 +490,7 @@ if __name__ == '__main__':
         preconds = []
 
         # dataLoader_test = kdata_multi_echo_GE(
-        dataLoader_test = kdata_multi_echo_CBIC(
+        dataLoader_test = kdata_multi_echo_MS(
             rootDir=rootName,
             contrast='MultiEcho', 
             split='test',
