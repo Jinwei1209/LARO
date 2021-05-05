@@ -373,6 +373,122 @@ def forward_multiEcho(image, csm, mask, flip, echo_cat=1):
     return cplx_mlpy(temp, mask)
 
 
+class Back_forward_MS():
+    '''
+        forward and backward imaging model operator for MS lesion multi echo GRE data (kdata computed from iField)
+        (echo dim as in the channel dim in CNN model)
+    '''
+    def __init__(
+        self,
+        csm,
+        mask,
+        flip,
+        lambda_dll2,
+        lambda_lowrank = 0,
+        echo_cat = 1, # flag to concatenate echo dimension into channel
+        necho = 11,
+        kdata = None,
+        csm_lowres = None,
+        rank = 0
+    ):
+        self.nrows = csm.size()[3]
+        self.ncols = csm.size()[4]
+        self.nechos = csm.size()[2]
+        self.csm = csm
+        self.mask = mask
+        self.lambda_dll2 = lambda_dll2
+        self.lambda_lowrank = lambda_lowrank
+        self.flip = flip
+        self.echo_cat = echo_cat
+        self.necho = necho
+        self.kdata = kdata
+        self.csm_lowres = csm_lowres
+        self.rank = rank
+
+    def AtA(
+        self, 
+        img, 
+        use_dll2=1  # 1 for l2-x0 reg, 2 for l2-TV reg, 3 for l1-TV reg
+    ):
+        # forward
+        if self.echo_cat:
+            image = torch_channel_deconcate(img)  # (batch, 2, echo, row, col)
+        else:
+            image = img
+        image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
+        temp = image[:, None, ...] # multiply order matters (in torch implementation)
+        temp = cplx_mlpy(self.csm, temp) # (batch, coil, echo, row, col, 2)
+        temp = torch.fft(temp, 2)
+        temp = fft_shift_row(fft_shift_col(temp, self.ncols, 1), self.nrows, 1) 
+        temp = cplx_mlpy(temp, self.mask)
+        # inverse
+        temp = fft_shift_row(fft_shift_col(temp, self.ncols, 1), self.nrows, 1)
+        coilImgs = torch.ifft(temp, 2)
+        coilComb = torch.sum(
+            cplx_mlpy(coilImgs, cplx_conj(self.csm)),
+            dim=1,
+            keepdim=False
+        )
+        coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
+        if self.echo_cat:
+            coilComb = torch_channel_concate(coilComb, self.necho) # (batch, 2*echo, row, col)
+        if use_dll2 == 1:
+            coilComb = coilComb + self.lambda_dll2 * img
+        elif use_dll2 == 2:
+            coilComb = coilComb + self.lambda_dll2 * divergence(gradient(img))
+        elif use_dll2 == 3:
+            coilComb = coilComb + self.lambda_dll2 * divergence(gradient(img) / torch.sqrt(gradient(img)**2+5e-4))  #1e-4 best, 5e-5 to have consistent result to ADMM
+        return coilComb
+
+    def low_rank_approx(self, img):
+        img = img.permute(0, 2, 3, 1)  # (batch, row, col, 2*echo)
+        s0 = img.size()
+        M = s0[-1]  # M different contrast weighted images
+        img = img.view(-1, M).permute(1, 0) # (M * N) with N voxels (samples) and M echos (features) 
+
+        # row rank approximation of full resolution img
+        tmp = torch.matmul(self.V.permute(1, 0), img)  # (k * M) * (M * N) => (k * N)
+        tmp = torch.matmul(self.V, tmp)  # (M * k) * (k * N) => (M * N)
+        tmp = tmp.permute(1, 0).view(s0[0], s0[1], s0[2], s0[3])  # (N * M) => (batch, row, col, 2*echo)
+        img_low_rank = tmp.permute(0, 3, 1, 2)  # (batch, 2*echo, row, col)
+        return img_low_rank
+
+def backward_MS(kdata, csm, mask, flip, echo_cat=1, necho=11):
+    """
+    backward operator for MS lesion multi-echo GE data
+    """
+    nrows = kdata.size()[3]
+    ncols = kdata.size()[4]
+    nechos = kdata.size()[2]
+    temp = cplx_mlpy(kdata, mask)
+    temp = fft_shift_row(fft_shift_col(temp, ncols, 1), nrows, 1)
+    temp = torch.ifft(temp, 2)
+    coilComb = torch.sum(
+        cplx_mlpy(temp, cplx_conj(csm)),
+        dim=1,
+        keepdim=False
+    )
+    coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
+    if echo_cat:
+        coilComb = torch_channel_concate(coilComb, necho) # (batch, 2*echo, row, col)
+    return coilComb
+
+def forward_MS(image, csm, mask, flip, echo_cat=1):
+    """
+        forward operator for MS lesion multi-echo GE data
+    """
+    if echo_cat:
+        image = torch_channel_deconcate(image)  # (batch, 2, echo, row, col)
+    image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
+    nrows = csm.size()[3]
+    ncols = csm.size()[4]
+    nechos = csm.size()[2]
+    temp = image[:, None, ...]
+    temp = cplx_mlpy(csm, temp)
+    temp = torch.fft(temp, 2)
+    temp = fft_shift_row(fft_shift_col(temp, ncols, 1), nrows, 1)
+    return cplx_mlpy(temp, mask)
+
 
 # class OperatorsMultiEcho():
     # """

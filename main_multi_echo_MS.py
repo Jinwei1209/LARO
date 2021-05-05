@@ -1,5 +1,5 @@
 """
-    Experiment on multi-echo kspace data reconstruction from GE scanner
+    Experiment on MS lesion multi-echo kspace data reconstruction
 """
 import os
 import time
@@ -14,10 +14,11 @@ from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
+from loader.kdata_multi_echo_MS import kdata_multi_echo_MS
 from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
-from utils.operators import backward_multiEcho
+from utils.operators import Back_forward_MS, backward_MS, forward_MS
 from models.resnet_with_dc import Resnet_with_DC2
 from fits.fits import fit_R2_LM, arlo, fit_complex
 from utils.operators import low_rank_approx
@@ -33,12 +34,13 @@ if __name__ == '__main__':
     errL2_dc_sum = 0
     PSNRs_val = []
     Validation_loss = []
-    ncoil = 8
+    ncoil = 1
     nrow = 206
-    ncol = 80
+    ncol = 68
     nslice = 200
     lambda_dll2 = 1e-3
-    TEs = [0.001972, 0.005356, 0.008740, 0.012124, 0.015508, 0.018892, 0.022276, 0.025660, 0.029044, 0.032428]
+    # TEs are different for each case
+    TEs = [0.004428,0.009244,0.014060,0.018876,0.023692,0.028508,0.033324,0.038140,0.042956,0.047772,0.052588]
 
     # typein parameters
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
@@ -52,7 +54,7 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
+    parser.add_argument('--necho', type=int, default=11)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
@@ -81,7 +83,7 @@ if __name__ == '__main__':
     lambda_maskbce = opt['lambda_maskbce']  # 0.01 too large
     rank = opt['rank']
     necho = opt['necho']
-    necho_pred = 10 - necho
+    necho_pred = 11 - necho
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -92,7 +94,7 @@ if __name__ == '__main__':
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
-    rootName = '/data/Jinwei/QSM_raw_CBIC'
+    rootName = '/data/Jinwei/QSM_iField_MS'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
@@ -151,10 +153,13 @@ if __name__ == '__main__':
         # add batch dimension
         masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
     else:
-        masks = []
+        # masks = []
+        masks = torch.ones([1, ncoil, necho, nrow, ncol, 1]).to('cuda')
+        masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (1, ncoil, necho, nrow, ncol, 2)
  
     # flip matrix
-    flip = []
+    flip = torch.ones([1, necho, nrow, ncol, 1]) 
+    flip = torch.cat((flip, torch.zeros(flip.shape)), -1).to(device) # (1, necho, nrow, ncol, 2)
 
     # training
     if opt['flag_train'] == 1:
@@ -168,18 +173,18 @@ if __name__ == '__main__':
 
         loss_cem = CrossEntropyMask(radius=30)  # cross entropy loss for mask
 
-        # dataLoader = kdata_multi_echo_GE(
-        dataLoader = kdata_multi_echo_CBIC(
-            rootDir=rootName,
-            contrast='MultiEcho', 
-            split='train',
-            normalization=opt['normalization'],
-            echo_cat=opt['echo_cat']
-        )
-        trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
+        # # dataLoader = kdata_multi_echo_GE(
+        # dataLoader = kdata_multi_echo_MS(
+        #     rootDir=rootName,
+        #     contrast='MultiEcho', 
+        #     split='train',
+        #     normalization=opt['normalization'],
+        #     echo_cat=opt['echo_cat']
+        # )
+        # trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
         # dataLoader_val = kdata_multi_echo_GE(
-        dataLoader_val = kdata_multi_echo_CBIC(  
+        dataLoader_val = kdata_multi_echo_MS(  
             rootDir=rootName,
             contrast='MultiEcho', 
             split='val',
@@ -188,6 +193,8 @@ if __name__ == '__main__':
         )
         valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
 
+        trainLoader = valLoader
+        
         if opt['echo_cat'] == 1:
             netG_dc = Resnet_with_DC2(
                 input_channels=2*necho,
@@ -195,6 +202,8 @@ if __name__ == '__main__':
                 necho=necho,
                 necho_pred=necho_pred,
                 lambda_dll2=lambda_dll2,
+                nrow=nrow,
+                ncol=ncol,
                 ncoil=ncoil,
                 K=K,
                 rank=opt['rank'],
@@ -208,13 +217,16 @@ if __name__ == '__main__':
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=opt['bcrnn'],
                 flag_att=opt['att'],
-                flag_cp=1
+                flag_cp=1,
+                flag_dataset=0
             )
         else:
             netG_dc = Resnet_with_DC2(
                 input_channels=2,
                 filter_channels=32,
                 lambda_dll2=lambda_dll2,
+                nrow=nrow,
+                ncol=ncol,
                 ncoil=ncoil,
                 K=K,
                 echo_cat=0,
@@ -225,18 +237,13 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_lambda12={}{}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], lamdba1, lambda2))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_lambda12={}{}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], lambda1, lambda2))
             netG_dc.load_state_dict(weights_dict)
-
-        # if opt['temporal_pred'] == 1:
-        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}.pt'
-        #                 .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
-        #     netG_dc.load_state_dict(weights_dict)
 
         # optimizer
         optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
@@ -304,9 +311,11 @@ if __name__ == '__main__':
                 brain_masks = brain_masks.to(device)
                 brain_masks_erode = brain_masks_erode.to(device)
 
-                # operator = Back_forward_multiEcho(csms, masks, 0)
+                # operator = Back_forward_MS(csms, masks, flip, 0)
                 # test_image = operator.AtA(targets, 0).cpu().detach().numpy()
-                # save_mat(rootName+'/results/test_image.mat', 'test_image', test_image)
+                # kdatas = forward_MS(targets, csms, masks, flip)
+                # test_image = backward_MS(kdatas, csms, masks, flip).cpu().detach().numpy()
+                # save_mat('test_image.mat', 'test_image', test_image)
 
                 optimizerG_dc.zero_grad()
                 if opt['temporal_pred'] == 1:
@@ -314,30 +323,30 @@ if __name__ == '__main__':
                 else:
                     Xs = netG_dc(kdatas, csms, csm_lowres, masks, flip)
 
-                # compute paremeters label
-                tmp = torch_channel_deconcate(targets)
-                mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
-                [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
-                # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-                [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
+                # # compute paremeters label
+                # tmp = torch_channel_deconcate(targets)
+                # mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
+                # [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
+                # # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
+                # [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
                 lossl2_sum = 0
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
-                        # # ssim loss
-                        # lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        # ssim loss
+                        lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
                         # # low rank loss
                         # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
-                        # compute parameters
-                        Xsi = torch_channel_deconcate(Xs[i])
-                        mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
-                        [r2s, water] = arlo(TEs, mags, flag_water=1)
-                        # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        # parameter estimation loss
-                        lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        # # compute parameters
+                        # Xsi = torch_channel_deconcate(Xs[i])
+                        # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
+                        # [r2s, water] = arlo(TEs, mags, flag_water=1)
+                        # # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                        # [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                        # # parameter estimation loss
+                        # lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        # # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        # lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        # # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                     elif opt['loss'] > 0:
                         # L1 or L2 loss
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
@@ -445,7 +454,8 @@ if __name__ == '__main__':
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=opt['bcrnn'],
-                flag_att=opt['att']
+                flag_att=opt['att'],
+                flag_dataset=0
             )
         else:
             netG_dc = Resnet_with_DC2(

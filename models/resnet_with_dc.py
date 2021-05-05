@@ -95,6 +95,7 @@ class Resnet_with_DC2(nn.Module):
         flag_att=0, # flag to use attention after temporal feature fusion
         # random=0, # flag to multiply the input data with a random complex number
         flag_cp=0,
+        flag_dataset=1,  # 1: 'CBIC', 0: 'MS'
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
@@ -118,6 +119,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_att = flag_att
         # self.random = random
         self.flag_cp = flag_cp
+        self.flag_dataset = flag_dataset
 
         if self.flag_solver <= 1:
             if self.flag_BCRNN == 0:
@@ -278,8 +280,12 @@ class Resnet_with_DC2(nn.Module):
         else:
             self.Mask = masks[0, 0, 0, :, :, 0]
         # input
-        x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat, self.necho)
+        if self.flag_dataset:
+            x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat, self.necho)
+        else:
+            x = backward_MS(kdatas, csms, masks, flip, self.echo_cat, self.necho)
         x_start = x
+        
         if self.echo_cat == 0:
             x_start_ = torch_channel_concate(x_start, self.necho)
         else:
@@ -305,8 +311,10 @@ class Resnet_with_DC2(nn.Module):
         # Deep Quasi-newton
         if self.flag_solver == 0:
             if self.flag_BCRNN == 0:
-                A = Back_forward_multiEcho(csms, masks, flip, 
-                                        self.lambda_dll2, self.echo_cat)
+                if self.flag_dataset:
+                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
+                else:
+                    A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
                 Xs = []
                 for i in range(self.K):
                     # if self.random:
@@ -338,8 +346,8 @@ class Resnet_with_DC2(nn.Module):
                     #         x = torch_channel_concate(mlpy_in_cg(torch_channel_deconcate(x), factor))  # for echo_cat=1
 
                     rhs = x_start + self.lambda_dll2*x_block1
-                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
-                            flag_precond=self.flag_precond, precond=self.precond)
+                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat, necho=self.necho,
+                                                  flag_precond=self.flag_precond, precond=self.precond)
                     x = dc_layer.CG_iter()
 
                     if self.echo_cat:
@@ -359,9 +367,10 @@ class Resnet_with_DC2(nn.Module):
                     hid_init = Variable(torch.zeros(size_h)).cuda()
                 for j in range(self.nd-1):
                     net['t0_x%d'%j]=hid_init
-
-                A = Back_forward_multiEcho(csms, masks, flip, 
-                                        self.lambda_dll2, self.echo_cat, self.necho)
+                if self.flag_dataset:
+                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
+                else:
+                    A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
                 Xs = []
                 for i in range(1, self.K+1):
                     # update auxiliary variable x0
@@ -427,9 +436,14 @@ class Resnet_with_DC2(nn.Module):
         # Deep ADMM
         elif self.flag_solver == 1:
             if self.flag_BCRNN == 0:
-                A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
-                                           self.lambda_lowrank, self.echo_cat, self.necho,
-                                           kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
+                if self.flag_dataset:
+                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
+                                            self.lambda_lowrank, self.echo_cat, self.necho,
+                                            kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
+                else:
+                    A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, 
+                                        self.lambda_lowrank, self.echo_cat, self.necho,
+                                        kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
                 Xs = []
                 uk = torch.zeros(x_start.size()).to('cuda')
                 for i in range(self.K):
@@ -439,8 +453,8 @@ class Resnet_with_DC2(nn.Module):
                     # update x using CG block
                     x0 = v_block1 - uk/self.lambda_dll2
                     rhs = x_start + self.lambda_dll2*x0
-                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat,
-                            flag_precond=self.flag_precond, precond=self.precond)
+                    dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat, necho=self.necho,
+                                                  flag_precond=self.flag_precond, precond=self.precond)
                     x = dc_layer.CG_iter()
                     if self.echo_cat:
                         x = torch_channel_concate(x, self.necho)
@@ -479,10 +493,14 @@ class Resnet_with_DC2(nn.Module):
                     hid_init = Variable(torch.zeros(size_h)).cuda()
                 for j in range(self.nd-1):
                     net['t0_x%d'%j]=hid_init
-
-                A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
-                                           self.lambda_lowrank, self.echo_cat, self.necho,
-                                           kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
+                if self.flag_dataset:
+                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
+                                            self.lambda_lowrank, self.echo_cat, self.necho,
+                                            kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
+                else:
+                    A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, 
+                                        self.lambda_lowrank, self.echo_cat, self.necho,
+                                        kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
                 Xs = []
                 uk = torch.zeros(n_batch, n_ch, width, height, n_seq).to('cuda')
                 for i in range(1, self.K+1):
