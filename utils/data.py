@@ -360,7 +360,7 @@ class Logger():
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_lambda12={6}{7}'.format( \
+        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_lambda12={6}{7}_prosp'.format( \
                          bcrnn, loss, K, loupe, ratio, solver, lambda1, lambda2) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 

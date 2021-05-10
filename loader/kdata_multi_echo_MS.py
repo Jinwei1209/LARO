@@ -97,6 +97,10 @@ class kdata_multi_echo_MS(data.Dataset):
             self.iField[:200, ...] = iField / np.max(abs(iField[Mask==1]))
             self.Mask[:200, ...] = Mask
 
+            # to reconstruct LLR QSM
+            # iField = load_mat(self.rootDir+'/data/iField_llr_loupe=-1_sub={}.mat'.format(subject), 'iField_llr')
+            # iField = np.concatenate((iField[:, 103:, ...], iField[:, :103, ...]), axis=1)
+            # self.iField[:200, ...] = iField
 
     def __len__(self):
 

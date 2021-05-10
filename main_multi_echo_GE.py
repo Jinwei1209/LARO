@@ -14,6 +14,7 @@ from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
+from loader.kdata_multi_echo_CBIC_prosp import kdata_multi_echo_CBIC_prosp
 from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
@@ -52,6 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
+    parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     
@@ -102,7 +104,10 @@ if __name__ == '__main__':
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_{}'.format(opt['samplingRatio'], opt['1d_type'])))
     elif opt['loupe'] == 0:
         # load fixed loupe optimized mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim'.format(opt['samplingRatio'])))
+        if opt['prosp'] == 0:
+            masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim'.format(opt['samplingRatio'])))
+        elif opt['prosp'] == 1:
+            masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
         masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
@@ -319,30 +324,33 @@ if __name__ == '__main__':
                 else:
                     Xs = netG_dc(kdatas, csms, csm_lowres, masks, flip)
 
-                # compute paremeters label
-                tmp = torch_channel_deconcate(targets)
-                mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
-                [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
-                # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-                [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
+                if lambda1 == 1:
+                    # compute paremeters label
+                    tmp = torch_channel_deconcate(targets)
+                    mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
+                    [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
+                    # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
+                    [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
                 lossl2_sum = 0
                 for i in range(len(Xs)):
                     if opt['loss'] == 0:
-                        # # ssim loss
-                        # lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
+                        if lambda1 == 0:
+                            # ssim loss
+                            lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
                         # # low rank loss
                         # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
-                        # compute parameters
-                        Xsi = torch_channel_deconcate(Xs[i])
-                        mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
-                        [r2s, water] = arlo(TEs, mags, flag_water=1)
-                        # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                        # parameter estimation loss
-                        lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                        elif lambda1 == 1:
+                            # compute parameters
+                            Xsi = torch_channel_deconcate(Xs[i])
+                            mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
+                            [r2s, water] = arlo(TEs, mags, flag_water=1)
+                            # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                            [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
+                            # parameter estimation loss
+                            lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                            # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                            lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
+                            # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
                     elif opt['loss'] > 0:
                         # L1 or L2 loss
                         lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
@@ -423,9 +431,9 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
     
     
@@ -467,6 +475,9 @@ if __name__ == '__main__':
             )
         weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+        if opt['prosp'] == 1 and opt['loupe'] == 0:
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -477,20 +488,31 @@ if __name__ == '__main__':
 
         Inputs = []
         Targets = []
+        LLRs = []
         R2s, R2s_target = [], []
         water, water_target = [], []
         Recons = []
         preconds = []
-
-        # dataLoader_test = kdata_multi_echo_GE(
-        dataLoader_test = kdata_multi_echo_CBIC(
-            rootDir=rootName,
-            contrast='MultiEcho', 
-            split='test',
-            subject=opt['test_sub'],
-            normalization=opt['normalization'],
-            echo_cat=opt['echo_cat']
-        )
+        
+        if opt['prosp'] == 0:
+            dataLoader_test = kdata_multi_echo_CBIC(
+                rootDir=rootName,
+                contrast='MultiEcho', 
+                split='test',
+                subject=opt['test_sub'],
+                normalization=opt['normalization'],
+                echo_cat=opt['echo_cat']
+            )
+        elif opt['prosp'] == 1:
+            dataLoader_test = kdata_multi_echo_CBIC_prosp(
+                rootDir=rootName,
+                contrast='MultiEcho', 
+                split='test',
+                subject=opt['test_sub'],
+                opt=opt['loupe']+1,
+                normalization=opt['normalization'],
+                echo_cat=opt['echo_cat']
+            )
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
         with torch.no_grad():
@@ -526,6 +548,7 @@ if __name__ == '__main__':
                 precond = netG_dc.precond
                 if opt['echo_cat']:
                     targets = torch_channel_deconcate(targets)
+                    recon_input = torch_channel_deconcate(recon_input)
                     # inputs = torch_channel_deconcate(inputs)
                     Xs_1 = torch_channel_deconcate(Xs_1)
                     # mags = torch.sqrt(Xs_1[:, 0, ...]**2 + Xs_1[:, 1, ...]**2).permute(0, 2, 3, 1)
@@ -540,6 +563,7 @@ if __name__ == '__main__':
 
                 # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
+                LLRs.append(recon_input.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
                 # R2s.append(y.cpu().detach())
                 # R2s_target.append(y1_target.cpu().detach())

@@ -418,6 +418,7 @@ if __name__ == '__main__':
                 print('\n Validation loss: %f \n' 
                     % (sum(loss_total_list) / float(len(loss_total_list))))
                 Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
+                PSNRs_val.append(np.mean(np.asarray(metrices_val.PSNRs)))
             
             # save log
             logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f' 
@@ -426,7 +427,7 @@ if __name__ == '__main__':
             % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
 
             # save weights
-            if Validation_loss[-1] == min(Validation_loss):
+            if PSNRs_val[-1] == max(PSNRs_val):
                 torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
             torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_last.pt' \
@@ -553,7 +554,7 @@ if __name__ == '__main__':
                 # water_target.append(y2_target.cpu().detach())
 
             # write into .mat file
-            Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
+            Recons_ = np.squeeze(r2c(np.concatenate(Targets, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['lambda1'] == 1:
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
@@ -574,10 +575,9 @@ if __name__ == '__main__':
             # save_mat(rootName+'/results_ablation/water_target.mat', 'water_target', water_target)
 
             # write into .bin file
-            # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
-            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
-            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
-            iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
+            # (nslice, 2, necho, nrow, ncol) to (ncol, nrow, nslice, necho, 2)
+            print('iField size is: ', np.concatenate(Targets, axis=0).shape)
+            iField = np.transpose(np.concatenate(Targets, axis=0), [4, 3, 0, 2, 1])
             iField[..., 1] = - iField[..., 1]
             print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
@@ -593,20 +593,20 @@ if __name__ == '__main__':
                     + ' --CSF ' + ' -of QR')
             
             # read .bin files and save into .mat files
-            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
-            QSM = np.transpose(QSM.reshape([80, 206, nslice]), [2, 1, 0])
+            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_11.bin', 'f4')
+            QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
-            iMag = np.transpose(iMag.reshape([80, 206, nslice]), [2, 1, 0])
+            iMag = np.transpose(iMag.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
-            RDF = np.transpose(RDF.reshape([80, 206, nslice]), [2, 1, 0])
+            RDF = np.transpose(RDF.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
-            R2star = np.transpose(R2star.reshape([80, 206, nslice]), [2, 1, 0])
+            R2star = np.transpose(R2star.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
-            Mask = np.transpose(Mask.reshape([80, 206, nslice]), [2, 1, 0]) > 0
+            Mask = np.transpose(Mask.reshape([ncol, nrow, nslice]), [2, 1, 0]) > 0
 
             adict = {}
             adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF

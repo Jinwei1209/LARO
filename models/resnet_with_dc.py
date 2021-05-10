@@ -351,7 +351,7 @@ class Resnet_with_DC2(nn.Module):
                     x = dc_layer.CG_iter()
 
                     if self.echo_cat:
-                        x = torch_channel_concate(x)
+                        x = torch_channel_concate(x, self.necho)
                     Xs.append(x)
                 return Xs
             elif self.flag_BCRNN > 0:

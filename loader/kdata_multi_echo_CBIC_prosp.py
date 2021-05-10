@@ -6,9 +6,9 @@ from utils.loss import *
 from utils.operators import *
 
 
-class kdata_multi_echo_CBIC(data.Dataset):
+class kdata_multi_echo_CBIC_prosp(data.Dataset):
     '''
-        Dataloader of multi-echo GRE data from GE scanner (CBIC scanner)
+        Dataloader of multi-echo GRE data from GE scanner with prospective under-sampling (CBIC scanner)
     '''
 
     def __init__(self,
@@ -19,6 +19,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         ncol = 80,
         split = 'train',
         subject = 0,  # 0: junghun, 1: chao, 2: alexey
+        opt = 0,  # 0: variable density; 1: optimal
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
@@ -33,6 +34,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.split = split
         self.nrow = nrow
         self.ncol = ncol
+        self.opt = opt
         if contrast == 'MultiEcho':
             if split == 'train':
                 self.nsamples = 600
@@ -46,7 +48,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
                     self.subject = 'chao2'
                 elif subject == 2:
                     self.subject = 'alexey2'
-                print("Test on {}".format(self.subject))
+                print("Test on {} with prospective under-sampling".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
         self.augSize = len(self.augmentations)
@@ -62,8 +64,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
             self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=0_val2.mat', 'Recons')
         elif split == 'test':
             self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2.mat'.format(subject), 'Recons')
-            # # to reconstruct LLR QSM
-            # self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_loupe=-1_sub={}.mat'.format(self.subject[:-1], subject), 'iField_llr')
+            # to reconstruct LLR QSM
+            self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_loupe=-1_sub={}.mat'.format(self.subject[:-1], subject), 'iField_llr')
 
     def __len__(self):
 
@@ -71,9 +73,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
 
 
     def __getitem__(self, idx):
-        recon_input = self.recon_inputs[idx, ...]
-        # # to reconstruct LLR QSM
-        # recon_input = self.iField[idx, ...]
+        # recon_input = self.recon_inputs[idx, ...]
+        recon_input = self.iField[idx, ...]
         recon_input =  c2r(recon_input, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 
@@ -96,6 +97,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
         
         elif self.split == 'test':
+            dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/20_opt={}_cc_slices/'.format(self.opt)
             dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
 
         idx += 30
@@ -116,7 +118,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             recon_input = np.transpose(recon_input, (0, 3, 1, 2))
         
         # Coil sensitivity maps
-        csm = readcfl(dataFD + 'sensMaps_slice_{}'.format(idx))
+        csm = readcfl(dataFD_prosp + 'sensMaps_slice_{}'.format(idx))
         csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
         csm = np.repeat(csm, self.necho, axis=1)  # (coil, echo, row, col)
         csm = c2r_kdata(csm) # (coil, echo, row, col, 2) with last dimension real&imag
@@ -128,7 +130,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         csm_lowres = c2r_kdata(csm_lowres) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # Fully sampled kspace data
-        kdata = readcfl(dataFD + 'kdata_slice_{}'.format(idx))
+        kdata = readcfl(dataFD_prosp + 'kdata_slice_{}'.format(idx))
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 

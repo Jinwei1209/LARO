@@ -222,7 +222,7 @@ class Back_forward_multiEcho():
         self.kdata = kdata
         self.csm_lowres = csm_lowres
         self.rank = rank
-        self.V = compute_V(self.kdata, self.csm_lowres, self.rank)
+        # self.V = compute_V(self.kdata, self.csm_lowres, self.rank)
 
         # device = self.csm.get_device()   
         # self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
