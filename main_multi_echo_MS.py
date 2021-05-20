@@ -473,7 +473,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_last.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
@@ -554,7 +554,7 @@ if __name__ == '__main__':
                 # water_target.append(y2_target.cpu().detach())
 
             # write into .mat file
-            Recons_ = np.squeeze(r2c(np.concatenate(Targets, axis=0), opt['echo_cat']))
+            Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['lambda1'] == 1:
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
@@ -576,8 +576,8 @@ if __name__ == '__main__':
 
             # write into .bin file
             # (nslice, 2, necho, nrow, ncol) to (ncol, nrow, nslice, necho, 2)
-            print('iField size is: ', np.concatenate(Targets, axis=0).shape)
-            iField = np.transpose(np.concatenate(Targets, axis=0), [4, 3, 0, 2, 1])
+            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
+            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             iField[..., 1] = - iField[..., 1]
             print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
