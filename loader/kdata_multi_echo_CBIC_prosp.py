@@ -68,7 +68,7 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
             # self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2.mat'.format(subject), 'Recons')
             self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=2_test2.mat', 'Recons')
             # # to reconstruct LLR QSM
-            # self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_loupe=-1_sub={}.mat'.format(self.subject[:-1], subject), 'iField_llr')
+            # self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_loupe=-1_sub={}.mat'.format(self.subject, subject), 'iField_llr')
 
     def __len__(self):
 
