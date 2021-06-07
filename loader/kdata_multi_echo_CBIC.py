@@ -41,11 +41,11 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'junghun2'
+                    self.subject = 'junghun2'  # or junghun2
                 elif subject == 1:
-                    self.subject = 'chao2'
+                    self.subject = 'chao2'  # or chao2
                 elif subject == 2:
-                    self.subject = 'alexey2'
+                    self.subject = 'alexey2'  # or alexey2_
                 elif subject == 3:
                     self.subject = 'hang'
                 print("Test on {}".format(self.subject))
@@ -66,7 +66,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             # self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2.mat'.format(subject), 'Recons')
             self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=2_test2.mat', 'Recons')
             # # to reconstruct LLR QSM
-            # self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_loupe=-1_sub={}.mat'.format(self.subject[:-1], subject), 'iField_llr')
+            # self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_loupe=0_sub={}.mat'.format(self.subject[:-1], subject), 'iField_llr')
 
     def __len__(self):
 
@@ -89,14 +89,14 @@ class kdata_multi_echo_CBIC(data.Dataset):
                     idx -= 200
                     subject += 1
             if subject == 0:
-                dataFD = self.rootDir + '/data_cfl/thanh/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/thanh2/full_cc_slices/'
             elif subject == 1:
-                dataFD = self.rootDir + '/data_cfl/jinwei/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jinwei2/full_cc_slices/'
             elif subject == 2:
-                dataFD = self.rootDir + '/data_cfl/qihao/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/qihao2/full_cc_slices/'
 
         elif self.split == 'val':
-            dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
         
         elif self.split == 'test':
             dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'

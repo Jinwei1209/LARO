@@ -28,6 +28,7 @@ class CRNNcell(nn.Module):
 
     # def forward(self, input, hidden_iteration, hidden):
     def forward(self, input, hidden):
+    # def forward(self, input):
         in_to_hid = self.i2h(input)
         hid_to_hid = self.h2h(hidden)
         in_to_hid = self.bn_i2h(in_to_hid)
@@ -36,6 +37,7 @@ class CRNNcell(nn.Module):
 
         # hidden = self.relu(in_to_hid + hid_to_hid + ih_to_ih)
         hidden = self.relu(in_to_hid + hid_to_hid)
+        # hidden = self.relu(in_to_hid)
 
         return hidden
 
@@ -77,6 +79,7 @@ class BCRNNlayer(nn.Module):
         for i in range(nt):
             # hidden = self.CRNN_model(input[i], input_iteration[i], hidden)
             hidden = self.CRNN_model(input[i], hidden)
+            # hidden = self.CRNN_model(input[i])
             output_f.append(hidden)
         output_f = torch.cat(output_f)
 
@@ -85,6 +88,7 @@ class BCRNNlayer(nn.Module):
         for i in range(nt):
             # hidden = self.CRNN_model(input[nt - i - 1], input_iteration[nt - i -1], hidden)
             hidden = self.CRNN_model(input[nt - i - 1], hidden)
+            # hidden = self.CRNN_model(input[nt - i - 1])
             output_b.append(hidden)
         output_b = torch.cat(output_b[::-1])
 

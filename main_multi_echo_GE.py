@@ -15,7 +15,7 @@ from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
 from loader.kdata_multi_echo_CBIC_prosp import kdata_multi_echo_CBIC_prosp
-from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
+from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger, c2r_kdata
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
@@ -58,8 +58,8 @@ if __name__ == '__main__':
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
+    parser.add_argument('--rank', type=int, default=0)  #  rank of compressor in forward model
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
-    parser.add_argument('--rank', type=int, default=0)  #  rank of low rank approximation loss (e.g. 10)
     parser.add_argument('--lambda1', type=float, default=0.0)  # weighting of r2s reconstruction loss
     parser.add_argument('--lambda2', type=float, default=0.0)  # weighting of p1 reconstruction loss
     parser.add_argument('--lambda_maskbce', type=float, default=0.0)  # weighting of Maximal cross entropy in masks
@@ -110,7 +110,8 @@ if __name__ == '__main__':
             masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo'.format(opt['samplingRatio'])))
         
     if opt['loupe'] < 1 and opt['loupe'] > -2:
         # for 2D random sampling 
@@ -166,6 +167,10 @@ if __name__ == '__main__':
     # add batch dimension
     flip = flip[None, ...] # (1, necho, nrow, ncol, 2)
 
+    # principle vectors
+    U = readcfl(rootName+'/data_cfl/dictionary/U')
+    U = torch.tensor(c2r_kdata(U)).to(device)
+
     # training
     if opt['flag_train'] == 1:
         # memory_pre_alloc(opt['gpu_id'])
@@ -207,6 +212,7 @@ if __name__ == '__main__':
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
+                U=U,
                 rank=opt['rank'],
                 echo_cat=1,
                 flag_solver=opt['solver'],
@@ -235,11 +241,11 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_lambda12=0.00.0.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_lambda12=0.00.0.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
 
@@ -431,10 +437,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2, rank))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2, rank))
     
     
     # for test
@@ -448,6 +454,7 @@ if __name__ == '__main__':
                 lambda_dll2=lambda_dll2,
                 ncoil=ncoil,
                 K=K,
+                U=U,
                 rank=opt['rank'],
                 echo_cat=1,
                 flag_solver=opt['solver'],
@@ -477,8 +484,8 @@ if __name__ == '__main__':
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
         else:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2, rank))
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -577,8 +584,8 @@ if __name__ == '__main__':
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
                     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
             elif opt['lambda1'] == 0:
-                save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
-                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
+                save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}_rank={}.mat' \
+                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio'], opt['rank']), 'Recons', Recons_)
             # write R2s into .mat file
             # R2s = np.squeeze(r2c(np.concatenate(R2s, axis=0), opt['echo_cat']))
             # R2s = np.transpose(R2s, [0, 2, 3, 1])
@@ -633,8 +640,8 @@ if __name__ == '__main__':
                 sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
                     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
             elif opt['lambda1'] == 0:
-                sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
-                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
+                sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}_rank={}.mat' \
+                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio'], opt['rank']), adict)
             
             
             # # # write into .mat file

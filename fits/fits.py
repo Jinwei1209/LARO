@@ -210,5 +210,43 @@ def fit_complex(M, max_iter=30):
     p1 = p1.view(s0[0], s0[1], s0[2])
     p0 = p0.view(s0[0], s0[1], s0[2])
     return [p1, p0]
+
+
+def fit_complex_all(iField, TE, opt):
+    '''
+    four parameter fitting (myfit_all in matlab):
+        iField: complex multi-echo data (batch, height, width, numte)
+        TE: echo times,
+        opt: options for optimization
+    '''
+    max_iter = opt['max_iter']
+    tol = opt['tol']
+    reg_p = opt['reg_p']
+    lambda_l2 = opt['lambda_l2']
+    modR2s = 1
+    modm0 = 1
+
+    alpha = 1
+    delta_TE = TE[1] - TE[0]
     
+    numte = len(TE)
+    matrix_size = iField.size()[:-1]
+    S = iField.view(-1, numte)
+    numvox = S.size()[0]
+    t = TE[None, :].repeat(numvox, 1)
+
+    y = torch.zeros(4, numvox).to('cuda')
+
+    # initialization
+    [R2s, water] = arlo(TE, iField.abs(), flag_water=1)
+    y[0, :] = torch.flatten(water)
+    y[1, :] = torch.flatten(R2s)
+
+    nechos = iField.size()[-1]
+    Y = S[:, :3].angle()
+    
+
+
+
+    return 0
 

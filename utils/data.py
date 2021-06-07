@@ -230,6 +230,25 @@ def cplx_mlpy(a, b):
     out = torch.cat([out1, out2], dim=-1)
     return out
 
+def cplx_matmlpy(A, B):
+    '''
+    multiply two "complex" matrices (with the last dim = 2, representing real and imaginary parts)
+    A: (k, M, 2), B: (M, N, 2)
+    return C: (k, N, 2)
+    '''
+    # A = torch.repeat_interleave(A[:, :, None, :], B.size()[1], dim=2)
+    # B = torch.repeat_interleave(B[None, :, :, :], A.size()[0], dim=0)
+    # out1 = torch.sum(A[..., 0]*B[..., 0] - A[..., 1]*B[..., 1], dim=1, keepdim=False)
+    # out2 = torch.sum(A[..., 0]*B[..., 1] + A[..., 1]*B[..., 0], dim=1, keepdim=False)
+
+    out1 = torch.matmul(A[..., 0], B[..., 0]) - torch.matmul(A[..., 1], B[..., 1])
+    out2 = torch.matmul(A[..., 0], B[..., 1]) + torch.matmul(A[..., 1], B[..., 0])
+    out = torch.cat([out1[..., None], out2[..., None]], dim=-1)
+
+    # test
+    # device = A.get_device()
+    # out = torch.ones(A.size()[0], B.size()[1], 2).to(device)
+    return out
 
 def my_isnan(a, i):
     print('K = {0}, {1}'.format(i, torch.sum(a[torch.isnan(a)])))
@@ -269,6 +288,13 @@ def cplx_conj(a):
     out = torch.cat([a[..., 0:1], -a[..., 1:2]], dim=-1)
     return out
 
+def cplx_matconj(A):
+    '''
+    conjugate of a complex matrix
+    A: (M, N, 2)
+    return: (N, M, 2) with conjugate imaginary part 
+    '''
+    return cplx_conj(A.permute(1, 0, 2))
 
 def fft_shift_row(image, nrows, flag_me=0):
     if flag_me == 0:
@@ -352,6 +378,7 @@ class Logger():
         solver = opt['solver']
         lambda1 = opt['lambda1']
         lambda2 = opt['lambda2']
+        rank = opt['rank']
 
         if(not os.path.exists(self.rootName)):
             os.mkdir(self.rootName)
@@ -360,8 +387,8 @@ class Logger():
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_lambda12={6}{7}_prosp'.format( \
-                         bcrnn, loss, K, loupe, ratio, solver, lambda1, lambda2) + '.log'
+        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_lambda12={6}{7}_rank={8}'.format( \
+                         bcrnn, loss, K, loupe, ratio, solver, lambda1, lambda2, rank) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 
         if self.flagSave:

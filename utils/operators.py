@@ -260,10 +260,10 @@ class Back_forward_multiEcho():
         if self.echo_cat:
             coilComb = torch_channel_concate(coilComb, self.necho) # (batch, 2*echo, row, col)
         if use_dll2 == 1:
-            if self.rank == 0:
-                coilComb = coilComb + self.lambda_dll2 * img
-            elif self.rank > 0:
-                coilComb = coilComb + self.lambda_dll2 * img + self.lambda_lowrank * (img - self.low_rank_approx(img))
+            # if self.rank == 0:
+            coilComb = coilComb + self.lambda_dll2 * img
+            # elif self.rank > 0:
+            #     coilComb = coilComb + self.lambda_dll2 * img + self.lambda_lowrank * (img - self.low_rank_approx(img))
         elif use_dll2 == 2:
             coilComb = coilComb + self.lambda_dll2 * divergence(gradient(img))
         elif use_dll2 == 3:
@@ -334,6 +334,99 @@ def low_rank_approx(img, kdata, csm, k=10):
     img_low_rank = tmp.permute(0, 3, 1, 2)  # (batch, 2*echo, row, col)
     return img_low_rank
 
+class Back_forward_multiEcho_compressor():
+    '''
+        forward and backward imaging model operator for multi echo GRE data with a temporal compressor
+        (echo dim as in the channel dim in CNN model)
+    '''
+    def __init__(
+        self,
+        csm,
+        mask,
+        flip,
+        lambda_dll2,
+        echo_cat = 1, # flag to concatenate echo dimension into channel
+        necho = 10,
+        kdata = None,
+        U = None, # temporal compressor
+        rank = 10,  # number of temporal basis to use
+        flag_compressor = 0  # flag = 0: MFSUrUr*(x) (x is the original images); 
+                             # flag = 1: MFSUr(x) (x is the compressed images);
+                             # flag = 2: MUrFS(x) (x is the compressed images).
+    ):
+        self.nrows = csm.size()[3]
+        self.ncols = csm.size()[4]
+        self.nechos = csm.size()[2]
+        self.csm = csm
+        self.mask = mask
+        self.lambda_dll2 = lambda_dll2
+        self.flip = flip
+        self.echo_cat = echo_cat
+        self.necho = necho
+        self.kdata = kdata
+        self.rank = rank
+        self.Ur = U[:, :self.rank, :]  # (echo, rank, 2)
+        self.flag_compressor = flag_compressor
+
+    def AtA(
+        self, 
+        img, 
+        use_dll2=1  # 1 for l2-x0 reg, 2 for l2-TV reg, 3 for l1-TV reg
+    ):
+        # forward
+        if self.echo_cat:
+            image = torch_channel_deconcate(img)  # (batch, 2, echo, row, col)
+        else:
+            image = img
+        if self.flag_compressor == 0:
+            # for low rank projection
+            image = image.permute(0, 3, 4, 2, 1)  # (batch, row, col, echo, 2)
+            image = image.view(-1, self.nechos, 2).permute(1, 0, 2)  # (batch*row*col, echo, 2) => (echo, batch*row*col, 2)
+            UrHx = cplx_matmlpy(cplx_matconj(self.Ur), image)  # (rank, echo, 2) * (echo, batch*row*col, 2) => (rank, batch*row*col, 2)
+            image = cplx_matmlpy(self.Ur, UrHx)   # (echo, rank, 2) * (rank, batch*row*col, 2) => (echo, batch*row*col, 2)
+            image = image.permute(1, 0, 2)  # (echo, batch*row*col, 2) => (batch*row*col, echo, 2)
+            image = image.view(-1, self.nrows, self.ncols, self.nechos, 2)  # (batch, row, col, echo, 2)
+            
+            # forward model
+            image = image.permute(0, 3, 1, 2, 4) # (batch, echo, row, col, 2)
+            temp = cplx_mlpy(image, self.flip) # for GE kdata
+            temp = temp[:, None, ...] # multiply order matters (in torch implementation)
+            temp = cplx_mlpy(self.csm, temp) # (batch, coil, echo, row, col, 2)
+            temp = fft_shift_row(temp, self.nrows, 1) # for GE kdata
+            temp = torch.fft(temp, 2) 
+            temp = cplx_mlpy(temp, self.mask)
+
+            # inverse
+            coilImgs = torch.ifft(temp, 2)
+            coilImgs = fft_shift_row(coilImgs, self.nrows, 1) # for GE kdata
+            coilComb = torch.sum(
+                cplx_mlpy(coilImgs, cplx_conj(self.csm)),
+                dim=1,
+                keepdim=False
+            )
+            coilComb = cplx_mlpy(coilComb, self.flip) # for GE kdata
+            
+            # for low rank projection 
+            image = coilComb.permute(0, 2, 3, 1, 4)  # (batch, row, col, echo, 2)
+            image = image.view(-1, self.nechos, 2).permute(1, 0, 2)  # (batch*row*col, echo, 2) => (echo, batch*row*col, 2)
+            UrHx = cplx_matmlpy(cplx_matconj(self.Ur), image)  # (rank, echo, 2) * (echo, batch*row*col, 2) => (rank, batch*row*col, 2)
+            image = cplx_matmlpy(self.Ur, UrHx)   # (echo, rank, 2) * (rank, batch*row*col, 2) => (echo, batch*row*col, 2)
+            image = image.permute(1, 0, 2)  # (echo, batch*row*col, 2) => (batch*row*col, echo, 2)
+            image = image.view(-1, self.nrows, self.ncols, self.nechos, 2)  # (batch, row, col, echo, 2)
+            
+            coilComb = image.permute(0, 4, 3, 1, 2) # (batch, 2, echo, row, col)
+            if self.echo_cat:
+                coilComb = torch_channel_concate(coilComb, self.necho) # (batch, 2*echo, row, col)
+            if use_dll2 == 1:
+                coilComb = coilComb + self.lambda_dll2 * img
+            return coilComb
+
+        elif self.flag_compressor == 1:
+            return 0
+        
+        elif self.flag_compressor == 2:
+            return 0
+
 def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1, necho=10):
     """
     backward operator for multi-echo GE data
@@ -354,6 +447,39 @@ def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1, necho=10):
     if echo_cat:
         coilComb = torch_channel_concate(coilComb, necho) # (batch, 2*echo, row, col)
     return coilComb
+
+def backward_multiEcho_compressor(kdata, csm, mask, flip, U, rank,
+                                  flag_compressor=0, echo_cat=1, necho=10):
+    """
+    backward operator for multi-echo GE data with a temporal compressor 
+    """
+    nrows = kdata.size()[3]
+    ncols = kdata.size()[4]
+    nechos = kdata.size()[2]
+    Ur = U[:, :rank, :]
+    if flag_compressor == 0:
+        temp = cplx_mlpy(kdata, mask)
+        temp = torch.ifft(temp, 2)
+        temp = fft_shift_row(temp, nrows, 1)
+        coilComb = torch.sum(
+            cplx_mlpy(temp, cplx_conj(csm)),
+            dim=1,
+            keepdim=False
+        )
+        coilComb = cplx_mlpy(coilComb, flip)
+
+        # for low rank projection
+        image = coilComb.permute(0, 2, 3, 1, 4)  # (batch, row, col, echo, 2)
+        image = image.view(-1, nechos, 2).permute(1, 0, 2)  # (batch*row*col, echo, 2) => (echo, batch*row*col, 2)
+        UrHx = cplx_matmlpy(cplx_matconj(Ur), image)  # (rank, echo, 2) * (echo, batch*row*col, 2) => (rank, batch*row*col, 2)
+        image = cplx_matmlpy(Ur, UrHx)   # (echo, rank, 2) * (rank, batch*row*col, 2) => (echo, batch*row*col, 2)
+        image = image.permute(1, 0, 2)  # (echo, batch*row*col, 2) => (batch*row*col, echo, 2)
+        image = image.view(-1, nrows, ncols, nechos, 2)  # (batch, row, col, echo, 2)
+        
+        coilComb = image.permute(0, 4, 3, 1, 2) # (batch, 2, echo, row, col)
+        if echo_cat:
+            coilComb = torch_channel_concate(coilComb, necho) # (batch, 2*echo, row, col)
+        return coilComb
 
 def forward_multiEcho(image, csm, mask, flip, echo_cat=1):
     """
