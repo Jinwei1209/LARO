@@ -20,7 +20,7 @@ from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, Fitting
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
 from models.resnet_with_dc import Resnet_with_DC2
-from fits.fits import fit_R2_LM, arlo, fit_complex
+from fits.fits import fit_R2_LM, arlo, fit_complex, fit_complex_all
 from utils.operators import low_rank_approx
 
 if __name__ == '__main__':
@@ -243,6 +243,7 @@ if __name__ == '__main__':
         if opt['loupe'] < 1 and opt['loupe'] > -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_lambda12=0.00.0.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_lambda12=0.00.0.pt'
@@ -437,9 +438,9 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}.pt' \
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}_.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2, rank))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}_.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2, rank))
     
     
@@ -484,8 +485,9 @@ if __name__ == '__main__':
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
         else:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_rank={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2, rank))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+            weights_dict['lambda_lowrank'] = torch.tensor([0.01])
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -497,8 +499,8 @@ if __name__ == '__main__':
         Inputs = []
         Targets = []
         LLRs = []
-        R2s, R2s_target = [], []
-        water, water_target = [], []
+        M0, R2s = [], []
+        F0, P = [], []
         Recons = []
         preconds = []
         
@@ -569,13 +571,20 @@ if __name__ == '__main__':
                     # y = low_rank_approx(torch_channel_concate(Xs_1), kdatas, csm_lowres, k=20)
                     # y = torch_channel_deconcate(y)
 
+                    targets_complex = r2c(targets).permute(0, 2, 3, 1)
+                    # t = time.time()
+                    [m0, r2s, f0, p] = fit_complex_all(targets_complex, TEs)
+                    # print(time.time() - t)
+
                 # Inputs.append(inputs.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 LLRs.append(recon_input.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
-                # R2s.append(y.cpu().detach())
-                # R2s_target.append(y1_target.cpu().detach())
-                # water_target.append(y2_target.cpu().detach())
+
+                M0.append(m0.cpu().detach())
+                R2s.append(r2s.cpu().detach())
+                F0.append(f0.cpu().detach())
+                P.append(p.cpu().detach())
 
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
@@ -586,12 +595,14 @@ if __name__ == '__main__':
             elif opt['lambda1'] == 0:
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}_rank={}.mat' \
                     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio'], opt['rank']), 'Recons', Recons_)
-            # write R2s into .mat file
-            # R2s = np.squeeze(r2c(np.concatenate(R2s, axis=0), opt['echo_cat']))
-            # R2s = np.transpose(R2s, [0, 2, 3, 1])
 
-            # R2s = np.concatenate(R2s, axis=0)
-            # save_mat(rootName+'/results_ablation/R2s.mat', 'R2s', R2s)
+            M0 = np.concatenate(M0, axis=0)
+            R2s = np.concatenate(R2s, axis=0)
+            F0 = np.concatenate(F0, axis=0)
+            P = np.concatenate(P, axis=0)
+            adict = {}
+            adict['m0'], adict['r2s'], adict['f0'], adict['p'] = M0, R2s, F0, P
+            sio.savemat(rootName+'/results_ablation/four_parameters.mat', adict)
 
             # R2s_target = np.concatenate(R2s_target, axis=0)
             # save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)

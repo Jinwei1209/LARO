@@ -188,7 +188,7 @@ class Resnet_with_DC2(nn.Module):
         self.U = U
         self.rank = rank
         self.flag_compressor = flag_compressor
-        self.lambda_lowrank = 0
+        self.lambda_lowrank = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
 
         # flag for using preconditioning:
         if self.flag_precond == 1:
@@ -283,9 +283,9 @@ class Resnet_with_DC2(nn.Module):
         # input
         if self.flag_dataset:
             x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat, self.necho)
-            if self.rank:
-                x = backward_multiEcho_compressor(kdatas, csms, masks, flip, self.U, self.rank,
-                                                  self.flag_compressor, self.echo_cat, self.necho)
+            # if self.rank:
+            #     x = backward_multiEcho_compressor(kdatas, csms, masks, flip, self.U, self.rank,
+            #                                       self.flag_compressor, self.echo_cat, self.necho)
         else:
             x = backward_MS(kdatas, csms, masks, flip, self.echo_cat, self.necho)
         x_start = x
@@ -443,11 +443,11 @@ class Resnet_with_DC2(nn.Module):
                 if self.flag_dataset:
                     A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
                                             self.lambda_lowrank, self.echo_cat, self.necho,
-                                            kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
-                    if self.rank:
-                        A = Back_forward_multiEcho_compressor(csms, masks, flip, self.lambda_dll2, 
-                                            self.echo_cat, self.necho, kdata=kdatas, 
-                                            U=self.U, rank=self.rank, flag_compressor=self.flag_compressor)
+                                            kdata=kdatas, csm_lowres=csm_lowres, U=self.U, rank=self.rank)
+                    # if self.rank:
+                    #     A = Back_forward_multiEcho_compressor(csms, masks, flip, self.lambda_dll2, 
+                    #                         self.echo_cat, self.necho, kdata=kdatas, 
+                    #                         U=self.U, rank=self.rank, flag_compressor=self.flag_compressor)
                 else:
                     A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, 
                                         self.lambda_lowrank, self.echo_cat, self.necho,
@@ -504,11 +504,11 @@ class Resnet_with_DC2(nn.Module):
                 if self.flag_dataset:
                     A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
                                             self.lambda_lowrank, self.echo_cat, self.necho,
-                                            kdata=kdatas, csm_lowres=csm_lowres, rank=self.rank)
-                    if self.rank:
-                        A = Back_forward_multiEcho_compressor(csms, masks, flip, self.lambda_dll2, 
-                                            self.echo_cat, self.necho, kdata=kdatas, 
-                                            U=self.U, rank=self.rank, flag_compressor=self.flag_compressor)
+                                            kdata=kdatas, csm_lowres=csm_lowres, U=self.U, rank=self.rank)
+                    # if self.rank:
+                    #     A = Back_forward_multiEcho_compressor(csms, masks, flip, self.lambda_dll2, 
+                    #                         self.echo_cat, self.necho, kdata=kdatas, 
+                    #                         U=self.U, rank=self.rank, flag_compressor=self.flag_compressor)
                 else:
                     A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, 
                                         self.lambda_lowrank, self.echo_cat, self.necho,

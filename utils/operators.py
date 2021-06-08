@@ -207,6 +207,7 @@ class Back_forward_multiEcho():
         necho = 10,
         kdata = None,
         csm_lowres = None,
+        U = None, 
         rank = 0
     ):
         self.nrows = csm.size()[3]
@@ -222,7 +223,7 @@ class Back_forward_multiEcho():
         self.kdata = kdata
         self.csm_lowres = csm_lowres
         self.rank = rank
-        # self.V = compute_V(self.kdata, self.csm_lowres, self.rank)
+        self.Ur = U[:, :self.rank, :]  # (echo, rank, 2)
 
         # device = self.csm.get_device()   
         # self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 
@@ -260,10 +261,27 @@ class Back_forward_multiEcho():
         if self.echo_cat:
             coilComb = torch_channel_concate(coilComb, self.necho) # (batch, 2*echo, row, col)
         if use_dll2 == 1:
-            # if self.rank == 0:
-            coilComb = coilComb + self.lambda_dll2 * img
-            # elif self.rank > 0:
-            #     coilComb = coilComb + self.lambda_dll2 * img + self.lambda_lowrank * (img - self.low_rank_approx(img))
+            if self.rank == 0:
+                coilComb = coilComb + self.lambda_dll2 * img
+            elif self.rank > 0:
+                coilComb = coilComb + self.lambda_dll2 * img
+
+                # for low rank regularization
+                if self.echo_cat:
+                    image = torch_channel_deconcate(img)  # (batch, 2, echo, row, col)
+                image = image.permute(0, 3, 4, 2, 1)  # (batch, row, col, echo, 2)
+                image = image.view(-1, self.nechos, 2).permute(1, 0, 2)  # (batch*row*col, echo, 2) => (echo, batch*row*col, 2)
+                UrHx = cplx_matmlpy(cplx_matconj(self.Ur), image)  # (rank, echo, 2) * (echo, batch*row*col, 2) => (rank, batch*row*col, 2)
+                image = cplx_matmlpy(self.Ur, UrHx)   # (echo, rank, 2) * (rank, batch*row*col, 2) => (echo, batch*row*col, 2)
+                image = image.permute(1, 0, 2)  # (echo, batch*row*col, 2) => (batch*row*col, echo, 2)
+                image = image.view(-1, self.nrows, self.ncols, self.nechos, 2)  # (batch, row, col, echo, 2)
+                low_rank_approx = image.permute(0, 4, 3, 1, 2)  # (batch, 2, echo, row, col)
+                if self.echo_cat:
+                    low_rank_approx = torch_channel_concate(low_rank_approx, self.necho) # (batch, 2*echo, row, col)
+                low_rank_reg = img - low_rank_approx
+                # combine together
+                coilComb += self.lambda_lowrank * low_rank_reg
+
         elif use_dll2 == 2:
             coilComb = coilComb + self.lambda_dll2 * divergence(gradient(img))
         elif use_dll2 == 3:

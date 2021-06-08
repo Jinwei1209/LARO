@@ -1,7 +1,9 @@
+from numpy.core.numeric import Inf
 import torch
 import numpy as np
 
 from models.dc_blocks import mlpy_in_cg, conj_in_cg, dvd_in_cg
+from skimage.restoration import unwrap_phase
 
 
 def fit_R2_LM(M, max_iter=10, tol=1e-2):
@@ -212,24 +214,29 @@ def fit_complex(M, max_iter=30):
     return [p1, p0]
 
 
-def fit_complex_all(iField, TE, opt):
+def fit_complex_all(iField, TE):
     '''
     four parameter fitting (myfit_all in matlab):
         iField: complex multi-echo data (batch, height, width, numte)
-        TE: echo times,
-        opt: options for optimization
+        TE: echo times
     '''
-    max_iter = opt['max_iter']
-    tol = opt['tol']
-    reg_p = opt['reg_p']
-    lambda_l2 = opt['lambda_l2']
+    max_iter = 30
+    tol = 1e-6
+    reg_p = 1
+    lambda_l2 = 1e-6
     modR2s = 1
     modm0 = 1
 
     alpha = 1
     delta_TE = TE[1] - TE[0]
     
+    te = TE
+    TE = torch.tensor(TE).to('cuda')
     numte = len(TE)
+
+    # make the first echo phase all zeros
+    iField = iField * torch_exp1j(-iField[..., 0:1].angle().repeat(1, 1, 1, numte))
+
     matrix_size = iField.size()[:-1]
     S = iField.view(-1, numte)
     numvox = S.size()[0]
@@ -237,16 +244,132 @@ def fit_complex_all(iField, TE, opt):
 
     y = torch.zeros(4, numvox).to('cuda')
 
-    # initialization
-    [R2s, water] = arlo(TE, iField.abs(), flag_water=1)
+    # initialization of m0 and r2s
+    [R2s, water] = arlo(te, iField.abs(), flag_water=1)
     y[0, :] = torch.flatten(water)
     y[1, :] = torch.flatten(R2s)
 
     nechos = iField.size()[-1]
     Y = S[:, :3].angle()
+
+    # phase unwrapping of the first three echos
+    Y = Y.view(matrix_size[0], matrix_size[1], matrix_size[2], 3).cpu().numpy()
+    for i in range(3):
+        Y[0, :, :, i] = unwrap_phase(Y[0, :, :, i])
+    Y = torch.tensor(Y).to('cuda')
+    Y = Y.view(-1, 3)
+    c = Y[:, 1] - Y[:, 0]
+
+    # initial of f0 and p (using the first two echos)
+    A = torch.tensor([[1.0, te[0]], [1.0, te[1]]]).to('cuda')
+    ip = torch.matmul(torch.inverse(A), Y[:, :2].permute(1, 0))
+    y[2, :] = ip[0, :]
+    y[3, :] = ip[1, :]
+    y_init = y
     
+    cf =  [ [11, 22, 33, 44], [11, 23, 34, 42], [11, 24, 32, 43],
+            [11, 24, 33, 42], [11, 23, 32, 44], [11, 22, 34, 43],
+            [12, 21, 33, 44], [13, 21, 34, 42], [14, 21, 32, 43],
+            [14, 21, 33, 42], [13, 21, 32, 44], [12, 21, 34, 43],
+            [12, 23, 31, 44], [13, 24, 31, 42], [14, 22, 31, 43],
+            [14, 23, 31, 42], [13, 22, 31, 44], [12, 24, 31, 43],
+            [12, 23, 34, 41], [13, 24, 32, 41], [14, 22, 33, 41],
+            [14, 23, 32, 41], [13, 22, 34, 41], [12, 24, 33, 41] ]
+
+    cf_sign = torch.ones(np.shape(cf)[0]).to('cuda')
+    cf_sign[3:9] = - cf_sign[3:9]
+    cf_sign[15:21] = - cf_sign[15:21]
+
+    iteration = 0
+    update = np.Inf
+    while ((iteration < max_iter) and (update > tol)):
+        W = y[0:1, :].permute(1, 0).repeat(1, numte) * torch.exp(-t*y[1:2, :].permute(1, 0).repeat(1, numte)) \
+            * torch_exp1j(y[2:3, :].permute(1, 0).repeat(1, numte) + y[3:4, :].permute(1, 0).repeat(1, numte)*t)
+        W_m0 = torch.exp(-t*y[1:2, :].permute(1, 0).repeat(1, numte)) \
+            * torch_exp1j(y[2:3, :].permute(1, 0).repeat(1, numte) + y[3:4, :].permute(1, 0).repeat(1, numte)*t)
+
+        a11 = torch.sum(torch.real(torch.conj(W_m0) * W_m0), dim=1)
+        a12 = torch.sum(torch.real(-torch.conj(W_m0) * W * t), dim=1)
+        a13 = torch.sum(torch.real(torch.conj(W_m0) * W * 1j), dim=1)
+        a14 = torch.sum(torch.real(torch.conj(W_m0) * W * t * 1j), dim=1)
+        a21 = torch.sum(torch.real(-torch.conj(W) * W_m0 * t), dim=1)
+        a22 = torch.sum(torch.real(torch.conj(W) * W * t * t), dim=1)
+        a23 = torch.sum(torch.real(-torch.conj(W) * W * 1j * t), dim=1)
+        a24 = torch.sum(torch.real(-torch.conj(W) * W * t * 1j * t), dim=1)
+        a31 = torch.sum(torch.real(torch.conj(W) * (-1j) * W_m0), dim=1)
+        a32 = torch.sum(torch.real(-torch.conj(W) * (-1j) * W * t), dim=1)
+        a33 = torch.sum(torch.real(torch.conj(W) * (-1j) * W * 1j), dim=1)
+        a34 = torch.sum(torch.real(torch.conj(W) * (-1j) * W * t * 1j), dim=1)
+        a41 = torch.sum(torch.real(torch.conj(W) * (-1j) * W_m0 * t), dim=1)
+        a42 = torch.sum(torch.real(-torch.conj(W) * (-1j) * W * t * t), dim=1)
+        a43 = torch.sum(torch.real(torch.conj(W) * (-1j) * W * 1j * t), dim=1)
+        a44 = torch.sum(torch.real(torch.conj(W) * (-1j) * W * t * 1j * t), dim=1)
+
+        b1 = torch.sum(torch.real(torch.conj(W_m0) * (S-W)), dim=1)
+        b2 = torch.sum(torch.real(-torch.conj(W) * t * (S-W)), dim=1)
+        b3 = torch.sum(torch.real((-1j) * torch.conj(W) * (S-W)), dim=1)
+        b4 = torch.sum(torch.real((-1j) * torch.conj(W) * t * (S-W)), dim=1)
+
+        # l2 regularization
+        a11 += lambda_l2
+        a22 += lambda_l2
+        a33 += lambda_l2
+        a44 += lambda_l2
+
+        determ = torch.zeros(a11.size()).to('cuda')
+        for idx in range(np.shape(cf)[0]):
+            cdeterm = eval('a{}'.format(cf[idx][0]))
+            for idx2 in range(1, np.shape(cf)[1]):
+                cdeterm = cdeterm * eval('a{}'.format(cf[idx][idx2]))
+            determ = determ + cf_sign[idx] * cdeterm
+
+        dy1 = (a22*a33*a44 + a23*a34*a42 + a24*a32*a43 - a24*a33*a42 - a23*a32*a44 - a22*a34*a43) / determ * b1 \
+            + (-a12*a33*a44 - a13*a34*a42 - a14*a32*a43 + a14*a33*a42 + a13*a32*a44 + a12*a34*a43) / determ * b2 \
+            + (a12*a23*a44 + a13*a24*a42 + a14*a22*a43 - a14*a23*a42 - a13*a22*a44 - a12*a24*a43) / determ * b3 \
+            + (-a12*a23*a34 - a13*a24*a32 - a14*a22*a33 + a14*a23*a32 + a13*a22*a34 + a12*a24*a33) / determ * b4
+
+        dy2 = (-a21*a33*a44 - a23*a34*a41 - a24*a31*a43 + a24*a33*a41 + a23*a31*a44 + a21*a34*a43) / determ * b1 \
+            + (a11*a33*a44 + a13*a34*a41 + a14*a31*a43 - a14*a33*a41 - a13*a31*a44 - a11*a34*a43) / determ * b2 \
+            + (-a11*a23*a44 - a13*a24*a41 - a14*a21*a43 + a14*a24*a41 + a13*a21*a44 + a11*a24*a43) / determ * b3 \
+            + (a11*a23*a34 + a13*a24*a31 + a14*a21*a33 - a14*a23*a31 - a13*a21*a34 - a11*a24*a33) / determ * b4    
+        
+        dy3 = (a21*a32*a44+a22*a34*a41+a24*a31*a42-a24*a32*a41-a22*a31*a44-a21*a34*a42)/determ*b1 \
+            + (-a11*a32*a44-a12*a34*a41-a14*a31*a42+a14*a32*a41+a12*a31*a44+a11*a34*a42)/determ*b2 \
+            + (a11*a22*a44+a12*a24*a41+a14*a21*a42-a14*a22*a41-a12*a21*a44-a11*a24*a42)/determ*b3 \
+            + (-a11*a22*a34-a12*a24*a31-a14*a21*a32+a14*a22*a31+a12*a21*a34+a11*a24*a32)/determ*b4
+
+        dy4 = (-a21*a32*a43-a22*a33*a41-a23*a31*a42+a23*a32*a41+a22*a31*a43+a21*a33*a42)/determ*b1 \
+            + (a11*a32*a43+a12*a33*a41+a13*a31*a42-a13*a32*a41-a12*a31*a43-a11*a33*a42)/determ*b2 \
+            + (-a11*a22*a43-a12*a23*a41-a13*a21*a42+a13*a22*a41+a12*a21*a43+a11*a23*a42)/determ*b3 \
+            + (a11*a22*a33+a12*a23*a31+a13*a21*a32-a13*a22*a31-a12*a21*a33-a11*a23*a32)/determ*b4    
+
+        dy = torch.cat([dy1[None, :], dy2[None, :], dy3[None, :], dy4[None, :]], dim=0)    
+        dy[torch.isnan(dy)] = 0
+        dy[torch.isinf(dy)] = 0
+        y += dy
+
+        if modm0 == 1:
+            ty = y[0, :]
+            ty[ty < 0] = 0
+            y[0, :] = ty
+        
+        if modR2s == 1:
+            ty = y[1, :]
+            ty[ty < 0] = 0
+            y[1, :] = ty
+
+        iteration += 1
+        update = torch.abs(torch.sum(dy)/numvox)
+        # print('Iter = {} | update = {}'.format(iteration, update))
+
+    m0 = y[0, :].view(matrix_size)
+    r2s = y[1, :].view(matrix_size)
+    f0 = y[2, :].view(matrix_size)
+    p = y[3, :].view(matrix_size)
+
+    return [m0, r2s, f0, p]
 
 
-
-    return 0
+def torch_exp1j(y):
+    return torch.cos(y) + 1j * torch.sin(y)
 
