@@ -13,7 +13,7 @@ from models.danet import daBlock, CAM_Module
 from models.fa import faBlockNew
 from models.unet import *
 from models.straight_through_layers import *
-from models.BCRNN import BCRNNlayer
+from models.BCRNN import BCRNNlayer, Conv2dFT
 from models.BCLSTM import BCLSTMlayer
 from fits.fits import fit_R2_LM, fit_complex, arlo
 from utils.data import *

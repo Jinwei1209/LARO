@@ -41,7 +41,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'junghun2'  # or junghun2
+                    self.subject = 'jiahao2'  # or junghun2
                 elif subject == 1:
                     self.subject = 'chao2'  # or chao2
                 elif subject == 2:

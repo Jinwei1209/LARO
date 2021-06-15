@@ -19,7 +19,7 @@ class kdata_multi_echo_MS(data.Dataset):
         nrow = 206,
         ncol = 68,
         split = 'train',
-        subject = 0,  # 0: iField5, 1: iField6, 2: iField7
+        subject = 0,  # 0: iField1, 1: iField2, 2: iField3
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,

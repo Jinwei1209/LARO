@@ -5,6 +5,8 @@ import scipy.io as sio
 import random
 import torch
 import datetime
+import nibabel as nib
+
 from IPython.display import display
 from PIL import Image
 
@@ -30,6 +32,17 @@ def listFilesWithSuffix(rootDir = '.', suffix = None):
             for filename in os.listdir(rootDir) 
                 if os.path.isfile(os.path.join(rootDir, filename))]    
     return res
+
+
+def load_nii(filename):
+    return nib.load(filename).get_data()
+
+
+def save_nii(data, filename, filename_sample=''):
+    if filename_sample:
+        nib.save(nib.Nifti1Image(data, None, nib.load(filename_sample).header), filename)
+    else:
+        nib.save(nib.Nifti1Image(data, None, None), filename)
 
 
 def load_h5(filename, varname='data'):

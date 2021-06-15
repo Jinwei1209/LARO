@@ -18,8 +18,10 @@ class CRNNcell(nn.Module):
     def __init__(self, input_size, hidden_size, kernel_size):
         super(CRNNcell, self).__init__()
         self.kernel_size = kernel_size
-        self.i2h = nn.Conv2d(input_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
+        # self.i2h = nn.Conv2d(input_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
+        self.i2h = Conv2dFT(input_size, hidden_size, kernel_size)
         self.h2h = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
+        # self.h2h = Conv2dFT(hidden_size, hidden_size, kernel_size)
         self.bn_i2h = nn.GroupNorm(hidden_size, hidden_size)
         self.bn_h2h = nn.GroupNorm(hidden_size, hidden_size)
         # add iteration hidden connection
@@ -99,3 +101,51 @@ class BCRNNlayer(nn.Module):
             output = output.view(nt, 1, self.hidden_size, nx, ny)
 
         return output
+
+class Conv2dFT(nn.Module):
+    """
+    Convolutional layer with half image domain and half k-space domain feature generation
+    -----------------
+    input: 4d tensor, shape (batch_size, channel, width, height)
+    -----------------
+    output: 4d tensor, shape (batch_size, hidden_size, width, height)
+    """
+    def __init__(self, input_size, hidden_size, kernel_size):
+        super(Conv2dFT, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.kernel_size = kernel_size
+        self.i2h_image_domain = nn.Conv2d(input_size, hidden_size // 2, kernel_size, padding=self.kernel_size // 2)
+        self.i2h_fourier_domain = nn.Conv2d(input_size, hidden_size // 2, kernel_size, padding=self.kernel_size // 2, padding_mode='reflect')
+        self.bn_i2h = nn.GroupNorm(hidden_size, hidden_size)
+
+    def fftshift(self, image):
+        '''
+            channel last fftshift
+        '''
+        (_, _, nrows, ncols, _) = image.size()
+        image = torch.cat((image[:, :, nrows//2:nrows, ...], image[:, :, 0:nrows//2, ...]), dim=2)
+        image = torch.cat((image[:, :, :, ncols//2:ncols, ...], image[:, :, :, 0:ncols//2, ...]), dim=3)
+        return image
+
+    def forward(self, input):
+        in_to_hid_image = self.i2h_image_domain(input)  # (batch, hidden/2, width, height) on image domain
+        
+        # (batch, input_size, width, height) to (batch, input_size/2, width, height, 2)
+        input = torch.cat([input[:, :self.input_size//2, :, :, None], input[:, self.input_size//2:, :, :, None]], dim=-1)
+        input_kspace = self.fftshift(torch.fft(input, 2))
+        input_kspace = torch.cat([input_kspace[..., 0], input_kspace[..., 1]], dim=1)  # (batch, input_size, width, height)
+
+        # Fourier domain convolution
+        in_to_hid_fourier = self.i2h_fourier_domain(input_kspace)  # (batch, hidden/2, width, height)
+        
+        # (batch, hidden/2, width, height) to (batch, hidden/4, width, height, 2)
+        in_to_hid_fourier = torch.cat([in_to_hid_fourier[:, :self.hidden_size//4, :, :, None], in_to_hid_fourier[:, self.hidden_size//4:, :, :, None]], dim=-1)
+        in_to_hid_fourier = torch.ifft(self.fftshift(in_to_hid_fourier), 2)
+        in_to_hid_fourier = torch.cat([in_to_hid_fourier[..., 0], in_to_hid_fourier[..., 1]], dim=1)  # (batch, hidden/2, width, height)
+        
+        # concatenate image and Fourier domain features
+        hidden = torch.cat([in_to_hid_image, in_to_hid_fourier], dim=1)  # (batch, hidden, width, height)
+        
+        return hidden
+

@@ -1,3 +1,4 @@
+from numpy.matrixlib.defmatrix import matrix
 import torch
 import torch.nn as nn
 import numpy as np
@@ -892,6 +893,40 @@ class OperatorsMultiEcho():
             return self.jacobian_conj(img=img, flag=flag)
 
 
+def hann_filter(matrix_size, voxel_size, fc=None):
+    '''
+        hann filter (numpy array)
+    '''
+    for idx, _ in enumerate(voxel_size):
+        voxel_size[idx] = voxel_size[idx] / voxel_size[1]
+    sy = 1
+    # sx = matrix_size[1] / matrix_size[0] / voxel_size[0]
+    sx = 1
+
+    x = np.arange(-matrix_size[1]/2*sy, matrix_size[1]/2*sy, sy)
+    y = np.arange(-matrix_size[0]/2*sx, matrix_size[0]/2*sx, sx)
+    Y, X = np.meshgrid(x, y)
+
+    n = np.pi * np.sqrt(Y**2 + X**2) / (fc/2)
+    n[n>np.pi] = np.pi
+    H = 0.5 * (1 + np.cos(n))
+    return H
+
+
+def hann_low(image, voxel_size, fc):
+    kdata = np.fft.fftshift(np.fft.fft2(image))
+    H = hann_filter(image.shape, voxel_size, fc)
+    out = np.fft.ifft2(np.fft.fftshift(kdata * H))
+    return out
+
+
+def HPphase(image, voxel_size):
+    matrix_size = image.shape
+    cPhase = np.zeros(matrix_size)
+    fc = matrix_size[0] / 8 * 3
+    for slice in range(matrix_size[-1]):
+        cPhase[:, :, slice] = np.angle(image[:, :, slice] / hann_low(image[:, :, slice], voxel_size, fc))
+    return cPhase
 
 
 
