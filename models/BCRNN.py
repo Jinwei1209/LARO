@@ -20,8 +20,8 @@ class CRNNcell(nn.Module):
         self.kernel_size = kernel_size
         # self.i2h = nn.Conv2d(input_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
         self.i2h = Conv2dFT(input_size, hidden_size, kernel_size)
-        self.h2h = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
-        # self.h2h = Conv2dFT(hidden_size, hidden_size, kernel_size)
+        # self.h2h = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
+        self.h2h = Conv2dFT(hidden_size, hidden_size, kernel_size)
         self.bn_i2h = nn.GroupNorm(hidden_size, hidden_size)
         self.bn_h2h = nn.GroupNorm(hidden_size, hidden_size)
         # add iteration hidden connection

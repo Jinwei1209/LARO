@@ -500,7 +500,7 @@ if __name__ == '__main__':
             contrast='MultiEcho', 
             split='test',
             subject=opt['test_sub'],
-            test_ID=opt['test_ID'],
+            # test_ID=opt['test_ID'],
             normalization=opt['normalization'],
             echo_cat=opt['echo_cat']
         )
@@ -564,8 +564,12 @@ if __name__ == '__main__':
             Recons_new = np.zeros((320, 260, 56)) + 1j * np.zeros((320, 260, 56))
             Recons_new[30:290, 25:235, :] = Recons_
             cPhase = HPphase(np.flip(np.transpose(Recons_new, (1, 0, 2)), 1), voxel_size=[0.75, 0.75, 3]) * 1000
-            save_nii(cPhase, '/data/Jinwei/QSM_SWI/dataset/{}/HPFF_under.nii'.format(QSM_folders[opt['test_ID']]), \
-                     '/data/Jinwei/QSM_SWI/dataset/{}/QSM.nii'.format(QSM_folders[opt['test_ID']]))
+            # save_nii(cPhase, '/data/Jinwei/QSM_SWI/dataset/{}/HPFF_under.nii'.format(QSM_folders[opt['test_ID']]), \
+            #          '/data/Jinwei/QSM_SWI/dataset/{}/QSM.nii'.format(QSM_folders[opt['test_ID']]))
+            # save_nii(np.flip(np.transpose(Recons_new, (1, 0, 2)), 1), '/data/Jinwei/QSM_SWI/dataset/{}/echo_SWI_under.nii'.format(QSM_folders[opt['test_ID']]), \
+            #          '/data/Jinwei/QSM_SWI/dataset/{}/QSM.nii'.format(QSM_folders[opt['test_ID']]))
+            save_nii(np.flip(np.transpose(abs(Recons_new), (1, 0, 2)), 1), '/data/Jinwei/QSM_SWI/dataset/0285/echo_SWI_under.nii', \
+                     '/data/Jinwei/QSM_SWI/dataset/0285/QSM.nii')
             if opt['lambda1'] == 1:
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
                     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
