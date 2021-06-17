@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 from torch.autograd import Variable
 from models.initialization import init_weights
+from models.BCRNN import Conv2dFT
 
 
 def ConvBlock(
@@ -11,25 +12,33 @@ def ConvBlock(
     kernel_size=3,
     stride=1,
     padding=1, 
-    use_bn=1
+    use_bn=1,
+    slim=0,  # flag to use only one convolution
+    convFT=0  # flag to use Conv2dFT
 ):
 
     layers = []
 
-    layers.append(nn.Conv2d(input_dim, output_dim, kernel_size, stride, padding))
+    if convFT:
+        layers.append(Conv2dFT(input_dim, output_dim, kernel_size))
+    else:
+        layers.append(nn.Conv2d(input_dim, output_dim, kernel_size, stride, padding))
     if use_bn == 1:
         layers.append(nn.BatchNorm2d(output_dim))
     elif use_bn == 2:
         layers.append(nn.GroupNorm(output_dim, output_dim))
-    layers.append(nn.LeakyReLU(inplace=False))
+    layers.append(nn.ReLU(inplace=True))
 
-    layers.append(nn.Conv2d(output_dim, output_dim, kernel_size, stride, padding))
-    if use_bn == 1:
-        layers.append(nn.BatchNorm2d(output_dim))
-    elif use_bn == 2:
-        layers.append(nn.GroupNorm(output_dim, output_dim))
-    layers.append(nn.LeakyReLU(inplace=False))
-
+    if not slim:
+        if convFT:
+            layers.append(Conv2dFT(input_dim, output_dim, kernel_size))
+        else:
+            layers.append(nn.Conv2d(output_dim, output_dim, kernel_size, stride, padding))
+        if use_bn == 1:
+            layers.append(nn.BatchNorm2d(output_dim))
+        elif use_bn == 2:
+            layers.append(nn.GroupNorm(output_dim, output_dim))
+        layers.append(nn.ReLU(inplace=False))
     return layers
 
 
@@ -43,7 +52,9 @@ class DownConvBlock(nn.Module):
         stride=1,
         padding=1, 
         use_bn=1, 
-        pool=True
+        pool=True,
+        slim=False,
+        convFT=0
     ):
 
         super(DownConvBlock, self).__init__()
@@ -53,7 +64,7 @@ class DownConvBlock(nn.Module):
             self.layers.append(nn.MaxPool2d(kernel_size=2, stride=2, padding=0))
             # self.layers.append(nn.Conv2d(input_dim, input_dim, kernel_size=2, stride=2, padding=0))
 
-        convBlock = ConvBlock(input_dim, output_dim, kernel_size, stride, padding, use_bn)
+        convBlock = ConvBlock(input_dim, output_dim, kernel_size, stride, padding, use_bn, slim, convFT)
 
         for layer in convBlock:
             self.layers.append(layer)
@@ -77,7 +88,9 @@ class UpConvBlock(nn.Module):
         stride=1,
         padding=1, 
         use_bn=1,
-        use_deconv=1
+        use_deconv=1,
+        slim=False,
+        convFT=0
     ):
         
         super(UpConvBlock, self).__init__()
@@ -89,7 +102,7 @@ class UpConvBlock(nn.Module):
             self.upconv_layer = nn.Conv2d(input_dim, output_dim, kernel_size, stride, padding)
         self.upconv_layer.apply(init_weights)
 
-        self.conv_block = DownConvBlock(input_dim, output_dim, kernel_size, stride, padding, use_bn, pool=False)
+        self.conv_block = DownConvBlock(input_dim, output_dim, kernel_size, stride, padding, use_bn, pool=False, slim=slim, convFT=convFT)
 
     def forward(self, right, left):
         

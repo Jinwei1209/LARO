@@ -12,7 +12,9 @@ class Unet(nn.Module):
         num_filters,
         use_bn=1,
         use_deconv=1,
-        skip_connect=False
+        skip_connect=False,
+        slim=False,
+        convFT=False
     ):
 
         super(Unet, self).__init__()
@@ -33,14 +35,14 @@ class Unet(nn.Module):
             else:
                 pool = True
 
-            self.downsampling_path.append(DownConvBlock(input_dim, output_dim, use_bn=use_bn, pool=pool))
+            self.downsampling_path.append(DownConvBlock(input_dim, output_dim, use_bn=use_bn, pool=pool, slim=slim, convFT=convFT))
 
         for i in range(len(self.num_filters)-2, -1, -1):
 
             input_dim = self.num_filters[i+1]
             output_dim = self.num_filters[i]
 
-            self.upsampling_path.append(UpConvBlock(input_dim, output_dim, use_bn=use_bn, use_deconv=use_deconv))
+            self.upsampling_path.append(UpConvBlock(input_dim, output_dim, use_bn=use_bn, use_deconv=use_deconv, slim=slim, convFT=convFT))
         
         self.last_layer = nn.Conv2d(output_dim, self.output_channels, kernel_size=1)
 

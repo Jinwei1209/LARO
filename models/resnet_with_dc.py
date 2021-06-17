@@ -88,6 +88,7 @@ class Resnet_with_DC2(nn.Module):
         flag_temporal_pred=0,  # predict the later echo images from the former echos
         norm_last=0, # put normalization after relu
         flag_temporal_conv=0,
+        flag_convFT=0,  # flag to use conv2DFT layer
         flag_BCRNN=0,
         slope=0.25,
         passSigmoid=0,
@@ -168,7 +169,8 @@ class Resnet_with_DC2(nn.Module):
                 self.conv3_x = Conv2dFT(nf, nf, ks)
                 self.bn3_x = nn.GroupNorm(nf, nf)
                 # self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
+                # self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
+                self.conv4_x = Conv2dFT(nf, n_ch, ks)
                 self.relu = nn.ReLU(inplace=True)
                 
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)

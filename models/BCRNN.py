@@ -115,8 +115,8 @@ class Conv2dFT(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.kernel_size = kernel_size
-        self.i2h_image_domain = nn.Conv2d(input_size, hidden_size // 2, kernel_size, padding=self.kernel_size // 2)
-        self.i2h_fourier_domain = nn.Conv2d(input_size, hidden_size // 2, kernel_size, padding=self.kernel_size // 2, padding_mode='reflect')
+        self.i2h_image_domain = nn.Conv2d(input_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
+        self.i2h_fourier_domain = nn.Conv2d(input_size, hidden_size, kernel_size, padding=self.kernel_size // 2, padding_mode='reflect')
         self.bn_i2h = nn.GroupNorm(hidden_size, hidden_size)
 
     def fftshift(self, image):
@@ -140,12 +140,13 @@ class Conv2dFT(nn.Module):
         in_to_hid_fourier = self.i2h_fourier_domain(input_kspace)  # (batch, hidden/2, width, height)
         
         # (batch, hidden/2, width, height) to (batch, hidden/4, width, height, 2)
-        in_to_hid_fourier = torch.cat([in_to_hid_fourier[:, :self.hidden_size//4, :, :, None], in_to_hid_fourier[:, self.hidden_size//4:, :, :, None]], dim=-1)
+        in_to_hid_fourier = torch.cat([in_to_hid_fourier[:, :self.hidden_size//2, :, :, None], in_to_hid_fourier[:, self.hidden_size//2:, :, :, None]], dim=-1)
         in_to_hid_fourier = torch.ifft(self.fftshift(in_to_hid_fourier), 2)
         in_to_hid_fourier = torch.cat([in_to_hid_fourier[..., 0], in_to_hid_fourier[..., 1]], dim=1)  # (batch, hidden/2, width, height)
         
         # concatenate image and Fourier domain features
-        hidden = torch.cat([in_to_hid_image, in_to_hid_fourier], dim=1)  # (batch, hidden, width, height)
+        # hidden = torch.cat([in_to_hid_image, in_to_hid_fourier], dim=1)  # (batch, hidden, width, height)
+        hidden = in_to_hid_image + in_to_hid_fourier
         
         return hidden
 
