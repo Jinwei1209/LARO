@@ -78,6 +78,39 @@ class DownConvBlock(nn.Module):
         return self.layers(inputs)
 
 
+class DownConvBlock2(nn.Module):
+    '''
+        DownConvBlock with additional concatenated input features from MultiLevelBCRNNlayer
+    '''
+    def __init__(
+        self, 
+        input_dim, 
+        output_dim, 
+        kernel_size=3,
+        stride=1,
+        padding=1, 
+        use_bn=1, 
+        pool=True,
+        slim=False,
+        convFT=0
+    ):
+
+        super(DownConvBlock2, self).__init__()
+        self.conv_layers = []
+        if pool:
+            self.downsampling = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        convBlock = ConvBlock(output_dim, output_dim, kernel_size, stride, padding, use_bn, slim, convFT)
+        for layer in convBlock:
+            self.conv_layers.append(layer)
+        self.conv_layers = nn.Sequential(*self.conv_layers)
+
+    def forward(self, inputs, features):
+        inputs = self.downsampling(inputs)
+        inputs = torch.cat([inputs, features], 1)
+        outputs = self.conv_layers(inputs)
+        return outputs
+
+
 class UpConvBlock(nn.Module):
 
     def __init__(

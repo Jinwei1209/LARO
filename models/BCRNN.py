@@ -105,6 +105,46 @@ class BCRNNlayer(nn.Module):
 
         return output
 
+
+class MultiLevelBCRNNlayer(nn.Module):
+    def __init__(self, input_size, hidden_size, kernel_size, flag_convFT=0):
+        super(MultiLevelBCRNNlayer, self).__init__()
+        self.hidden_size = hidden_size
+        self.kernel_size = kernel_size
+        self.input_size = input_size
+        self.flag_convFT = flag_convFT
+        self.BCRNNlayer1 = BCRNNlayer(self.input_size, self.hidden_size, self.kernel_size, self.flag_convFT)
+        self.BCRNNlayer2 = BCRNNlayer(self.input_size, self.hidden_size*2, self.kernel_size, self.flag_convFT)
+        self.BCRNNlayer3 = BCRNNlayer(self.input_size, self.hidden_size*4, self.kernel_size, self.flag_convFT)
+        self.BCRNNlayer4 = BCRNNlayer(self.input_size, self.hidden_size*8, self.kernel_size, self.flag_convFT)
+        self.downsampling = nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2), padding=0)
+    def forward(self, input, test=False):
+        outputs = []
+        nt, nb, nc, nx, ny = input.shape
+        output1 = self.BCRNNlayer1(input, test)
+        output1 = output1.view(-1, self.hidden_size, nx, ny)
+        outputs.append(output1)
+        
+        input = self.downsampling(input)
+        _, _, _, nx, ny = input.shape
+        output2 = self.BCRNNlayer2(input, test)
+        output2 = output2.view(-1, self.hidden_size*2, nx, ny)
+        outputs.append(output2)
+
+        input = self.downsampling(input)
+        _, _, _, nx, ny = input.shape
+        output3 = self.BCRNNlayer3(input, test)
+        output3 = output3.view(-1, self.hidden_size*4, nx, ny)
+        outputs.append(output3)
+
+        input = self.downsampling(input)
+        _, _, _, nx, ny = input.shape
+        output4 = self.BCRNNlayer4(input, test)
+        output4 = output4.view(-1, self.hidden_size*8, nx, ny)
+        outputs.append(output4)
+        return outputs
+
+
 class Conv2dFT(nn.Module):
     """
     Convolutional layer with half image domain and half k-space domain feature generation

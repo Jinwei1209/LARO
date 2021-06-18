@@ -13,7 +13,7 @@ from models.danet import daBlock, CAM_Module
 from models.fa import faBlockNew
 from models.unet import *
 from models.straight_through_layers import *
-from models.BCRNN import BCRNNlayer, Conv2dFT
+from models.BCRNN import BCRNNlayer, Conv2dFT, MultiLevelBCRNNlayer
 from models.BCLSTM import BCLSTMlayer
 from fits.fits import fit_R2_LM, fit_complex, arlo
 from utils.data import *
@@ -90,6 +90,7 @@ class Resnet_with_DC2(nn.Module):
         flag_temporal_conv=0,
         flag_convFT=0,  # flag to use conv2DFT layer
         flag_BCRNN=0,
+        flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -114,6 +115,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_loupe = flag_loupe
         self.flag_temporal_pred = flag_temporal_pred
         self.flag_BCRNN = flag_BCRNN
+        self.flag_multi_level = flag_multi_level
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -149,7 +151,10 @@ class Resnet_with_DC2(nn.Module):
                 self.ks = ks
                 if self.flag_BCRNN == 1:
                     print('Use BCRNN')
-                    self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT)
+                    if self.flag_multi_level:
+                        self.bcrnn = MultiLevelBCRNNlayer(n_ch, nf//2, ks, flag_convFT)
+                    else:
+                        self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT)
                     if flag_convFT:
                         print('BCRNN with conv2DFT')
                 elif self.flag_BCRNN == 2:
@@ -175,16 +180,28 @@ class Resnet_with_DC2(nn.Module):
                 # self.conv4_x = Conv2dFT(nf, n_ch, ks)
                 # self.relu = nn.ReLU(inplace=True)
 
-                self.denoiser = Unet(
-                    input_channels=nf,
-                    output_channels=n_ch,
-                    num_filters=[2**i for i in range(6, 10)],
-                    use_bn=2,
-                    use_deconv=1,
-                    skip_connect=False,
-                    slim=True,
-                    convFT=flag_convFT
-                )
+                if self.flag_multi_level:
+                    self.denoiser = UnetWithInputFeatures(
+                        input_channels=nf//2,
+                        output_channels=n_ch,
+                        num_filters=[2**i for i in range(6, 10)],
+                        use_bn=2,
+                        use_deconv=1,
+                        skip_connect=False,
+                        slim=True,
+                        convFT=flag_convFT
+                    )
+                else:
+                    self.denoiser = Unet(
+                        input_channels=nf,
+                        output_channels=n_ch,
+                        num_filters=[2**i for i in range(6, 10)],
+                        use_bn=2,
+                        use_deconv=1,
+                        skip_connect=False,
+                        slim=True,
+                        convFT=flag_convFT
+                    )
             
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         
@@ -557,7 +574,7 @@ class Resnet_with_DC2(nn.Module):
                     x_ = x_.contiguous()
                     # net['t%d_x0'%(i-1)] = net['t%d_x0'%(i-1)].view(n_seq, n_batch, self.nf, width, height)
                     # net['t%d_x0'%i] = self.bcrnn(x_, net['t%d_x0'%(i-1)], test)
-                    if x_.requires_grad and self.flag_cp:
+                    if x_.requires_grad and self.flag_cp and not self.flag_multi_level:
                         net['t%d_x0'%i] = checkpoint(self.bcrnn, x_)
                     else:
                         net['t%d_x0'%i] = self.bcrnn(x_, test)
@@ -569,8 +586,8 @@ class Resnet_with_DC2(nn.Module):
                         net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 0, 2, 3, 4).view(n_batch, n_seq, self.nf, width*height)  # (nt, 1, nf, nx, ny) to (1, nt, nf, nx*ny)
                         net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
                         net['t%d_x0'%i].view(n_batch, n_seq, self.nf, width, height).permute(1, 0, 2, 3, 4)
-
-                    net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
+                    if not self.flag_multi_level:
+                        net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
                     # net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
                     # net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
@@ -592,7 +609,10 @@ class Resnet_with_DC2(nn.Module):
 
                     # net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
 
-                    net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
+                    if x_.requires_grad and self.flag_cp and self.flag_multi_level:
+                        net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i])
+                    else:
+                        net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
 
                     x_ = x_.view(-1, n_ch, width, height)
                     net['t%d_out'%i] = x_ - net['t%d_x4'%i]
