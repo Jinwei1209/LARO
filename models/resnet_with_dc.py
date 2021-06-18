@@ -149,7 +149,9 @@ class Resnet_with_DC2(nn.Module):
                 self.ks = ks
                 if self.flag_BCRNN == 1:
                     print('Use BCRNN')
-                    self.bcrnn = BCRNNlayer(n_ch, nf, ks)
+                    self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT)
+                    if flag_convFT:
+                        print('BCRNN with conv2DFT')
                 elif self.flag_BCRNN == 2:
                     nf_lstm = 32 # number of filters in BCLSTM
                     nf = 32
@@ -157,22 +159,33 @@ class Resnet_with_DC2(nn.Module):
                     print('Use BCLSTM')
                     self.bcrnn = BCLSTMlayer(n_ch, nf_lstm, ks)
 
-                # self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                self.conv1_x = Conv2dFT(nf, nf, ks)
-                self.bn1_x = nn.GroupNorm(nf, nf)
-                # self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                self.conv2_x = Conv2dFT(nf, nf, ks)
-                self.bn2_x = nn.GroupNorm(nf, nf)
-                # self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                self.conv3_x = Conv2dFT(nf, nf, ks)
-                self.bn3_x = nn.GroupNorm(nf, nf)
-                # self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
-                self.conv4_x = Conv2dFT(nf, n_ch, ks)
-                self.relu = nn.ReLU(inplace=True)
-                
+                # # self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # self.conv1_x = Conv2dFT(nf, nf, ks)
+                # self.bn1_x = nn.GroupNorm(nf, nf)
+                # # self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # # self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # self.conv2_x = Conv2dFT(nf, nf, ks)
+                # self.bn2_x = nn.GroupNorm(nf, nf)
+                # # self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # # self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # self.conv3_x = Conv2dFT(nf, nf, ks)
+                # self.bn3_x = nn.GroupNorm(nf, nf)
+                # # self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # # self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
+                # self.conv4_x = Conv2dFT(nf, n_ch, ks)
+                # self.relu = nn.ReLU(inplace=True)
+
+                self.denoiser = Unet(
+                    input_channels=nf,
+                    output_channels=n_ch,
+                    num_filters=[2**i for i in range(6, 10)],
+                    use_bn=2,
+                    use_deconv=1,
+                    skip_connect=False,
+                    slim=True,
+                    convFT=flag_convFT
+                )
+            
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         
         elif self.flag_solver == 2:
@@ -559,25 +572,27 @@ class Resnet_with_DC2(nn.Module):
 
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
-                    net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
-                    net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
-                    # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
-                    # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
-                    net['t%d_x1'%i] = self.relu(net['t%d_x1'%i])
+                    # net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
+                    # net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
+                    # # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
+                    # # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
+                    # net['t%d_x1'%i] = self.relu(net['t%d_x1'%i])
 
-                    net['t%d_x2'%i] = self.conv2_x(net['t%d_x1'%i])
-                    net['t%d_x2'%i] = self.bn2_x(net['t%d_x2'%i])
-                    # net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
-                    # net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
-                    net['t%d_x2'%i] = self.relu(net['t%d_x2'%i])
+                    # net['t%d_x2'%i] = self.conv2_x(net['t%d_x1'%i])
+                    # net['t%d_x2'%i] = self.bn2_x(net['t%d_x2'%i])
+                    # # net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
+                    # # net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
+                    # net['t%d_x2'%i] = self.relu(net['t%d_x2'%i])
 
-                    net['t%d_x3'%i] = self.conv3_x(net['t%d_x2'%i])
-                    net['t%d_x3'%i] = self.bn3_x(net['t%d_x3'%i])
-                    # net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
-                    # net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
-                    net['t%d_x3'%i] = self.relu(net['t%d_x3'%i])
+                    # net['t%d_x3'%i] = self.conv3_x(net['t%d_x2'%i])
+                    # net['t%d_x3'%i] = self.bn3_x(net['t%d_x3'%i])
+                    # # net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
+                    # # net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
+                    # net['t%d_x3'%i] = self.relu(net['t%d_x3'%i])
 
-                    net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
+                    # net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
+
+                    net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
 
                     x_ = x_.view(-1, n_ch, width, height)
                     net['t%d_out'%i] = x_ - net['t%d_x4'%i]

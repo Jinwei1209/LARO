@@ -44,7 +44,7 @@ class Unet(nn.Module):
 
             self.upsampling_path.append(UpConvBlock(input_dim, output_dim, use_bn=use_bn, use_deconv=use_deconv, slim=slim, convFT=convFT))
         
-        self.last_layer = nn.Conv2d(output_dim, self.output_channels, kernel_size=1)
+        self.last_layer = nn.Conv2d(output_dim, self.output_channels, kernel_size=3, padding=1)
 
 
     def forward(self, x):
