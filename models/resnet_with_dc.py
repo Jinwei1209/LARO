@@ -609,7 +609,7 @@ class Resnet_with_DC2(nn.Module):
 
                     # net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
 
-                    if x_.requires_grad and self.flag_cp and self.flag_multi_level:
+                    if x_.requires_grad and self.flag_cp and not self.flag_multi_level:
                         net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i])
                     else:
                         net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])

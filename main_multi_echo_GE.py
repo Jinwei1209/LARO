@@ -442,10 +442,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_convft={}_multilevel={}_unet.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['convft'], opt['multilevel']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_convft={}_multilevel={}_unet.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['convft'], opt['multilevel']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_convft={}_unet.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['convft']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_convft={}_unet.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['convft']))
     
     
     # for test
@@ -466,6 +466,8 @@ if __name__ == '__main__':
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe'],
                 flag_temporal_pred=0,
+                flag_convFT=opt['convft'],
+                flag_multi_level=opt['multilevel'],
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
@@ -489,8 +491,8 @@ if __name__ == '__main__':
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
                     .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
         else:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_FT_all_.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_convft={}_unet.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['convft']))
             weights_dict['lambda_lowrank'] = torch.tensor([0.01])
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
