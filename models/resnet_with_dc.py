@@ -81,6 +81,7 @@ class Resnet_with_DC2(nn.Module):
         rank=0,  # rank > 0 if incorporate low rank compressor in forward model
         flag_compressor=0, # flag of different types of forward models with temporal compressor 
         echo_cat=1, # flag to concatenate echo dimension into channel
+        flag_2D=1,  # flag to use 2D undersampling (variable density)
         flag_solver=0,  # 0 for deep Quasi-newton, 1 for deep ADMM,
                         # 2 for TV Quasi-newton, 3 for TV ADMM.
         flag_precond=0, # flag to use the preconditioner in the CG layer
@@ -111,6 +112,7 @@ class Resnet_with_DC2(nn.Module):
         self.ncol = ncol
         self.ncoil = ncoil
         self.echo_cat = echo_cat
+        self.flag_2D = flag_2D
         self.flag_solver = flag_solver
         self.flag_precond = flag_precond
         self.flag_loupe = flag_loupe
@@ -233,14 +235,26 @@ class Resnet_with_DC2(nn.Module):
             self.preconditioner = Unet(2*self.necho, 2*self.necho, num_filters=[2**i for i in range(4, 8)])
 
         # flag for mask learning strategy
-        if self.flag_loupe == 2 or self.flag_loupe == -2:
-            temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30  # (necho, nrow, ncol)
-            temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
-            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
-        elif self.flag_loupe < 2:
-            temp = (torch.rand(self.nrow, self.ncol)-0.5)*30  # (nrow, ncol)
-            temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
-            self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+        if self.flag_2D == 1:
+            print('Use 2D variable density sampling strategy')
+            if self.flag_loupe == 2 or self.flag_loupe == -2:
+                temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30  # (necho, nrow, ncol)
+                temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+                self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+            elif self.flag_loupe < 2:
+                temp = (torch.rand(self.nrow, self.ncol)-0.5)*30  # (nrow, ncol)
+                temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+                self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+        else:
+            print('Use 1D variable density sampling strategy')
+            if self.flag_loupe == 2 or self.flag_loupe == -2:
+                temp = (torch.rand(self.necho, self.nrow)-0.5)*30  # (necho, nrow)
+                temp[:, self.nrow//2-13 : self.nrow//2+12] = 15
+                self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+            elif self.flag_loupe < 2:
+                temp = (torch.rand(self.nrow)-0.5)*30  # (nrow)
+                temp[self.nrow//2-13 : self.nrow//2+12] = 15
+                self.weight_parameters = nn.Parameter(temp, requires_grad=True)
 
     def generateMask(self, weight_parameters):
         if self.passSigmoid:
@@ -290,19 +304,40 @@ class Resnet_with_DC2(nn.Module):
             # le = (r<=1).to('cuda', dtype=torch.float32)
             le = (r<=1).float()
             return le * Pmask * r + (1-le) * (1 - (1-Pmask) * beta)
-        elif self.flag_loupe == 2:
+        elif self.flag_loupe == 2 and self.flag_2D == 1:
             xbar = torch.mean(Pmask, dim=[1,2])
             r = samplingRatio / xbar
             beta = (1-samplingRatio) / (1-xbar)
             le = (r<=1).float()
             return le[:, None, None] * Pmask * r[:, None, None] + (1-le[:, None, None]) * (1 - (1-Pmask) * beta[:, None, None])
-    
+        elif self.flag_loupe == 2 and self.flag_2D == 0:
+            xbar = torch.mean(Pmask, dim=1)
+            r = samplingRatio / xbar
+            beta = (1-samplingRatio) / (1-xbar)
+            le = (r<=1).float()
+            return le[:, None] * Pmask * r[:, None] + (1-le[:, None]) * (1 - (1-Pmask) * beta[:, None])
+
     def samplingPmask(self, Pmask_rescaled):
-        if self.stochasticSampling:
-            Mask = bernoulliSample.apply(Pmask_rescaled)
+        if self.flag_2D == 1:
+            if self.stochasticSampling:
+                Mask = bernoulliSample.apply(Pmask_rescaled)
+            else:
+                thresh = torch.rand(Pmask_rescaled.shape).to('cuda')
+                Mask = 1/(1+torch.exp(-12*(Pmask_rescaled-thresh)))
         else:
-            thresh = torch.rand(Pmask_rescaled.shape).to('cuda')
-            Mask = 1/(1+torch.exp(-12*(Pmask_rescaled-thresh)))
+            if self.stochasticSampling:
+                Mask1D = bernoulliSample.apply(Pmask_rescaled)
+                if self.flag_loupe == 1:
+                    Mask = Mask1D[..., None].repeat(1, self.ncol)
+                else:
+                    Mask = Mask1D[..., None].repeat(1, 1, self.ncol)
+            else:
+                thresh = torch.rand(Pmask_rescaled.shape).to('cuda')
+                Mask1D = 1/(1+torch.exp(-12*(Pmask_rescaled-thresh)))
+                if self.flag_loupe == 1:
+                    Mask = Mask1D[..., None].repeat(1, self.ncol)
+                else:
+                    Mask = Mask1D[..., None].repeat(1, 1, self.ncol)
         return Mask
 
     def forward(self, kdatas, csms, csm_lowres, masks, flip, test=False, x_input=None):
@@ -313,7 +348,7 @@ class Resnet_with_DC2(nn.Module):
             self.Mask = masks[0, 0, 0, :, :, 0]
         elif self.flag_loupe == 2:
             masks = self.generateMask(self.weight_parameters)
-            self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters)).permute(1, 2, 0)
+            self.Pmask = 1 / (1 + torch.exp(-self.slope * self.weight_parameters))
             self.Mask = masks[0, 0, :, :, :, 0].permute(1, 2, 0)
         else:
             self.Mask = masks[0, 0, 0, :, :, 0]

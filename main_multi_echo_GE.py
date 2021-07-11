@@ -53,11 +53,12 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
+    parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
+    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
+
     parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
-    
-    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--convft', type=int, default=0)  # 0: conventional conv layer, 1: conv2DFT layer
     parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 0: no normalization, 2: use group normalization
     parser.add_argument('--multilevel', type=int, default=0)  # 0: original image space feature extraction and denoising, 1: multi-level
@@ -218,6 +219,7 @@ if __name__ == '__main__':
                 U=U,
                 rank=opt['rank'],
                 echo_cat=1,
+                flag_2D=opt['flag_2D'],
                 flag_solver=opt['solver'],
                 flag_precond=opt['precond'],
                 flag_loupe=opt['loupe'],
@@ -444,10 +446,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_convft={}_bn={}_unet.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['convft'], opt['bn']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_convft={}_bn={}_unet.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['convft'], opt['bn']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_2Dunder={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_2D']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_2Dunder={}.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_2D']))
     
     
     # for test
