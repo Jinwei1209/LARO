@@ -15,17 +15,19 @@ class CRNNcell(nn.Module):
     -----------------
     output: 4d tensor, shape (batch_size, hidden_size, width, height)
     """
-    def __init__(self, input_size, hidden_size, kernel_size, flag_convFT=0):
+    def __init__(self, input_size, hidden_size, kernel_size, flag_convFT=0, flag_bn=1):
         super(CRNNcell, self).__init__()
         self.kernel_size = kernel_size
+        self.flag_bn = flag_bn
         if flag_convFT:
             self.i2h = Conv2dFT(input_size, hidden_size, kernel_size)
             self.h2h = Conv2dFT(hidden_size, hidden_size, kernel_size)
         else:
             self.i2h = nn.Conv2d(input_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
             self.h2h = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
-        self.bn_i2h = nn.GroupNorm(hidden_size, hidden_size)
-        self.bn_h2h = nn.GroupNorm(hidden_size, hidden_size)
+        if self.flag_bn:
+            self.bn_i2h = nn.GroupNorm(hidden_size, hidden_size)
+            self.bn_h2h = nn.GroupNorm(hidden_size, hidden_size)
         # add iteration hidden connection
         # self.ih2ih = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.kernel_size // 2)
         self.relu = nn.ReLU(inplace=True)
@@ -35,8 +37,9 @@ class CRNNcell(nn.Module):
     # def forward(self, input):
         in_to_hid = self.i2h(input)
         hid_to_hid = self.h2h(hidden)
-        in_to_hid = self.bn_i2h(in_to_hid)
-        hid_to_hid = self.bn_h2h(hid_to_hid)
+        if self.flag_bn:
+            in_to_hid = self.bn_i2h(in_to_hid)
+            hid_to_hid = self.bn_h2h(hid_to_hid)
         # ih_to_ih = self.ih2ih(hidden_iteration)
 
         # hidden = self.relu(in_to_hid + hid_to_hid + ih_to_ih)
@@ -58,15 +61,16 @@ class BCRNNlayer(nn.Module):
     --------------------
     output: 5d tensor, shape (n_seq, n_batch, hidden_size, width, height)
     """
-    def __init__(self, input_size, hidden_size, kernel_size, flag_convFT=0):
+    def __init__(self, input_size, hidden_size, kernel_size, flag_convFT=0, flag_bn=1):
         super(BCRNNlayer, self).__init__()
         self.hidden_size = hidden_size
         self.kernel_size = kernel_size
         self.input_size = input_size
         self.flag_convFT = flag_convFT
+        self.flag_bn = flag_bn
         # self.CRNN_model1 = CRNNcell(self.input_size, self.hidden_size, self.kernel_size)
         # self.CRNN_model2 = CRNNcell(self.input_size, self.hidden_size, self.kernel_size)
-        self.CRNN_model = CRNNcell(self.input_size, self.hidden_size, self.kernel_size, self.flag_convFT)
+        self.CRNN_model = CRNNcell(self.input_size, self.hidden_size, self.kernel_size, self.flag_convFT, self.flag_bn)
     # def forward(self, input, input_iteration, test=False):
     def forward(self, input, test=False):
         nt, nb, nc, nx, ny = input.shape

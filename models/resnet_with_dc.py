@@ -91,6 +91,7 @@ class Resnet_with_DC2(nn.Module):
         flag_convFT=0,  # flag to use conv2DFT layer
         flag_BCRNN=0,
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
+        flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -116,6 +117,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_temporal_pred = flag_temporal_pred
         self.flag_BCRNN = flag_BCRNN
         self.flag_multi_level = flag_multi_level
+        self.flag_bn = flag_bn
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -154,7 +156,7 @@ class Resnet_with_DC2(nn.Module):
                     if self.flag_multi_level:
                         self.bcrnn = MultiLevelBCRNNlayer(n_ch, nf//2, ks, flag_convFT)
                     else:
-                        self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT)
+                        self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn)
                     if flag_convFT:
                         print('BCRNN with conv2DFT')
                 elif self.flag_BCRNN == 2:
@@ -185,7 +187,7 @@ class Resnet_with_DC2(nn.Module):
                         input_channels=nf//2,
                         output_channels=n_ch,
                         num_filters=[2**i for i in range(6, 10)],
-                        use_bn=2,
+                        use_bn=flag_bn,
                         use_deconv=1,
                         skip_connect=False,
                         slim=True,
@@ -196,7 +198,7 @@ class Resnet_with_DC2(nn.Module):
                         input_channels=nf,
                         output_channels=n_ch,
                         num_filters=[2**i for i in range(6, 10)],
-                        use_bn=2,
+                        use_bn=flag_bn,
                         use_deconv=1,
                         skip_connect=False,
                         slim=True,
