@@ -168,20 +168,20 @@ class Resnet_with_DC2(nn.Module):
                     print('Use BCLSTM')
                     self.bcrnn = BCLSTMlayer(n_ch, nf_lstm, ks)
 
-                # # self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv1_x = Conv2dFT(nf, nf, ks)
+                # self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # # self.conv1_x = Conv2dFT(nf, nf, ks)
                 # self.bn1_x = nn.GroupNorm(nf, nf)
                 # # self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # # self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv2_x = Conv2dFT(nf, nf, ks)
+                # self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # # self.conv2_x = Conv2dFT(nf, nf, ks)
                 # self.bn2_x = nn.GroupNorm(nf, nf)
                 # # self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # # self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv3_x = Conv2dFT(nf, nf, ks)
+                # self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                # # self.conv3_x = Conv2dFT(nf, nf, ks)
                 # self.bn3_x = nn.GroupNorm(nf, nf)
                 # # self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # # self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
-                # self.conv4_x = Conv2dFT(nf, n_ch, ks)
+                # self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
+                # # self.conv4_x = Conv2dFT(nf, n_ch, ks)
                 # self.relu = nn.ReLU(inplace=True)
 
                 if self.flag_multi_level:
@@ -199,11 +199,11 @@ class Resnet_with_DC2(nn.Module):
                     self.denoiser = Unet(
                         input_channels=nf,
                         output_channels=n_ch,
-                        num_filters=[2**i for i in range(6, 10)],
+                        num_filters=[2**i for i in range(6, 9)],
                         use_bn=flag_bn,
                         use_deconv=1,
                         skip_connect=False,
-                        slim=True,
+                        slim=False,
                         convFT=flag_convFT
                     )
             
@@ -237,7 +237,7 @@ class Resnet_with_DC2(nn.Module):
         # flag for mask learning strategy
         if self.flag_2D == 1:
             print('Use 2D variable density sampling strategy')
-            if self.flag_loupe == 2 or self.flag_loupe == -2:
+            if self.flag_loupe == 2 or self.flag_loupe == -2 or self.flag_loupe == -3:
                 temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30  # (necho, nrow, ncol)
                 temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
                 self.weight_parameters = nn.Parameter(temp, requires_grad=True)

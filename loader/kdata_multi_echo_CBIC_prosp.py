@@ -19,7 +19,7 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
         ncol = 80,
         split = 'train',
         subject = 0,  # 0: junghun, 1: chao, 2: alexey
-        opt = 0,  # 0: variable density; 1: optimal
+        loupe = 0,  # 0: variable density; 1: optimal
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
@@ -34,7 +34,7 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
         self.split = split
         self.nrow = nrow
         self.ncol = ncol
-        self.opt = opt
+        self.loupe = loupe
         if contrast == 'MultiEcho':
             if split == 'train':
                 self.nsamples = 600
@@ -43,7 +43,7 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'junghun2'
+                    self.subject = 'jiahao2'
                 elif subject == 1:
                     self.subject = 'chao2'
                 elif subject == 2:
@@ -91,17 +91,17 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
                     idx -= 200
                     subject += 1
             if subject == 0:
-                dataFD = self.rootDir + '/data_cfl/thanh/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/thanh2/full_cc_slices/'
             elif subject == 1:
-                dataFD = self.rootDir + '/data_cfl/jinwei/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jinwei2/full_cc_slices/'
             elif subject == 2:
-                dataFD = self.rootDir + '/data_cfl/qihao/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/qihao2/full_cc_slices/'
 
         elif self.split == 'val':
-            dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
         
         elif self.split == 'test':
-            dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/20_opt={}_cc_slices/'.format(self.opt)
+            dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo/'.format(self.loupe)
             # dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
             dataFD = self.rootDir + '/data_cfl/alexey2/full_cc_slices/'
 
@@ -124,8 +124,11 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
         
         # Coil sensitivity maps
         csm = readcfl(dataFD_prosp + 'sensMaps_slice_{}'.format(idx))
-        csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
-        csm = np.repeat(csm, self.necho, axis=1)  # (coil, echo, row, col)
+        # csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
+        # csm = np.repeat(csm, self.necho, axis=1)  # (coil, echo, row, col)
+        csm = np.transpose(csm, (2, 3, 0, 1))  # (coil, echo, row, col)
+        for i in range(self.necho):
+            csm[:, i, :, :] = csm[:, i, :, :] * np.exp(-1j * np.angle(csm[0:1, i, :, :]))
         csm = c2r_kdata(csm) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # Coil sensitivity maps from central kspace data

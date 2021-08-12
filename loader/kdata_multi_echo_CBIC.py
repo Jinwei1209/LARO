@@ -41,13 +41,13 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'junghun'  # or junghun2
+                    self.subject = 'junghun2'  # or junghun2
                 elif subject == 1:
-                    self.subject = 'chao'  # or chao2
+                    self.subject = 'chao2'  # or chao2
                 elif subject == 2:
-                    self.subject = 'alexey'  # or alexey2_
+                    self.subject = 'alexey2'  # or alexey2_
                 elif subject == 3:
-                    self.subject = 'hang'
+                    self.subject = 'hang2'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -89,17 +89,23 @@ class kdata_multi_echo_CBIC(data.Dataset):
                     idx -= 200
                     subject += 1
             if subject == 0:
-                dataFD = self.rootDir + '/data_cfl/thanh/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/thanh2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/thanh2/full_cc_slices_sense_echo/'
             elif subject == 1:
-                dataFD = self.rootDir + '/data_cfl/jinwei/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jinwei2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/jinwei2/full_cc_slices_sense_echo/'
             elif subject == 2:
-                dataFD = self.rootDir + '/data_cfl/qihao/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/qihao2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/qihao2/full_cc_slices_sense_echo/'
 
         elif self.split == 'val':
-            dataFD = self.rootDir + '/data_cfl/jiahao/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/jiahao2/full_cc_slices_sense_echo/'
         
         elif self.split == 'test':
-            dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
+            # dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/' + 'alexey2' + '/full_cc_slices/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
 
         idx += 30
 
@@ -110,7 +116,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
             self.augmentation = self.augmentations[self.augIndex]
         self.batchIndex += 1
 
-        org = readcfl(dataFD + 'fully_slice_{}'.format(idx))  # (row, col, echo)
+        org = readcfl(dataFD_sense_echo + 'fully_slice_{}'.format(idx))  # (row, col, echo)
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 
@@ -118,10 +124,19 @@ class kdata_multi_echo_CBIC(data.Dataset):
             org = np.transpose(org, (0, 3, 1, 2)) # (2, echo, row, col)
             recon_input = np.transpose(recon_input, (0, 3, 1, 2))
         
-        # Coil sensitivity maps
-        csm = readcfl(dataFD + 'sensMaps_slice_{}'.format(idx))
-        csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
-        csm = np.repeat(csm, self.necho, axis=1)  # (coil, echo, row, col)
+        # # Option 1: coil sensitivity maps from the 1st echo
+        # csm = readcfl(dataFD + 'sensMaps_slice_{}'.format(idx))
+        # csm = np.transpose(csm, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
+        # csm = np.repeat(csm, self.necho, axis=1)  # (coil, echo, row, col)
+        # for i in range(self.necho):
+        #     csm[:, i, :, :] = csm[:, i, :, :] * np.exp(-1j * np.angle(csm[0:1, i, :, :]))
+
+        # Option 2: csms estimated from each echo
+        csm = readcfl(dataFD_sense_echo + 'sensMaps_slice_{}'.format(idx))
+        csm = np.transpose(csm, (2, 3, 0, 1))  # (coil, echo, row, col)
+        for i in range(self.necho):
+            csm[:, i, :, :] = csm[:, i, :, :] * np.exp(-1j * np.angle(csm[0:1, i, :, :]))
+    
         csm = c2r_kdata(csm) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # Coil sensitivity maps from central kspace data
@@ -131,7 +146,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         csm_lowres = c2r_kdata(csm_lowres) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # Fully sampled kspace data
-        kdata = readcfl(dataFD + 'kdata_slice_{}'.format(idx))
+        kdata = readcfl(dataFD_sense_echo + 'kdata_slice_{}'.format(idx))
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 

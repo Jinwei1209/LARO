@@ -45,18 +45,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey
+    parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey, 3: hang
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
-    parser.add_argument('--loupe', type=int, default=0)  # -2: fixed learned mask across echos
-                                                         # -1: manually designed mask, 0 fixed learned mask, 
-                                                         # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
-    parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
+    parser.add_argument('--loupe', type=int, default=0)  # -3: fixed manually designed mask across echos,
+                                                         # -2: fixed learned mask across echos,
+                                                         # -1: fixed manually designed mask, 
+                                                         #  0: fixed learned mask, 
+                                                         #  1: mask learning, same mask across echos, 
+                                                         #  2: mask learning, mask for each echo
+    parser.add_argument('--bcrnn', type=int, default=1)  #  0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
     parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
 
+    parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
     parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     parser.add_argument('--convft', type=int, default=0)  # 0: conventional conv layer, 1: conv2DFT layer
@@ -102,23 +105,19 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
-    if opt['loupe'] == -1:
-        # load manually designed mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
-        # masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_{}'.format(opt['samplingRatio'], opt['1d_type'])))
-    elif opt['loupe'] == 0:
+    if opt['loupe'] == 0:
         # load fixed loupe optimized mask
-        if opt['prosp'] == 0:
-            # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim'.format(opt['samplingRatio'])))
-            masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_ssim'.format(opt['samplingRatio'])))
-        elif opt['prosp'] == 1:
-            masks = np.real(readcfl(rootName+'/masks/mask_{}'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo'.format(opt['samplingRatio'])))[0, :, :]
+    elif opt['loupe'] == -1:
+        # load manually designed mask
+        masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))[0, :, :]
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
-        # masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
-        # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo'.format(opt['samplingRatio'])))
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_ssim_echo'.format(opt['samplingRatio'])))
-        
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo'.format(opt['samplingRatio'])))  # equal ratios from same PDF
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_test'.format(opt['samplingRatio'])))  # equal ratios from same PDF, prospective qihao
+    elif opt['loupe'] == -3:
+        masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))
+
     if opt['loupe'] < 1 and opt['loupe'] > -2:
         # for 2D random sampling 
         masks = masks[..., np.newaxis] # (nrow, ncol, 1)
@@ -152,7 +151,7 @@ if __name__ == '__main__':
         # masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
         # # add batch dimension
         # masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
-    elif opt['loupe'] == -2:
+    elif opt['loupe'] == -2 or opt['loupe'] == -3:
         masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
         masks = torch.tensor(masks, device=device).float()
         # to complex data
@@ -251,13 +250,14 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_2Dunder={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_2D']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_unet.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
-        elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_2Dunder={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_2D']))
+        elif opt['loupe'] == -2 or opt['loupe'] == -3:
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_unet.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
 
         # if opt['temporal_pred'] == 1:
@@ -448,10 +448,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_2Dunder={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_2D']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_2Dunder={}.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_2D']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))  
     
     
     # for test
@@ -495,12 +495,9 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        if opt['prosp'] == 1 and opt['loupe'] == 0:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_prosp.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
-        else:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_2Dunder={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_2D']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+        weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -533,7 +530,7 @@ if __name__ == '__main__':
                 contrast='MultiEcho', 
                 split='test',
                 subject=opt['test_sub'],
-                opt=opt['loupe']+1,
+                loupe=opt['loupe'],
                 normalization=opt['normalization'],
                 echo_cat=opt['echo_cat']
             )
