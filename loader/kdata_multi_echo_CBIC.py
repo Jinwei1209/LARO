@@ -35,7 +35,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 600
+                self.nsamples = 1200
             elif split == 'val':
                 self.nsamples = 200
             elif split == 'test':
@@ -97,6 +97,15 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif subject == 2:
                 dataFD = self.rootDir + '/data_cfl/qihao2/full_cc_slices/'
                 dataFD_sense_echo = self.rootDir + '/data_cfl/qihao2/full_cc_slices_sense_echo/'
+            elif subject == 3:
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/hang2/full_cc_slices_sense_echo/'
+            elif subject == 4:
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/dominick2/full_cc_slices_sense_echo/'
+            elif subject == 5:
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei2/full_cc_slices_sense_echo/'
 
         elif self.split == 'val':
             dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
@@ -151,7 +160,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # brain tissue mask
-        brain_mask = np.real(readcfl(dataFD + 'mask_slice_{}'.format(idx)))  # (row, col)
+        brain_mask = np.real(readcfl(dataFD_sense_echo + 'mask_slice_{}'.format(idx)))  # (row, col)
         brain_mask_erode = np.real(readcfl(dataFD + 'mask_erode_slice_{}'.format(idx)))  # (row, col)
         if self.echo_cat:
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
