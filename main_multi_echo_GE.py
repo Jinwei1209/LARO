@@ -32,8 +32,8 @@ if __name__ == '__main__':
     t0 = time.time()
     epoch = 0
     errL2_dc_sum = 0
-    PSNRs_val = []
     Validation_loss = []
+    Validation_psnr = []
     ncoil = 8
     nrow = 206
     ncol = 80
@@ -107,14 +107,17 @@ if __name__ == '__main__':
 
     if opt['loupe'] == 0:
         # load fixed loupe optimized mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo'.format(opt['samplingRatio'])))[0, :, :]
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))[0, :, :]
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -1:
         # load manually designed mask
         masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))[0, :, :]
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo'.format(opt['samplingRatio'])))  # equal ratios from same PDF
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))  # equal ratios from same PDF
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_test'.format(opt['samplingRatio'])))  # equal ratios from same PDF, prospective qihao
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -3:
         masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))
 
@@ -250,12 +253,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_unet.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2 or opt['loupe'] == -3:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_unet.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
@@ -295,7 +298,7 @@ if __name__ == '__main__':
                 if gen_iterations%display_iters == 0:
 
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                    % (epoch, niter, idx, 1200//batch_size, time.time()-t0))
+                    % (epoch, niter, idx, 1600//batch_size, time.time()-t0))
 
                     print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, rank: {}'.format( \
                             opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], opt['rank']))
@@ -439,6 +442,7 @@ if __name__ == '__main__':
                 print('\n Validation loss: %f \n' 
                     % (sum(loss_total_list) / float(len(loss_total_list))))
                 Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
+                Validation_psnr.append(np.mean(np.asarray(metrices_val.PSNRs)))
             
             # save log
             logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f' 
@@ -447,10 +451,10 @@ if __name__ == '__main__':
             % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
 
             # save weights
-            if Validation_loss[-1] == min(Validation_loss):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet.pt' \
+            if Validation_psnr[-1] == max(Validation_psnr):
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet_last.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_last.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))  
     
     
@@ -495,7 +499,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         # if opt['temporal_pred'] == 1:

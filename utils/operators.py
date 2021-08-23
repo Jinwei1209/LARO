@@ -224,7 +224,8 @@ class Back_forward_multiEcho():
         self.kdata = kdata
         self.csm_lowres = csm_lowres
         self.rank = rank
-        self.Ur = U[:, :self.rank, :]  # (echo, rank, 2)
+        if self.rank > 0:
+            self.Ur = U[:, :self.rank, :]  # (echo, rank, 2)
 
         # device = self.csm.get_device()   
         # self.flip = torch.ones([self.nechos, self.nrows, self.ncols, 1]) 

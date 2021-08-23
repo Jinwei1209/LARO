@@ -35,19 +35,17 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 1200
+                self.nsamples = 1600
             elif split == 'val':
                 self.nsamples = 200
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'junghun2'  # or junghun2
+                    self.subject = 'junghun2'
                 elif subject == 1:
-                    self.subject = 'chao2'  # or chao2
+                    self.subject = 'chao2'
                 elif subject == 2:
-                    self.subject = 'alexey2'  # or alexey2_
-                elif subject == 3:
-                    self.subject = 'hang2'
+                    self.subject = 'feng2'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -106,6 +104,12 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif subject == 5:
                 dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
                 dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei2/full_cc_slices_sense_echo/'
+            elif subject == 6:
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/kelly2/full_cc_slices_sense_echo/'
+            elif subject == 7:
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/feng2/full_cc_slices_sense_echo/'
 
         elif self.split == 'val':
             dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
@@ -113,7 +117,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         
         elif self.split == 'test':
             # dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
-            dataFD = self.rootDir + '/data_cfl/' + 'alexey2' + '/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
             dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
 
         idx += 30

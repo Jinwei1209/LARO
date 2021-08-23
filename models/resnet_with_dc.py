@@ -91,6 +91,7 @@ class Resnet_with_DC2(nn.Module):
         flag_temporal_conv=0,
         flag_convFT=0,  # flag to use conv2DFT layer
         flag_BCRNN=0,
+        flag_unet=0,  # flag to use unet as denoiser
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
         slope=0.25,
@@ -118,6 +119,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_loupe = flag_loupe
         self.flag_temporal_pred = flag_temporal_pred
         self.flag_BCRNN = flag_BCRNN
+        self.flag_unet = flag_unet
         self.flag_multi_level = flag_multi_level
         self.flag_bn = flag_bn
         self.slope = slope
@@ -168,34 +170,23 @@ class Resnet_with_DC2(nn.Module):
                     print('Use BCLSTM')
                     self.bcrnn = BCLSTMlayer(n_ch, nf_lstm, ks)
 
-                # self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # # self.conv1_x = Conv2dFT(nf, nf, ks)
-                # self.bn1_x = nn.GroupNorm(nf, nf)
-                # # self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # # self.conv2_x = Conv2dFT(nf, nf, ks)
-                # self.bn2_x = nn.GroupNorm(nf, nf)
-                # # self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # # self.conv3_x = Conv2dFT(nf, nf, ks)
-                # self.bn3_x = nn.GroupNorm(nf, nf)
-                # # self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
-                # self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
-                # # self.conv4_x = Conv2dFT(nf, n_ch, ks)
-                # self.relu = nn.ReLU(inplace=True)
-
-                if self.flag_multi_level:
-                    self.denoiser = UnetWithInputFeatures(
-                        input_channels=nf//2,
-                        output_channels=n_ch,
-                        num_filters=[2**i for i in range(6, 10)],
-                        use_bn=flag_bn,
-                        use_deconv=1,
-                        skip_connect=False,
-                        slim=True,
-                        convFT=flag_convFT
-                    )
-                else:
+                if self.flag_unet == 0:
+                    self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                    # self.conv1_x = Conv2dFT(nf, nf, ks)
+                    self.bn1_x = nn.GroupNorm(nf, nf)
+                    # self.conv1_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                    self.conv2_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                    # self.conv2_x = Conv2dFT(nf, nf, ks)
+                    self.bn2_x = nn.GroupNorm(nf, nf)
+                    # self.conv2_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                    self.conv3_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                    # self.conv3_x = Conv2dFT(nf, nf, ks)
+                    self.bn3_x = nn.GroupNorm(nf, nf)
+                    # self.conv3_h = nn.Conv2d(nf, nf, ks, padding = ks//2)
+                    self.conv4_x = nn.Conv2d(nf, n_ch, ks, padding = ks//2)
+                    # self.conv4_x = Conv2dFT(nf, n_ch, ks)
+                    self.relu = nn.ReLU(inplace=True)
+                elif self.flag_unet == 1:
                     self.denoiser = Unet(
                         input_channels=nf,
                         output_channels=n_ch,
@@ -206,6 +197,29 @@ class Resnet_with_DC2(nn.Module):
                         slim=False,
                         convFT=flag_convFT
                     )
+
+                # if self.flag_multi_level:
+                #     self.denoiser = UnetWithInputFeatures(
+                #         input_channels=nf//2,
+                #         output_channels=n_ch,
+                #         num_filters=[2**i for i in range(6, 10)],
+                #         use_bn=flag_bn,
+                #         use_deconv=1,
+                #         skip_connect=False,
+                #         slim=True,
+                #         convFT=flag_convFT
+                #     )
+                # else:
+                #     self.denoiser = Unet(
+                #         input_channels=nf,
+                #         output_channels=n_ch,
+                #         num_filters=[2**i for i in range(6, 9)],
+                #         use_bn=flag_bn,
+                #         use_deconv=1,
+                #         skip_connect=False,
+                #         slim=False,
+                #         convFT=flag_convFT
+                #     )
             
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         
@@ -237,14 +251,22 @@ class Resnet_with_DC2(nn.Module):
         # flag for mask learning strategy
         if self.flag_2D == 1:
             print('Use 2D variable density sampling strategy')
+
             if self.flag_loupe == 2 or self.flag_loupe == -2 or self.flag_loupe == -3:
-                temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30  # (necho, nrow, ncol)
-                temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+                # temp = (torch.rand(self.necho, self.nrow, self.ncol)-0.5)*30  # (necho, nrow, ncol)
+                # temp[:, self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+                temp = torch.zeros(self.necho, self.nrow, self.ncol)  # (necho, nrow, ncol)
                 self.weight_parameters = nn.Parameter(temp, requires_grad=True)
             elif self.flag_loupe < 2:
-                temp = (torch.rand(self.nrow, self.ncol)-0.5)*30  # (nrow, ncol)
-                temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+                # temp = (torch.rand(self.nrow, self.ncol)-0.5)*30  # (nrow, ncol)
+                # temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+                temp = torch.zeros(self.nrow, self.ncol)  # (nrow, ncol)
                 self.weight_parameters = nn.Parameter(temp, requires_grad=True)
+            
+            # # temp = (torch.rand(self.nrow, self.ncol)-0.5)*30  # (nrow, ncol)
+            # # temp[self.nrow//2-13 : self.nrow//2+12, self.ncol//2-13 : self.ncol//2+12] = 15
+            # temp = torch.zeros(self.nrow, self.ncol)  # (nrow, ncol)
+            # self.weight_parameters = nn.Parameter(temp, requires_grad=True)
         else:
             print('Use 1D variable density sampling strategy')
             if self.flag_loupe == 2 or self.flag_loupe == -2:
@@ -271,7 +293,7 @@ class Resnet_with_DC2(nn.Module):
         if self.flag_loupe == 1:
             masks = self.samplingPmask(Pmask_rescaled)[:, :, None] # (nrow, ncol, 1)
             # keep central calibration region to 1
-            masks[self.nrow//2-13:self.nrow//2+12, self.ncol//2-13:self.ncol//2+12, :] = 1
+            masks[self.nrow//2-9:self.nrow//2+9, self.ncol//2-9:self.ncol//2+9, :] = 1
             # to complex data
             masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (nrow, ncol, 2)
             # add echo dimension
@@ -286,7 +308,7 @@ class Resnet_with_DC2(nn.Module):
         elif self.flag_loupe == 2:
             masks = self.samplingPmask(Pmask_rescaled)[..., None] # (necho, nrow, ncol, 1)
             # keep central calibration region to 1
-            masks[:, self.nrow//2-13:self.nrow//2+12, self.ncol//2-13:self.ncol//2+12, :] = 1
+            masks[:, self.nrow//2-9:self.nrow//2+9, self.ncol//2-9:self.ncol//2+9, :] = 1
             # to complex data
             masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (necho, nrow, ncol, 2)
             # add coil dimension
@@ -626,30 +648,32 @@ class Resnet_with_DC2(nn.Module):
                     if not self.flag_multi_level:
                         net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
-                    # net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
-                    # net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
-                    # # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
-                    # # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
-                    # net['t%d_x1'%i] = self.relu(net['t%d_x1'%i])
+                    if self.flag_unet == 0:
+                        net['t%d_x1'%i] = self.conv1_x(net['t%d_x0'%i])
+                        net['t%d_x1'%i] = self.bn1_x(net['t%d_x1'%i])
+                        # net['t%d_h1'%i] = self.conv1_h(net['t%d_x1'%(i-1)])
+                        # net['t%d_x1'%i] = self.relu(net['t%d_h1'%i]+net['t%d_x1'%i])
+                        net['t%d_x1'%i] = self.relu(net['t%d_x1'%i])
 
-                    # net['t%d_x2'%i] = self.conv2_x(net['t%d_x1'%i])
-                    # net['t%d_x2'%i] = self.bn2_x(net['t%d_x2'%i])
-                    # # net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
-                    # # net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
-                    # net['t%d_x2'%i] = self.relu(net['t%d_x2'%i])
+                        net['t%d_x2'%i] = self.conv2_x(net['t%d_x1'%i])
+                        net['t%d_x2'%i] = self.bn2_x(net['t%d_x2'%i])
+                        # net['t%d_h2'%i] = self.conv2_h(net['t%d_x2'%(i-1)])
+                        # net['t%d_x2'%i] = self.relu(net['t%d_h2'%i]+net['t%d_x2'%i])
+                        net['t%d_x2'%i] = self.relu(net['t%d_x2'%i])
 
-                    # net['t%d_x3'%i] = self.conv3_x(net['t%d_x2'%i])
-                    # net['t%d_x3'%i] = self.bn3_x(net['t%d_x3'%i])
-                    # # net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
-                    # # net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
-                    # net['t%d_x3'%i] = self.relu(net['t%d_x3'%i])
+                        net['t%d_x3'%i] = self.conv3_x(net['t%d_x2'%i])
+                        net['t%d_x3'%i] = self.bn3_x(net['t%d_x3'%i])
+                        # net['t%d_h3'%i] = self.conv3_h(net['t%d_x3'%(i-1)])
+                        # net['t%d_x3'%i] = self.relu(net['t%d_h3'%i]+net['t%d_x3'%i])
+                        net['t%d_x3'%i] = self.relu(net['t%d_x3'%i])
 
-                    # net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
+                        net['t%d_x4'%i] = self.conv4_x(net['t%d_x3'%i])
 
-                    if x_.requires_grad and self.flag_cp and not self.flag_multi_level:
-                        net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i])
-                    else:
-                        net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
+                    elif self.flag_unet == 1:
+                        if x_.requires_grad and self.flag_cp and not self.flag_multi_level:
+                            net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i])
+                        else:
+                            net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
 
                     x_ = x_.view(-1, n_ch, width, height)
                     net['t%d_out'%i] = x_ - net['t%d_x4'%i]
