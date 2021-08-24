@@ -71,7 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda2', type=float, default=0.0)  # weighting of p1 reconstruction loss
     parser.add_argument('--lambda_maskbce', type=float, default=0.0)  # weighting of Maximal cross entropy in masks
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
-    parser.add_argument('--weights_dir', type=str, default='weights_ablation')
+    parser.add_argument('--weights_dir', type=str, default='weights_ablation2')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--norm_last', type=int, default=0)  # 0: norm+relu, 1: relu+norm
     parser.add_argument('--temporal_conv', type=int, default=0) # 0: no temporal, 1: center, 2: begining
@@ -99,6 +99,17 @@ if __name__ == '__main__':
     else:
         niter = 100
 
+    # flag to use hidden state recurrent pass in BCRNN layer
+    if opt['solver'] == 1 and opt['bcrnn'] == 0:
+        flag_bcrnn = 1
+        flag_hidden = 0
+    elif opt['solver'] == 1 and opt['bcrnn'] == 1:
+        flag_bcrnn = 1
+        flag_hidden = 1
+    elif opt['solver'] == 0 and opt['bcrnn'] == 0:
+        flag_bcrnn = 0
+        flag_hidden = 0
+
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
     rootName = '/data/Jinwei/QSM_raw_CBIC'
@@ -108,16 +119,16 @@ if __name__ == '__main__':
     if opt['loupe'] == 0:
         # load fixed loupe optimized mask
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))[0, :, :]
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks2/mask_{}_ssim'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -1:
         # load manually designed mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))[0, :, :]
-        # masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))[0, :, :]
+        masks = np.real(readcfl(rootName+'/masks2/mask_{}m'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))  # equal ratios from same PDF
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_test'.format(opt['samplingRatio'])))  # equal ratios from same PDF, prospective qihao
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks2/mask_{}_echo'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -3:
         masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))
 
@@ -234,7 +245,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=opt['bcrnn'],
+                flag_BCRNN=flag_bcrnn,
+                flag_hidden=flag_hidden,
                 flag_att=opt['att'],
                 flag_cp=1
             )
@@ -253,12 +265,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_last.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2 or opt['loupe'] == -3:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_last.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
@@ -483,7 +495,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=opt['bcrnn'],
+                flag_BCRNN=flag_bcrnn,
+                flag_hidden=flag_hidden,
                 flag_att=opt['att']
             )
         else:
@@ -499,7 +512,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_last.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         # if opt['temporal_pred'] == 1:

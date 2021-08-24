@@ -36,9 +36,9 @@ if __name__ == '__main__':
     PSNRs_val = []
     Validation_loss = []
     ncoil = 1
-    nrow = 210
-    ncol = 56
-    nslice = 260
+    nrow = 206
+    ncol = 68
+    nslice = 200
     lambda_dll2 = 1e-3
     # TEs are different for each case
     TEs = [0.004428,0.009244,0.014060,0.018876,0.023692,0.028508,0.033324,0.038140,0.042956,0.047772,0.052588]
@@ -47,8 +47,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey
-    parser.add_argument('--test_ID', type=int, default=0)
+    parser.add_argument('--test_sub', type=int, default=0)  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
+    # parser.add_argument('--test_ID', type=int, default=0)
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
@@ -56,17 +56,17 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
+    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
+
     parser.add_argument('--necho', type=int, default=11)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
-    
-    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
     parser.add_argument('--rank', type=int, default=0)  #  rank of low rank approximation loss (e.g. 10)
     parser.add_argument('--lambda1', type=float, default=0.0)  # weighting of r2s reconstruction loss
     parser.add_argument('--lambda2', type=float, default=0.0)  # weighting of p1 reconstruction loss
     parser.add_argument('--lambda_maskbce', type=float, default=0.0)  # weighting of Maximal cross entropy in masks
     parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
-    parser.add_argument('--weights_dir', type=str, default='weights_ablation')
+    parser.add_argument('--weights_dir', type=str, default='weights_ablation2')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--norm_last', type=int, default=0)  # 0: norm+relu, 1: relu+norm
     parser.add_argument('--temporal_conv', type=int, default=0) # 0: no temporal, 1: center, 2: begining
@@ -93,6 +93,17 @@ if __name__ == '__main__':
         niter = 2000
     else:
         niter = 100
+
+    # flag to use hidden state recurrent pass in BCRNN layer
+    if opt['solver'] == 1 and opt['bcrnn'] == 0:
+        flag_bcrnn = 1
+        flag_hidden = 0
+    elif opt['solver'] == 1 and opt['bcrnn'] == 1:
+        flag_bcrnn = 1
+        flag_hidden = 1
+    elif opt['solver'] == 0 and opt['bcrnn'] == 0:
+        flag_bcrnn = 0
+        flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
@@ -175,8 +186,8 @@ if __name__ == '__main__':
 
         loss_cem = CrossEntropyMask(radius=30)  # cross entropy loss for mask
 
-        # dataLoader = kdata_multi_echo_MS(
-        dataLoader = kdata_multi_echo_MS075(
+        dataLoader = kdata_multi_echo_MS(
+        # dataLoader = kdata_multi_echo_MS075(
             rootDir=rootName,
             contrast='MultiEcho', 
             split='train',
@@ -185,8 +196,8 @@ if __name__ == '__main__':
         )
         trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
-        # dataLoader_val = kdata_multi_echo_MS(
-        dataLoader_val = kdata_multi_echo_MS075(  
+        dataLoader_val = kdata_multi_echo_MS(
+        # dataLoader_val = kdata_multi_echo_MS075(  
             rootDir=rootName,
             contrast='MultiEcho', 
             split='val',
@@ -216,7 +227,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=opt['bcrnn'],
+                flag_BCRNN=flag_bcrnn,
+                flag_hidden=flag_hidden,
                 flag_att=opt['att'],
                 flag_cp=1,
                 flag_dataset=0
@@ -238,12 +250,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_lambda12={}{}_ms075.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], 0.0, 0.0))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_last.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_lambda12={}{}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], 0.0, 0.0))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_last.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -276,7 +288,7 @@ if __name__ == '__main__':
                 if gen_iterations%display_iters == 0:
 
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                    % (epoch, niter, idx, 600//batch_size, time.time()-t0))
+                    % (epoch, niter, idx, 1200//batch_size, time.time()-t0))
 
                     print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, rank: {}'.format( \
                             opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], opt['rank']))
@@ -432,10 +444,10 @@ if __name__ == '__main__':
 
             # save weights
             if PSNRs_val[-1] == max(PSNRs_val):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_ms075_2.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_ms075_2_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
     
     
     # for test
@@ -460,7 +472,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio'],
                 norm_last=norm_last,
                 flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=opt['bcrnn'],
+                flag_BCRNN=flag_bcrnn,
+                flag_hidden=flag_hidden,
                 flag_att=opt['att'],
                 flag_dataset=0
             )
@@ -477,8 +490,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_lambda12={}{}_ms075_2.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], lambda1, lambda2))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_last.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -494,8 +507,8 @@ if __name__ == '__main__':
         Recons = []
         preconds = []
 
-        # dataLoader_test = kdata_multi_echo_MS(
-        dataLoader_test = kdata_multi_echo_MS075(
+        dataLoader_test = kdata_multi_echo_MS(
+        # dataLoader_test = kdata_multi_echo_MS075(
             rootDir=rootName,
             contrast='MultiEcho', 
             split='test',
@@ -560,24 +573,30 @@ if __name__ == '__main__':
 
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
-            # Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
-            Recons_new = np.zeros((320, 260, 56)) + 1j * np.zeros((320, 260, 56))
-            Recons_new[30:290, 25:235, :] = Recons_
-            cPhase = HPphase(np.flip(np.transpose(Recons_new, (1, 0, 2)), 1), voxel_size=[0.75, 0.75, 3]) * 1000
-            # save_nii(cPhase, '/data/Jinwei/QSM_SWI/dataset/{}/HPFF_under.nii'.format(QSM_folders[opt['test_ID']]), \
-            #          '/data/Jinwei/QSM_SWI/dataset/{}/QSM.nii'.format(QSM_folders[opt['test_ID']]))
-            # save_nii(np.flip(np.transpose(Recons_new, (1, 0, 2)), 1), '/data/Jinwei/QSM_SWI/dataset/{}/echo_SWI_under.nii'.format(QSM_folders[opt['test_ID']]), \
-            #          '/data/Jinwei/QSM_SWI/dataset/{}/QSM.nii'.format(QSM_folders[opt['test_ID']]))
-            save_nii(np.flip(np.transpose(abs(Recons_new), (1, 0, 2)), 1), '/data/Jinwei/QSM_SWI/dataset/0285/echo_SWI_under.nii', \
-                     '/data/Jinwei/QSM_SWI/dataset/0285/QSM.nii')
-            if opt['lambda1'] == 1:
-                save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
-                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
-            elif opt['lambda1'] == 0:
-                save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_half_bcrnn.mat' \
-                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
-                save_mat(rootName+'/results_ablation2/cPhase_bcrnn={}_loupe={}_solver={}_sub={}_half_bcrnn.mat' \
-                    .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'cPhase', cPhase)
+            Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
+            save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
+                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', Recons_)
+
+            # # write into .mat file
+            # Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
+            # # Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
+            # Recons_new = np.zeros((320, 260, 56)) + 1j * np.zeros((320, 260, 56))
+            # Recons_new[30:290, 25:235, :] = Recons_
+            # cPhase = HPphase(np.flip(np.transpose(Recons_new, (1, 0, 2)), 1), voxel_size=[0.75, 0.75, 3]) * 1000
+            # # save_nii(cPhase, '/data/Jinwei/QSM_SWI/dataset/{}/HPFF_under.nii'.format(QSM_folders[opt['test_ID']]), \
+            # #          '/data/Jinwei/QSM_SWI/dataset/{}/QSM.nii'.format(QSM_folders[opt['test_ID']]))
+            # # save_nii(np.flip(np.transpose(Recons_new, (1, 0, 2)), 1), '/data/Jinwei/QSM_SWI/dataset/{}/echo_SWI_under.nii'.format(QSM_folders[opt['test_ID']]), \
+            # #          '/data/Jinwei/QSM_SWI/dataset/{}/QSM.nii'.format(QSM_folders[opt['test_ID']]))
+            # save_nii(np.flip(np.transpose(abs(Recons_new), (1, 0, 2)), 1), '/data/Jinwei/QSM_SWI/dataset/0285/echo_SWI_under.nii', \
+            #          '/data/Jinwei/QSM_SWI/dataset/0285/QSM.nii')
+            # if opt['lambda1'] == 1:
+            #     save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
+            #         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
+            # elif opt['lambda1'] == 0:
+            #     save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_half_bcrnn.mat' \
+            #         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
+            #     save_mat(rootName+'/results_ablation2/cPhase_bcrnn={}_loupe={}_solver={}_sub={}_half_bcrnn.mat' \
+            #         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'cPhase', cPhase)
             # # write R2s into .mat file
             # # R2s = np.squeeze(r2c(np.concatenate(R2s, axis=0), opt['echo_cat']))
             # # R2s = np.transpose(R2s, [0, 2, 3, 1])
@@ -590,49 +609,45 @@ if __name__ == '__main__':
             # # water_target = np.concatenate(water_target, axis=0)
             # # save_mat(rootName+'/results_ablation/water_target.mat', 'water_target', water_target)
 
-            # # write into .bin file
-            # # (nslice, 2, necho, nrow, ncol) to (ncol, nrow, nslice, necho, 2)
-            # print('iField size is: ', np.concatenate(Recons, axis=0).shape)
-            # iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
-            # iField[..., 1] = - iField[..., 1]
-            # print('iField size is: ', iField.shape)
-            # if os.path.exists(rootName+'/results_QSM/iField.bin'):
-            #     os.remove(rootName+'/results_QSM/iField.bin')
-            # iField.tofile(rootName+'/results_QSM/iField.bin')
-            # print('Successfully save iField.bin')
+            # write into .bin file
+            # (nslice, 2, necho, nrow, ncol) to (ncol, nrow, nslice, necho, 2)
+            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
+            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
+            iField[..., 1] = - iField[..., 1]
+            print('iField size is: ', iField.shape)
+            if os.path.exists(rootName+'/results_QSM/iField.bin'):
+                os.remove(rootName+'/results_QSM/iField.bin')
+            iField.tofile(rootName+'/results_QSM/iField.bin')
+            print('Successfully save iField.bin')
 
-            # # run MEDIN
-            # os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-            #         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-            #         + ' --temp ' + rootName +  '/results_QSM/'
-            #         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-            #         + ' --CSF ' + ' -of QR')
+            # run MEDIN
+            os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                    + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                    + ' --temp ' + rootName +  '/results_QSM/'
+                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                    + ' --CSF ' + ' -of QR')
             
-            # # read .bin files and save into .mat files
-            # QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_11.bin', 'f4')
-            # QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
+            # read .bin files and save into .mat files
+            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_11.bin', 'f4')
+            QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
-            # iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
-            # iMag = np.transpose(iMag.reshape([ncol, nrow, nslice]), [2, 1, 0])
+            iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
+            iMag = np.transpose(iMag.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
-            # RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
-            # RDF = np.transpose(RDF.reshape([ncol, nrow, nslice]), [2, 1, 0])
+            RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
+            RDF = np.transpose(RDF.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
-            # R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
-            # R2star = np.transpose(R2star.reshape([ncol, nrow, nslice]), [2, 1, 0])
+            R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
+            R2star = np.transpose(R2star.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
-            # Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
-            # Mask = np.transpose(Mask.reshape([ncol, nrow, nslice]), [2, 1, 0]) > 0
+            Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
+            Mask = np.transpose(Mask.reshape([ncol, nrow, nslice]), [2, 1, 0]) > 0
 
-            # adict = {}
-            # adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
-            # adict['R2star'], adict['Mask'] = R2star, Mask
-            # if opt['lambda1'] == 1:
-            #     sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
-            #         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
-            # elif opt['lambda1'] == 0:
-            #     sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_half_bcrnn.mat' \
-            #         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
+            adict = {}
+            adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
+            adict['R2star'], adict['Mask'] = R2star, Mask
+            sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
+                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
             
             
             # # # # write into .mat file

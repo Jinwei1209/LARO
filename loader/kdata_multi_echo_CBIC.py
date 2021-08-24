@@ -45,7 +45,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
                 elif subject == 1:
                     self.subject = 'chao2'
                 elif subject == 2:
-                    self.subject = 'feng2'
+                    self.subject = 'alexey2'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]

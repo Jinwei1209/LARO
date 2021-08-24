@@ -91,6 +91,7 @@ class Resnet_with_DC2(nn.Module):
         flag_temporal_conv=0,
         flag_convFT=0,  # flag to use conv2DFT layer
         flag_BCRNN=0,
+        flag_hidden=1, # BCRNN hidden feature recurrency
         flag_unet=0,  # flag to use unet as denoiser
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
@@ -119,6 +120,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_loupe = flag_loupe
         self.flag_temporal_pred = flag_temporal_pred
         self.flag_BCRNN = flag_BCRNN
+        self.flag_hidden = flag_hidden
         self.flag_unet = flag_unet
         self.flag_multi_level = flag_multi_level
         self.flag_bn = flag_bn
@@ -160,7 +162,7 @@ class Resnet_with_DC2(nn.Module):
                     if self.flag_multi_level:
                         self.bcrnn = MultiLevelBCRNNlayer(n_ch, nf//2, ks, flag_convFT)
                     else:
-                        self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn)
+                        self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn, flag_hidden)
                     if flag_convFT:
                         print('BCRNN with conv2DFT')
                 elif self.flag_BCRNN == 2:
