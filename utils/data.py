@@ -389,9 +389,7 @@ class Logger():
         loupe = opt['loupe']
         ratio = opt['samplingRatio']
         solver = opt['solver']
-        lambda1 = opt['lambda1']
-        lambda2 = opt['lambda2']
-        rank = opt['rank']
+        flag_unet = opt['flag_unet']
 
         if(not os.path.exists(self.rootName)):
             os.mkdir(self.rootName)
@@ -400,8 +398,8 @@ class Logger():
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_lambda12={6}{7}_rank={8}'.format( \
-                         bcrnn, loss, K, loupe, ratio, solver, lambda1, lambda2, rank) + '.log'
+        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_unet={6}'.format( \
+                         bcrnn, loss, K, loupe, ratio, solver, flag_unet) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 
         if self.flagSave:
