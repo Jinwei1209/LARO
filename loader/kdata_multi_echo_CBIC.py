@@ -46,6 +46,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
                     self.subject = 'chao2'
                 elif subject == 2:
                     self.subject = 'alexey2'
+                elif subject == 3:
+                    self.subject = 'liangdong2'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -63,8 +65,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
         elif split == 'test':
             # self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub={}_test2.mat'.format(subject), 'Recons')
             self.recon_inputs[:200, ...] = load_mat(rootDir+'/data_cfl/20%train2/iField_bcrnn=1_loupe=0_solver=1_sub=2_test2.mat', 'Recons')
-            # # to reconstruct LLR QSM
-            # self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_loupe=0_sub={}.mat'.format(self.subject[:-1], subject), 'iField_llr')
+            # to reconstruct LLR QSM
+            self.iField = load_mat(rootDir+'/data_cfl/{}/iField_llr_full_sub={}.mat'.format(self.subject[:-1], subject), 'iField_llr')
 
     def __len__(self):
 
@@ -73,8 +75,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
 
     def __getitem__(self, idx):
         recon_input = self.recon_inputs[idx, ...]
-        # # to reconstruct LLR QSM
-        # recon_input = self.iField[idx, ...]
+        # to reconstruct LLR QSM
+        recon_input = self.iField[idx, ...]
         recon_input =  c2r(recon_input, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 

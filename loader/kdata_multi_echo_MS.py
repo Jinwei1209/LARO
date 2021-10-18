@@ -49,6 +49,10 @@ class kdata_multi_echo_MS(data.Dataset):
                     self.subject = '3'
                 elif subject == 3:
                     self.subject = '4'
+                elif subject == -1:
+                    self.subject = '0'
+                elif subject == -2:
+                    self.subject = '-1'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -100,9 +104,9 @@ class kdata_multi_echo_MS(data.Dataset):
             self.Mask[:200, ...] = Mask
 
             # to reconstruct LLR QSM
-            # iField = load_mat(self.rootDir+'/data/iField_llr_loupe=-1_sub={}.mat'.format(subject), 'iField_llr')
-            # iField = np.concatenate((iField[:, 103:, ...], iField[:, :103, ...]), axis=1)
-            # self.iField[:200, ...] = iField
+            iField = load_mat(self.rootDir+'/data/iField_llr_loupe=-2_sub={}.mat'.format(subject), 'iField_llr')
+            iField = np.concatenate((iField[:, 103:, ...], iField[:, :103, ...]), axis=1)
+            self.iField[:200, ...] = iField
 
     def __len__(self):
 

@@ -47,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey, 3: hang
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
-    parser.add_argument('--loupe', type=int, default=0)  # -3: fixed manually designed mask across echos,
+    parser.add_argument('--loupe', type=int, default=0)  # -3: fixed learned mask across echos, generated from same pdf
                                                          # -2: fixed learned mask across echos,
                                                          # -1: fixed manually designed mask, 
                                                          #  0: fixed learned mask, 
@@ -56,9 +56,9 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  #  0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
-    parser.add_argument('--flag_unet', type=int, default=0)  # flag to use unet as denoiser
+    parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
 
     parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
     parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
@@ -131,7 +131,8 @@ if __name__ == '__main__':
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_test'.format(opt['samplingRatio'])))  # equal ratios from same PDF, prospective qihao
         masks = np.real(readcfl(rootName+'/masks2/mask_{}_echo'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -3:
-        masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks2/mask_{}_ssim_echo'.format(opt['samplingRatio'])))
 
     if opt['loupe'] < 1 and opt['loupe'] > -2:
         # for 2D random sampling 
@@ -619,7 +620,7 @@ if __name__ == '__main__':
                 P.append(p.cpu().detach())
 
             # write into .mat file
-            Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
+            Recons_ = np.squeeze(r2c(np.concatenate(LLRs, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['lambda1'] == 1:
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
@@ -654,8 +655,8 @@ if __name__ == '__main__':
 
             # write into .bin file
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
-            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
-            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
+            print('iField size is: ', np.concatenate(LLRs, axis=0).shape)
+            iField = np.transpose(np.concatenate(LLRs, axis=0), [4, 3, 0, 2, 1])
             iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
             iField[..., 1] = - iField[..., 1]
             print('iField size is: ', iField.shape)

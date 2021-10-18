@@ -26,7 +26,7 @@ from utils.operators import low_rank_approx, HPphase
 
 if __name__ == '__main__':
 
-    lrG_dc = 1e-2
+    lrG_dc = 1e-3
     batch_size = 1
     display_iters = 10
     gen_iterations = 1
@@ -56,7 +56,8 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
+    parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
 
     parser.add_argument('--necho', type=int, default=11)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
@@ -115,14 +116,15 @@ if __name__ == '__main__':
 
     if opt['loupe'] == -1:
         # load manually designed mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}m'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks2/mask_{}m'.format(opt['samplingRatio'])))
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_1d_{}'.format(opt['samplingRatio'], opt['1d_type'])))
     elif opt['loupe'] == 0:
         # load fixed loupe optimized mask
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_ms075_2'.format(opt['samplingRatio'])))
+        # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_ms075_2'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks2/mask_{}_ssim'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks2/mask_{}_echo'.format(opt['samplingRatio'])))
         
     if opt['loupe'] < 1 and opt['loupe'] > -2:
         # for 2D random sampling 
@@ -229,6 +231,7 @@ if __name__ == '__main__':
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=flag_bcrnn,
                 flag_hidden=flag_hidden,
+                flag_unet=opt['flag_unet'],
                 flag_att=opt['att'],
                 flag_cp=1,
                 flag_dataset=0
@@ -250,12 +253,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_unet={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_unet']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_unet={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_unet']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -444,10 +447,10 @@ if __name__ == '__main__':
 
             # save weights
             if PSNRs_val[-1] == max(PSNRs_val):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
     
     
     # for test
@@ -474,6 +477,7 @@ if __name__ == '__main__':
                 flag_temporal_conv=flag_temporal_conv,
                 flag_BCRNN=flag_bcrnn,
                 flag_hidden=flag_hidden,
+                flag_unet=opt['flag_unet'],
                 flag_att=opt['att'],
                 flag_dataset=0
             )
@@ -490,8 +494,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_last.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -625,7 +629,8 @@ if __name__ == '__main__':
                     + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                     + ' --temp ' + rootName +  '/results_QSM/'
                     + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                    + ' --CSF ' + ' -of QR')
+                    + ' --CSF ' + ' -of QR'
+                    + ' --mask Mask{}.bin'.format(opt['test_sub']+1))
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_11.bin', 'f4')
@@ -646,8 +651,8 @@ if __name__ == '__main__':
             adict = {}
             adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
             adict['R2star'], adict['Mask'] = R2star, Mask
-            sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}.mat' \
-                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
+            sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
+                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), adict)
             
             
             # # # # write into .mat file
