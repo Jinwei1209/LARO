@@ -37,10 +37,12 @@ class CRNNcell(nn.Module):
     def forward(self, input, hidden):
     # def forward(self, input):
         in_to_hid = self.i2h(input)
-        hid_to_hid = self.h2h(hidden)
+        if self.flag_hidden:
+            hid_to_hid = self.h2h(hidden)
         if self.flag_bn:
             in_to_hid = self.bn_i2h(in_to_hid)
-            hid_to_hid = self.bn_h2h(hid_to_hid)
+            if self.flag_hidden:
+                hid_to_hid = self.bn_h2h(hid_to_hid)
         # ih_to_ih = self.ih2ih(hidden_iteration)
 
         # hidden = self.relu(in_to_hid + hid_to_hid + ih_to_ih)
