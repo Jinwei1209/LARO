@@ -9,15 +9,17 @@ nslice = 200
 nrol = 206
 ncol = 80
 necho = 10
-for loupe in [-2]:  # [-1, 0, -2]
-    for sub_id in [0]:  # [0, 1, 2]
+for loupe in [-1, 0, -2]:  # [-1, 0, -2]
+    for sub_id in range(0, 1):  # [0, 1, 2]
         
-        iField = np.zeros((80, 206, 200, 10, 2))
-        rootName = '/data/Jinwei/QSM_raw_CBIC'
+        iField = np.zeros((80, 206, 200, 10, 2), dtype=np.float32)
+        rootName = '/data3/Jinwei/QSM_raw_CBIC'
         # load kspace slice and sensMap
-        subs = ['junghun', 'chao', 'alexey']
+        subs = ['junghun2', 'chao2', 'alexey2', 'liangdong2', 'fenglei2', 'jiahao2', 
+                'dom2', 'hangwei2', 'wenxin2', 'hanxuan2']
         sub = subs[sub_id]
-        file = sio.loadmat('/data/Jinwei/QSM_raw_CBIC/data_cfl/{}/iField_llr_loupe={}_sub={}.mat'.format(sub, loupe, sub_id))
+        print("LLR QSM recon on {} with prospective under-sampling".format(sub))
+        file = sio.loadmat(rootName+'/data_cfl/{}/iField_llr_loupe={}_sub={}.mat'.format(sub, loupe, sub_id))
         Recons = file['iField_llr']
         Recons = np.transpose(Recons, [2, 1, 0, 3])
         
@@ -36,8 +38,9 @@ for loupe in [-2]:  # [-1, 0, -2]
         os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                 + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                 + ' --temp ' + rootName +  '/results_QSM/'
-                + ' --GPU ' + ' --device ' + '0' 
-                + ' --CSF ' + ' -of QR')
+                + ' --GPU ' + ' --device ' + '2' 
+                + ' --CSF ' + ' -of QR'
+                + ' -l 1000')
 
         # read .bin files and save into .mat files
         QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
@@ -58,6 +61,6 @@ for loupe in [-2]:  # [-1, 0, -2]
         adict = {}
         adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
         adict['R2star'], adict['Mask'] = R2star, Mask
-        sio.savemat(rootName+'/results_ablation/QSM_llr_loupe={}_sub={}.mat' \
-            .format(loupe, sub_id), adict)
+        sio.savemat(rootName+'/data_cfl/{}/QSM_llr_loupe={}_sub={}.mat' \
+            .format(sub, loupe, sub_id), adict)
         print('successfully save data')

@@ -45,7 +45,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey, 3: hang
+    parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey, 3: liangdong
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=0)  # -3: fixed learned mask across echos, generated from same pdf
                                                          # -2: fixed learned mask across echos,
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
-    rootName = '/data/Jinwei/QSM_raw_CBIC'
+    rootName = '/data3/Jinwei/QSM_raw_CBIC'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
@@ -620,7 +620,7 @@ if __name__ == '__main__':
                 P.append(p.cpu().detach())
 
             # write into .mat file
-            Recons_ = np.squeeze(r2c(np.concatenate(LLRs, axis=0), opt['echo_cat']))
+            Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['lambda1'] == 1:
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
@@ -655,8 +655,8 @@ if __name__ == '__main__':
 
             # write into .bin file
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
-            print('iField size is: ', np.concatenate(LLRs, axis=0).shape)
-            iField = np.transpose(np.concatenate(LLRs, axis=0), [4, 3, 0, 2, 1])
+            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
+            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
             iField[..., 1] = - iField[..., 1]
             print('iField size is: ', iField.shape)
