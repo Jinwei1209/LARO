@@ -157,9 +157,8 @@ if __name__ == '__main__':
         
         # write into .bin file
         # (nslice, 2, 7, 258, 112) to (112, 258, nslice, 7, 2)
-        if opt['res'] == 0:
-            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
-        elif opt['res'] == 1:
+        iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
+        if opt['res'] == 1:
             Recons_ = np.transpose(Recons_, [0, 3, 1, 2])
             iField = np.concatenate((Recons_.real[:, np.newaxis, ...], Recons_.imag[:, np.newaxis, ...]), axis=1)
             iField = np.transpose(iField, [4, 3, 0, 2, 1])
