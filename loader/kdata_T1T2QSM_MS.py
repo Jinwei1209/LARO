@@ -60,7 +60,7 @@ class kdata_T1T2QSM_MS(data.Dataset):
                     Mask = np.pad(Mask, [(0, 0), (0, 0), (padding_dim, padding_dim)], mode='constant')
                 Mask = np.transpose(Mask, (1, 0, 2))
                 Mask = np.repeat(Mask[..., np.newaxis], self.necho, axis=-1)
-                self.imgs_all.append(img_all)
+                self.imgs_all.append(img_all / np.max(abs(img_all[Mask==1])) / 2)  # divided by 2 is a magic number
                 self.Masks.append(Mask)
         elif split == 'val':
             print('Loading validation dataset')
@@ -75,7 +75,7 @@ class kdata_T1T2QSM_MS(data.Dataset):
                 Mask = np.pad(Mask, [(0, 0), (0, 0), (padding_dim, padding_dim)], mode='constant')
             Mask = np.transpose(Mask, (1, 0, 2))
             Mask = np.repeat(Mask[..., np.newaxis], self.necho, axis=-1)
-            self.imgs_all.append(img_all)
+            self.imgs_all.append(img_all / np.max(abs(img_all[Mask==1])) / 2)  # divided by 2 is a magic number
             self.Masks.append(Mask)
         elif split == 'test':
             print('Loading test dataset {}'.format(self.subject_test))
@@ -89,7 +89,7 @@ class kdata_T1T2QSM_MS(data.Dataset):
                 Mask = np.pad(Mask, [(0, 0), (0, 0), (padding_dim, padding_dim)], mode='constant')
             Mask = np.transpose(Mask, (1, 0, 2))
             Mask = np.repeat(Mask[..., np.newaxis], self.necho, axis=-1)
-            self.imgs_all.append(img_all)
+            self.imgs_all.append(img_all / np.max(abs(img_all[Mask==1])) / 2)  # divided by 2 is a magic number
             self.Masks.append(Mask)
         self.imgs_all = np.concatenate(self.imgs_all, axis=0)
         self.Masks = np.concatenate(self.Masks, axis=0)

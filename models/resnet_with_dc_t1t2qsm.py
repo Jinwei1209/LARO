@@ -580,11 +580,16 @@ class Resnet_with_DC2(nn.Module):
                         if x_.requires_grad and self.flag_cp:
                             # concatenate t1t2 features to all multi-echo recurrent features
                             net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
+                            # net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i])
+
                             # concatenate 1st echo features to t1t2 features
                             net['t%d_t1t2_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
+                            # net['t%d_t1t2_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_t1t2_0'%i])
                         else:
                             net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
+                            # net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
                             net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
+                            # net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_t1t2_0'%i])
                         # concatenate denoised t1w and t2w
                         net['t%d_t1t2_4'%i] = torch.cat((net['t%d_t1t2_4'%i][:, 0:2], net['t%d_t1t2_4'%i][:, 2:4]), 0)
 

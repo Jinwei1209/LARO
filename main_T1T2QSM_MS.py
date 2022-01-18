@@ -43,14 +43,14 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--test_sub', type=int, default=0)  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
-    parser.add_argument('--K', type=int, default=10)  # number of unrolls
+    parser.add_argument('--K', type=int, default=2)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=2)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.15)  # Under-sampling ratio
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
 
     parser.add_argument('--necho', type=int, default=13)  # number of echos with kspace data (generalized echoes including T1w and T2w)
@@ -123,6 +123,11 @@ if __name__ == '__main__':
     # flip matrix
     flip = torch.ones([1, necho, nrow, ncol, 1]) 
     flip = torch.cat((flip, torch.zeros(flip.shape)), -1).to(device) # (1, necho, nrow, ncol, 2)
+
+    # test
+    masks = torch.ones([1, ncoil, necho, nrow, ncol, 1])
+    masks = torch.cat((masks, torch.zeros(masks.shape)), -1).to(device) # (1, ncoil, necho, nrow, ncol, 2) 
+    print(masks.size())
 
     # training
     if opt['flag_train'] == 1:
@@ -268,6 +273,13 @@ if __name__ == '__main__':
                 targets = targets.to(device)
                 csms = csms.to(device)
                 brain_masks = brain_masks.to(device)
+
+                # # test
+                # operator = Back_forward_MS(csms, masks, flip, 0, necho=necho)
+                # test_image = operator.AtA(targets, 0).cpu().detach().numpy()
+                # kdatas = forward_MS(targets, csms, masks, flip)
+                # test_image = backward_MS(kdatas, csms, masks, flip, necho=necho).cpu().detach().numpy()
+                # save_mat('test_image.mat', 'test_image', test_image)
 
                 optimizerG_dc.zero_grad()
                 if opt['temporal_pred'] == 1:
