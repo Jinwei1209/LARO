@@ -42,7 +42,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0'), 
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--test_sub', type=int, default=0)  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
+    parser.add_argument('--test_sub', type=int, default=8)  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
     parser.add_argument('--K', type=int, default=2)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=2)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
+    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
 
@@ -102,13 +102,13 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data2/Jinwei/T1T2QSM_MS/'
+    rootName = '/data2/Jinwei/T1T2QSM_MS'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
     if opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
-        masks = np.real(readcfl(rootName+'/masks2/mask_{}_echo'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
         masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
         masks = torch.tensor(masks, device=device).float()
         # to complex data
@@ -124,11 +124,6 @@ if __name__ == '__main__':
     # flip matrix
     flip = torch.ones([1, necho, nrow, ncol, 1]) 
     flip = torch.cat((flip, torch.zeros(flip.shape)), -1).to(device) # (1, necho, nrow, ncol, 2)
-
-    # test
-    masks = torch.ones([1, ncoil, necho, nrow, ncol, 1])
-    masks = torch.cat((masks, torch.zeros(masks.shape)), -1).to(device) # (1, ncoil, necho, nrow, ncol, 2) 
-    print(masks.size())
 
     # training
     if opt['flag_train'] == 1:
@@ -275,13 +270,6 @@ if __name__ == '__main__':
                 targets = targets.to(device)
                 csms = csms.to(device)
                 brain_masks = brain_masks.to(device)
-
-                # # test
-                # operator = Back_forward_MS(csms, masks, flip, 0, necho=necho)
-                # test_image = operator.AtA(targets, 0).cpu().detach().numpy()
-                # kdatas = forward_MS(targets, csms, masks, flip)
-                # test_image = backward_MS(kdatas, csms, masks, flip, necho=necho).cpu().detach().numpy()
-                # save_mat('test_image.mat', 'test_image', test_image)
 
                 optimizerG_dc.zero_grad()
                 if opt['temporal_pred'] == 1:
@@ -434,7 +422,6 @@ if __name__ == '__main__':
             for idx, (kdatas, targets, csms, brain_masks) in enumerate(testLoader):
                 kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
-                csm_lowres = csm_lowres[:, :, :necho, ...]  # temporal undersampling
 
                 if idx == 1 and opt['loupe'] > 0:
                     # Mask = netG_dc.Mask.cpu().detach().numpy()
@@ -452,9 +439,9 @@ if __name__ == '__main__':
                 brain_masks = brain_masks.to(device)
 
                 if opt['temporal_pred'] == 1:
-                    Xs_1 = netG_dc(kdatas, csms, csm_lowres, masks, flip, x_input=None)[-1]
+                    Xs_1 = netG_dc(kdatas, csms, None, masks, flip, x_input=None)[-1]
                 else:
-                    Xs_1 = netG_dc(kdatas, csms, csm_lowres, masks, flip)[-1]
+                    Xs_1 = netG_dc(kdatas, csms, None, masks, flip)[-1]
                 precond = netG_dc.precond
                 if opt['echo_cat']:
                     targets = torch_channel_deconcate(targets)
@@ -467,15 +454,17 @@ if __name__ == '__main__':
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
+            Recons_ = np.flip(Recons_, axis=0)
             save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', Recons_)
 
             # write into .bin file
             # (nslice, 2, necho, nrow, ncol) to (ncol, nrow, nslice, necho, 2)
-            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             nslice = iField.shape[2]
             iField[..., 1] = - iField[..., 1]
+            iField = iField[:, :, :, 2:, :]
+            iField = np.flip(iField, axis=2)
             print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
                 os.remove(rootName+'/results_QSM/iField.bin')
@@ -487,8 +476,7 @@ if __name__ == '__main__':
                     + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                     + ' --temp ' + rootName +  '/results_QSM/'
                     + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                    + ' --CSF ' + ' -of QR'
-                    + ' --mask Mask{}.bin'.format(opt['test_sub']+1))
+                    + ' --CSF ' + ' -of QR')
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_11.bin', 'f4')

@@ -38,7 +38,7 @@ class kdata_T1T2QSM_MS(data.Dataset):
         if contrast == 'MultiContrast':
             if split == 'test':
                 self.subject_test = subject_test
-                print("Test on {}".format(self.subject))
+                print("Test on {}".format(self.subject_test))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
         self.augSize = len(self.augmentations)

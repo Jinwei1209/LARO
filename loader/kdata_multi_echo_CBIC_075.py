@@ -35,7 +35,7 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 320 * 4
+                self.nsamples = 320 * 8
             elif split == 'val':
                 self.nsamples = 320
             elif split == 'test':
@@ -47,7 +47,7 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
                 elif subject == 2:
                     self.subject = 'chao'
                 elif subject == 3:
-                    self.subject = 'liangdong2'
+                    self.subject = 'liangdong'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -78,14 +78,14 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
                 dataFD_sense_echo = self.rootDir + '/data_cfl/alexey/full_cc_slices_sense_echo/'
             elif subject == 3:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/qihao/full_cc_slices_sense_echo/'
-            # elif subject == 4:
-            #     dataFD_sense_echo = self.rootDir + '/data_cfl/dominick2/full_cc_slices_sense_echo/'
-            # elif subject == 5:
-            #     dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei2/full_cc_slices_sense_echo/'
-            # elif subject == 6:
-            #     dataFD_sense_echo = self.rootDir + '/data_cfl/kelly2/full_cc_slices_sense_echo/'
-            # elif subject == 7:
-            #     dataFD_sense_echo = self.rootDir + '/data_cfl/feng2/full_cc_slices_sense_echo/'
+            elif subject == 4:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/jiahao/full_cc_slices_sense_echo/'
+            elif subject == 5:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/chao/full_cc_slices_sense_echo/'
+            elif subject == 6:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/kelly/full_cc_slices_sense_echo/'
+            elif subject == 7:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/junghun/full_cc_slices_sense_echo/'
 
         elif self.split == 'val':
             dataFD_sense_echo = self.rootDir + '/data_cfl/thanh/full_cc_slices_sense_echo/'

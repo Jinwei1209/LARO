@@ -59,6 +59,7 @@ if __name__ == '__main__':
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
+    parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
 
     parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
     parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
@@ -313,7 +314,7 @@ if __name__ == '__main__':
                 if gen_iterations%display_iters == 0:
 
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                    % (epoch, niter, idx, 1600//batch_size, time.time()-t0))
+                    % (epoch, niter, idx, 2200//batch_size, time.time()-t0))
 
                     print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, rank: {}'.format( \
                             opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], opt['rank']))
@@ -622,6 +623,13 @@ if __name__ == '__main__':
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
+            if opt['interpolate'] == 1:
+                kdata = np.fft.fftshift(np.fft.fftn(Recons_, axes=(0, 1, 2)), axes=(0, 1, 2))
+                kdata = np.pad(kdata, ((nslice//2, nslice//2), (nrow//2, nrow//2), (ncol//2, ncol//2), (0, 0)))
+                Recons_ = np.fft.ifftn(np.fft.ifftshift(kdata, axes=(0, 1, 2)), axes=(0, 1, 2))  # (nslice, nrow, ncol, necho)
+                nslice *= 2
+                nrow *= 2
+                ncol *= 2
             if opt['lambda1'] == 1:
                 save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
                     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
@@ -655,8 +663,12 @@ if __name__ == '__main__':
 
             # write into .bin file
             # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
-            print('iField size is: ', np.concatenate(Recons, axis=0).shape)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
+            if opt['interpolate'] == 1:
+                Recons_ = np.transpose(Recons_, [0, 3, 1, 2])
+                iField = np.concatenate((Recons_.real[:, np.newaxis, ...], Recons_.imag[:, np.newaxis, ...]), axis=1)
+                iField = np.transpose(iField, [4, 3, 0, 2, 1])
+                iField = iField.astype('float32')
             iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
             iField[..., 1] = - iField[..., 1]
             print('iField size is: ', iField.shape)
@@ -666,27 +678,34 @@ if __name__ == '__main__':
             print('Successfully save iField.bin')
 
             # run MEDIN
-            os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                    + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-                    + ' --temp ' + rootName +  '/results_QSM/'
-                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                    + ' --CSF ' + ' -of QR')
+            if opt['interpolate'] == 0:
+                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                        + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                        + ' --temp ' + rootName +  '/results_QSM/'
+                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                        + ' --CSF ' + ' -of QR')
+            elif opt['interpolate'] == 1:
+                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                        + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate.txt'
+                        + ' --temp ' + rootName +  '/results_QSM/'
+                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                        + ' --CSF ' + ' -of QR')
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
-            QSM = np.transpose(QSM.reshape([80, 206, nslice]), [2, 1, 0])
+            QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
-            iMag = np.transpose(iMag.reshape([80, 206, nslice]), [2, 1, 0])
+            iMag = np.transpose(iMag.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
-            RDF = np.transpose(RDF.reshape([80, 206, nslice]), [2, 1, 0])
+            RDF = np.transpose(RDF.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
-            R2star = np.transpose(R2star.reshape([80, 206, nslice]), [2, 1, 0])
+            R2star = np.transpose(R2star.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
-            Mask = np.transpose(Mask.reshape([80, 206, nslice]), [2, 1, 0]) > 0
+            Mask = np.transpose(Mask.reshape([ncol, nrow, nslice]), [2, 1, 0]) > 0
 
             adict = {}
             adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF

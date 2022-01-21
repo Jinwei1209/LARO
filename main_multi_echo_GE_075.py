@@ -39,8 +39,8 @@ if __name__ == '__main__':
     ncol = 112
     nslice = 320
     lambda_dll2 = 1e-3
-    # TEs = [0.0042240, 0.008952, 0.01368, 0.018408, 0.023136, 0.027864, 0.0325920]  # full sampled data?
-    TEs = [0.004256, 0.009008, 0.013760, 0.018512, 0.023264, 0.028016, 0.032768]  # prospective recon
+    # TEs = [0.0042240, 0.008952, 0.01368, 0.018408, 0.023136, 0.027864, 0.0325920]
+    TEs = [0.004256, 0.009008, 0.013760, 0.018512, 0.021776, 0.026032, 0.030288]
 
     # typein parameters
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
@@ -308,7 +308,7 @@ if __name__ == '__main__':
                 if gen_iterations%display_iters == 0:
 
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                    % (epoch, niter, idx, 1600//batch_size, time.time()-t0))
+                    % (epoch, niter, idx, dataLoader.nsamples//batch_size, time.time()-t0))
 
                     print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, rank: {}'.format( \
                             opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], opt['rank']))
