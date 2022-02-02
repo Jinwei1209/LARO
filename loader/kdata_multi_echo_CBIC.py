@@ -35,13 +35,13 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 2200
+                self.nsamples = 800
             elif split == 'val':
                 self.nsamples = 200
             elif split == 'test':
                 self.nsamples = 200
                 if subject == 0:
-                    self.subject = 'thanh2'
+                    self.subject = 'junghun2'
                 elif subject == 1:
                     self.subject = 'chao2'
                 elif subject == 2:
@@ -121,6 +121,18 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif subject == 10:
                 dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
                 dataFD_sense_echo = self.rootDir + '/data_cfl/alexey2/full_cc_slices_sense_echo/'
+            # if subject == 0:
+            #     dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+            #     dataFD_sense_echo = self.rootDir + '/data_cfl/feng2/full_cc_slices_sense_echo/'
+            # elif subject == 1:
+            #     dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+            #     dataFD_sense_echo = self.rootDir + '/data_cfl/junghun2/full_cc_slices_sense_echo/'
+            # elif subject == 2:
+            #     dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+            #     dataFD_sense_echo = self.rootDir + '/data_cfl/chao2/full_cc_slices_sense_echo/'
+            # elif subject == 3:
+            #     dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+            #     dataFD_sense_echo = self.rootDir + '/data_cfl/alexey2/full_cc_slices_sense_echo/'
 
         elif self.split == 'val':
             dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'

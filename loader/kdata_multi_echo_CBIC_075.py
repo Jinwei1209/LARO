@@ -43,10 +43,6 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
                 if subject == 0:
                     self.subject = 'thanh'
                 elif subject == 1:
-                    self.subject = 'jiahao'
-                elif subject == 2:
-                    self.subject = 'chao'
-                elif subject == 3:
                     self.subject = 'liangdong'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations

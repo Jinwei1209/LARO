@@ -9,13 +9,14 @@ import argparse
 import scipy.io as sio
 import numpy as np
 
+from scipy.ndimage import zoom
 from torch.optim.lr_scheduler import MultiStepLR
 from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
 from loader.kdata_multi_echo_CBIC_prosp import kdata_multi_echo_CBIC_prosp
-from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger, c2r_kdata
+from utils.data import load_nii, r2c, save_mat, readcfl, memory_pre_alloc, save_nii, torch_channel_deconcate, torch_channel_concate, Logger, c2r_kdata
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
 from utils.operators import backward_multiEcho
@@ -59,6 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
+    parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
     parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
 
     parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
@@ -113,8 +115,8 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
-    rootName = '/data3/Jinwei/QSM_raw_CBIC'
+    rootName = '/data/Jinwei/QSM_raw_CBIC'  # for fully sampled data
+    # rootName = '/data3/Jinwei/QSM_raw_CBIC'  # for prospective data
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
@@ -251,6 +253,7 @@ if __name__ == '__main__':
                 flag_BCRNN=flag_bcrnn,
                 flag_hidden=flag_hidden,
                 flag_unet=opt['flag_unet'],
+                flag_complexConv=opt['flag_complex'],
                 flag_att=opt['att'],
                 flag_cp=1
             )
@@ -269,13 +272,13 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_unet={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_unet']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_complex={}_last.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2 or opt['loupe'] == -3:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_unet={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_unet']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_complex={}_last.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
 
@@ -468,10 +471,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_psnr[-1] == max(Validation_psnr):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))  
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex']))  
     
     
     # for test
@@ -624,6 +627,13 @@ if __name__ == '__main__':
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['interpolate'] == 1:
+                # # get brain mask from iMag
+                # iMag = np.sqrt(np.sum(abs(Recons_)**2, axis=-1))
+                # save_nii(iMag, rootName+'/results_QSM/iMag.nii')
+                # os.system('bet2 ' + rootName + '/results_QSM/iMag.nii ' + rootName + '/results_QSM/Mask.nii ' + '-m')
+                # mask_bet = load_nii(rootName + '/results_QSM/Mask_mask.nii.gz')
+                # Recons_ = Recons_ * mask_bet[..., np.newaxis]
+                
                 kdata = np.fft.fftshift(np.fft.fftn(Recons_, axes=(0, 1, 2)), axes=(0, 1, 2))
                 kdata = np.pad(kdata, ((nslice//2, nslice//2), (nrow//2, nrow//2), (ncol//2, ncol//2), (0, 0)))
                 Recons_ = np.fft.ifftn(np.fft.ifftshift(kdata, axes=(0, 1, 2)), axes=(0, 1, 2))  # (nslice, nrow, ncol, necho)

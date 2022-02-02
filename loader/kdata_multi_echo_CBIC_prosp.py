@@ -37,7 +37,7 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
         self.loupe = loupe
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 600
+                self.nsamples = 800
             elif split == 'val':
                 self.nsamples = 200
             elif split == 'test':
@@ -105,14 +105,17 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
                     idx -= 200
                     subject += 1
             if subject == 0:
-                dataFD = self.rootDir + '/data_cfl/thanh2/full_cc_slices/'
+                dataFD_prosp = self.rootDir + '/data_cfl/fenglei2/10_loupe={}_cc_slices_sense_echo/'
             elif subject == 1:
-                dataFD = self.rootDir + '/data_cfl/jinwei2/full_cc_slices/'
+                dataFD_prosp = self.rootDir + '/data_cfl/jiahao2/10_loupe={}_cc_slices_sense_echo/'
             elif subject == 2:
-                dataFD = self.rootDir + '/data_cfl/qihao2/full_cc_slices/'
+                dataFD_prosp = self.rootDir + '/data_cfl/wenxin2/10_loupe={}_cc_slices_sense_echo/'
+            elif subject == 3:
+                dataFD_prosp = self.rootDir + '/data_cfl/hanxuan2/10_loupe={}_cc_slices_sense_echo/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices_sense_echo/'
 
         elif self.split == 'val':
-            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices_sense_echo/'
         
         elif self.split == 'test':
             dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo/'.format(self.loupe)

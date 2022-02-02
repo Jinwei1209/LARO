@@ -43,27 +43,9 @@ class kdata_multi_echo_CBIC_075_prosp(data.Dataset):
             elif split == 'test':
                 self.nsamples = 320
                 if subject == 0:
-                    self.subject = 'jiahao'
-                # elif subject == 1:
-                #     self.subject = 'chao2'
-                # elif subject == 2:
-                #     self.subject = 'alexey2'
-                # elif subject == 3:
-                #     self.subject = 'liangdong2'
-                # elif subject == 4:
-                #     self.subject = 'fenglei2'
-                # elif subject == 5:
-                #     self.subject = 'jiahao2'
-                # elif subject == 6:
-                #     self.subject = 'dom2'
-                # elif subject == 7:
-                #     self.subject = 'hangwei2'
-                # elif subject == 8:
-                #     self.subject = 'wenxin2'
-                # elif subject == 9:
-                #     self.subject = 'hanxuan2'
-                # elif subject == 10:
-                #     self.subject = 'qihao2'
+                    self.subject = 'thanh'
+                elif subject == 1:
+                    self.subject = 'liangdong'
                 print("Test on {} with prospective under-sampling".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]

@@ -12,8 +12,10 @@ from models.resBlocks import *
 from models.danet import daBlock, CAM_Module  
 from models.fa import faBlockNew
 from models.unet import *
+from models.complex_unet import *
 from models.straight_through_layers import *
 from models.BCRNN import BCRNNlayer, Conv2dFT, MultiLevelBCRNNlayer
+from models.complex_BCRNN import ComplexBCRNNlayer
 from models.BCLSTM import BCLSTMlayer
 from fits.fits import fit_R2_LM, fit_complex, arlo
 from utils.data import *
@@ -93,6 +95,7 @@ class Resnet_with_DC2(nn.Module):
         flag_BCRNN=0,
         flag_hidden=1, # BCRNN hidden feature recurrency
         flag_unet=0,  # flag to use unet as denoiser
+        flag_complexConv=0,
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
         slope=0.25,
@@ -122,6 +125,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_BCRNN = flag_BCRNN
         self.flag_hidden = flag_hidden
         self.flag_unet = flag_unet
+        self.flag_complexConv = flag_complexConv
         self.flag_multi_level = flag_multi_level
         self.flag_bn = flag_bn
         self.slope = slope
@@ -162,9 +166,14 @@ class Resnet_with_DC2(nn.Module):
                     if self.flag_multi_level:
                         self.bcrnn = MultiLevelBCRNNlayer(n_ch, nf//2, ks, flag_convFT)
                     else:
-                        self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn, flag_hidden)
+                        if not self.flag_complexConv:
+                            self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn, flag_hidden)
+                        else:
+                            self.bcrnn = ComplexBCRNNlayer(1, nf//2, ks, flag_convFT, flag_bn, flag_hidden)
                     if flag_convFT:
                         print('BCRNN with conv2DFT')
+                    if flag_complexConv:
+                        print('Using complex convolution')
                 elif self.flag_BCRNN == 2:
                     nf_lstm = 32 # number of filters in BCLSTM
                     nf = 32
@@ -189,17 +198,28 @@ class Resnet_with_DC2(nn.Module):
                     # self.conv4_x = Conv2dFT(nf, n_ch, ks)
                     self.relu = nn.ReLU(inplace=True)
                 elif self.flag_unet == 1:
-                    self.denoiser = Unet(
-                        input_channels=nf,
-                        output_channels=n_ch,
-                        num_filters=[2**i for i in range(6, 9)],
-                        use_bn=flag_bn,
-                        use_deconv=1,
-                        skip_connect=False,
-                        slim=False,
-                        convFT=flag_convFT
-                    )
-
+                    if not self.flag_complexConv:
+                        self.denoiser = Unet(
+                            input_channels=nf,
+                            output_channels=n_ch,
+                            num_filters=[2**i for i in range(6, 9)],
+                            use_bn=flag_bn,
+                            use_deconv=1,
+                            skip_connect=False,
+                            slim=False,
+                            convFT=flag_convFT
+                        )
+                    else:
+                        self.denoiser = ComplexUnet(
+                            input_channels=nf//2,
+                            output_channels=1,
+                            num_filters=[2**i for i in range(5, 8)],  # half the parameters
+                            use_bn=flag_bn,
+                            use_deconv=1,
+                            skip_connect=False,
+                            slim=False,
+                            convFT=flag_convFT
+                        )
                 # if self.flag_multi_level:
                 #     self.denoiser = UnetWithInputFeatures(
                 #         input_channels=nf//2,
@@ -647,7 +667,7 @@ class Resnet_with_DC2(nn.Module):
                         net['t%d_x0'%i] = net['t%d_x0'%i].permute(1, 0, 2, 3, 4).view(n_batch, n_seq, self.nf, width*height)  # (nt, 1, nf, nx, ny) to (1, nt, nf, nx*ny)
                         net['t%d_x0'%i] = self.attBlock(net['t%d_x0'%i])
                         net['t%d_x0'%i].view(n_batch, n_seq, self.nf, width, height).permute(1, 0, 2, 3, 4)
-                    if not self.flag_multi_level:
+                    if not self.flag_complexConv:
                         net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
 
                     if self.flag_unet == 0:
@@ -678,6 +698,8 @@ class Resnet_with_DC2(nn.Module):
                             net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
 
                     x_ = x_.view(-1, n_ch, width, height)
+                    if self.flag_complexConv:
+                        net['t%d_x4'%i] = net['t%d_x4'%i].view(-1, n_ch, width, height)
                     net['t%d_out'%i] = x_ - net['t%d_x4'%i]
 
                     # update x using CG block

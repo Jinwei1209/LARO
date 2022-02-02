@@ -216,8 +216,8 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['K'] == 10:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=-2_ratio={}_solver={}_SS={}_last.pt'
-                        .format(opt['bcrnn'], opt['loss'], opt['samplingRatio'], opt['solver'], opt['ss_ratio']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss=0_K=10_loupe=-2_ratio={}_solver={}_unet={}.pt'
+                        .format(opt['bcrnn'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
 
@@ -417,7 +417,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_SS={}_last.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_SS={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['ss_ratio']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         netG_dc.load_state_dict(weights_dict)
