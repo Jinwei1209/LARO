@@ -317,7 +317,7 @@ if __name__ == '__main__':
                 if gen_iterations%display_iters == 0:
 
                     print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                    % (epoch, niter, idx, 2200//batch_size, time.time()-t0))
+                    % (epoch, niter, idx, 1600//batch_size, time.time()-t0))
 
                     print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, rank: {}'.format( \
                             opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], opt['rank']))

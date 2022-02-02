@@ -35,7 +35,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 800
+                self.nsamples = 1600
             elif split == 'val':
                 self.nsamples = 200
             elif split == 'test':
@@ -112,15 +112,6 @@ class kdata_multi_echo_CBIC(data.Dataset):
             elif subject == 7:
                 dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
                 dataFD_sense_echo = self.rootDir + '/data_cfl/feng2/full_cc_slices_sense_echo/'
-            elif subject == 8:
-                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
-                dataFD_sense_echo = self.rootDir + '/data_cfl/junghun2/full_cc_slices_sense_echo/'
-            elif subject == 9:
-                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
-                dataFD_sense_echo = self.rootDir + '/data_cfl/chao2/full_cc_slices_sense_echo/'
-            elif subject == 10:
-                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
-                dataFD_sense_echo = self.rootDir + '/data_cfl/alexey2/full_cc_slices_sense_echo/'
             # if subject == 0:
             #     dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
             #     dataFD_sense_echo = self.rootDir + '/data_cfl/feng2/full_cc_slices_sense_echo/'
