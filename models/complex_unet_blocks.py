@@ -16,7 +16,7 @@ class ComplexConvBlock(nn.Module):
         kernel_size=3,
         stride=1,
         padding=1, 
-        use_bn=2,  # use instance norm 2
+        use_bn=2,  # use instance norm 2, use complex instance norm 3
         slim=0,  # flag to use only one convolution
         convFT=0  # flag to use Conv2dFT
     ):
@@ -27,16 +27,21 @@ class ComplexConvBlock(nn.Module):
         else:
             self.conv = ComplexConv2d(input_dim, output_dim, kernel_size)
         if use_bn == 1:
-            self.norm = nn.BatchNorm2d(output_dim*2)  ## TODO for complex instance norm
+            self.norm = nn.BatchNorm2d(output_dim*2)
         elif use_bn == 2:
-            self.norm = nn.GroupNorm(output_dim*2, output_dim*2)  ## TODO for complex instance norm
+            self.norm = nn.GroupNorm(output_dim*2, output_dim*2)
+        elif use_bn == 3:
+            self.norm = ComplexInstanceNorm2d(output_dim)
+
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, input):
         x = self.conv(input)
         (N, _, C, W, H) = x.size()
-        if self.use_bn:
-            x = self.norm(x.view(N, 2*C, W, H)).view(N, 2, C, W, H)  ## TODO for complex instance norm
+        if self.use_bn == 1 or self.use_bn == 2:
+            x = self.norm(x.view(N, 2*C, W, H)).view(N, 2, C, W, H)
+        elif self.use_bn == 3:
+            x = self.norm(x)
         x = self.relu(x)
         return x
 

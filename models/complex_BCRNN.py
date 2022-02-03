@@ -28,9 +28,12 @@ class ComplexCRNNcell(nn.Module):
         else:
             self.i2h = ComplexConv2d(input_size, hidden_size, kernel_size)
             self.h2h = ComplexConv2d(hidden_size, hidden_size, kernel_size)
-        if self.flag_bn:
-            self.bn_i2h = nn.GroupNorm(hidden_size*2, hidden_size*2)  ## TODO for complex instance norm
-            self.bn_h2h = nn.GroupNorm(hidden_size*2, hidden_size*2)  ## TODO for complex instance norm
+        if self.flag_bn == 2:
+            self.bn_i2h = nn.GroupNorm(hidden_size*2, hidden_size*2)
+            self.bn_h2h = nn.GroupNorm(hidden_size*2, hidden_size*2)
+        elif self.flag_bn == 3:
+            self.bn_i2h = ComplexInstanceNorm2d(hidden_size)
+            self.bn_h2h = ComplexInstanceNorm2d(hidden_size)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, input, hidden):
@@ -38,13 +41,15 @@ class ComplexCRNNcell(nn.Module):
         (N, _, C, W, H) = in_to_hid.size()
         if self.flag_hidden:
             hid_to_hid = self.h2h(hidden)
-        if self.flag_bn:
-            in_to_hid = self.bn_i2h(in_to_hid.view(N, 2*C, W, H)).view(N, 2, C, W, H)  ## TODO for complex instance norm
+        if self.flag_bn == 2:
+            in_to_hid = self.bn_i2h(in_to_hid.view(N, 2*C, W, H)).view(N, 2, C, W, H)
             if self.flag_hidden:
-                hid_to_hid = self.bn_h2h(hid_to_hid.view(N, 2*C, W, H)).view(N, 2, C, W, H)  ## TODO for complex instance norm
-        # ih_to_ih = self.ih2ih(hidden_iteration)
+                hid_to_hid = self.bn_h2h(hid_to_hid.view(N, 2*C, W, H)).view(N, 2, C, W, H)
+        elif self.flag_bn == 3:
+            in_to_hid = self.bn_i2h(in_to_hid)
+            if self.flag_hidden:
+                hid_to_hid = self.bn_h2h(hid_to_hid)
 
-        # hidden = self.relu(in_to_hid + hid_to_hid + ih_to_ih)
         if self.flag_hidden:
             hidden = self.relu(in_to_hid + hid_to_hid)
         else:

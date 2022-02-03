@@ -61,13 +61,16 @@ if __name__ == '__main__':
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
+    parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 
+                                                      # 0: no normalization, 
+                                                      # 2: use instance normalization
+                                                      # 3: use complex intance normalization (only when flag_complex=1)
     parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
 
     parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
     parser.add_argument('--necho', type=int, default=10)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     parser.add_argument('--convft', type=int, default=0)  # 0: conventional conv layer, 1: conv2DFT layer
-    parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 0: no normalization, 2: use group normalization
     parser.add_argument('--multilevel', type=int, default=0)  # 0: original image space feature extraction and denoising, 1: multi-level
     parser.add_argument('--rank', type=int, default=0)  #  rank of compressor in forward model
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
@@ -274,13 +277,13 @@ if __name__ == '__main__':
         print(netG_dc)
         print("{} total parameters.".format(sum(p.numel() for p in netG_dc.parameters() if p.requires_grad)))
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_complex={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_complex={}_bn={}_last.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex'], opt['bn']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2 or opt['loupe'] == -3:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_complex={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_complex={}_bn_{}_last.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex'], opt['bn']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
 
@@ -473,10 +476,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_psnr[-1] == max(Validation_psnr):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex']))  
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}_bn={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex'], opt['bn']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}_bn={}_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex'], opt['bn']))  
     
     
     # for test

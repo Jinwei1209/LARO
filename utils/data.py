@@ -390,6 +390,7 @@ class Logger():
         ratio = opt['samplingRatio']
         solver = opt['solver']
         flag_complex = opt['flag_complex']
+        bn = opt['bn']
 
         if(not os.path.exists(self.rootName)):
             os.mkdir(self.rootName)
@@ -398,8 +399,8 @@ class Logger():
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_complex={6}'.format( \
-                         bcrnn, loss, K, loupe, ratio, solver, flag_complex) + '.log'
+        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_complex={6}_bn={7}'.format( \
+                         bcrnn, loss, K, loupe, ratio, solver, flag_complex, bn) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 
         if self.flagSave:
