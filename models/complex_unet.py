@@ -41,7 +41,7 @@ class ComplexUnet(nn.Module):
             else:
                 pool = True
 
-            self.downsampling_path.append(ComplexDownConvBlock(input_dim, output_dim, use_bn=use_bn, pool=pool, slim=slim, convFT=convFT))
+            self.downsampling_path.append(ComplexDownConvBlock(input_dim, output_dim, use_bn=use_bn, pool=pool, poolType=1, slim=slim, convFT=convFT))
 
         for i in range(len(self.num_filters)-2, -1, -1):
 

@@ -21,6 +21,7 @@ class ComplexConvBlock(nn.Module):
         convFT=0  # flag to use Conv2dFT
     ):
         super(ComplexConvBlock, self).__init__()
+        self.use_bn = use_bn
         if convFT:
             self.conv = Conv2dFT(input_dim, output_dim, kernel_size)
         else:
@@ -34,7 +35,8 @@ class ComplexConvBlock(nn.Module):
     def forward(self, input):
         x = self.conv(input)
         (N, _, C, W, H) = x.size()
-        x = self.norm(x.view(N, 2*C, W, H)).view(N, 2, C, W, H)  ## TODO for complex instance norm
+        if self.use_bn:
+            x = self.norm(x.view(N, 2*C, W, H)).view(N, 2, C, W, H)  ## TODO for complex instance norm
         x = self.relu(x)
         return x
 
@@ -58,6 +60,7 @@ class ComplexDownConvBlock(nn.Module):
         super(ComplexDownConvBlock, self).__init__()
 
         self.pool = pool
+        self.poolType = poolType
         if pool:
             if poolType == 0:
                 self.pooling = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
@@ -70,7 +73,10 @@ class ComplexDownConvBlock(nn.Module):
         x = input
         (N, _, C, W, H) = x.size()
         if self.pool:
-            x = self.pooling(x.view(N, 2*C, W, H)).view(N, 2, C, W//2, H//2)  ## TODO for complex pooling
+            if self.poolType == 0:
+                x = self.pooling(x.view(N, 2*C, W, H)).view(N, 2, C, W//2, H//2)
+            else:
+                x = self.pooling(x)
         x = self.convBlock(x)
         return x
 

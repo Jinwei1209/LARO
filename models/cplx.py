@@ -65,6 +65,8 @@ class ComplexMaxPool2d(nn.Module):
     def forward(self, input):    
         _, indices = self.pool(input[:, 0, ...]**2 + input[:, 1, ...]**2)
         flat = input.flatten(3, -1)
-        ix = indices.flatten(2 -1)
-        output = torch.gather(flat, -1, ix)
-        return output.reshape(input.shape[:3], indices.shape[2:])
+        ix = indices.flatten(2, -1)
+        output_real = torch.gather(flat[:, 0, ...], dim=-1, index=ix)
+        output_imag = torch.gather(flat[:, 1, ...], dim=-1, index=ix)
+        output = torch.cat([output_real[:, None, ...], output_imag[:, None, ...]], 1)
+        return output.reshape(*input.shape[:3], *indices.shape[2:])

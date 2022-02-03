@@ -271,6 +271,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         netG_dc.to(device)
+        print(netG_dc)
+        print("{} total parameters.".format(sum(p.numel() for p in netG_dc.parameters() if p.requires_grad)))
         if opt['loupe'] < 1 and opt['loupe'] > -2:
             weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_complex={}_last.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex']))
@@ -520,7 +522,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}_last.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         # if opt['temporal_pred'] == 1:

@@ -89,13 +89,13 @@ class kdata_multi_echo_CBIC(data.Dataset):
                     idx -= 200
                     subject += 1
             if subject == 0:
-                dataFD = self.rootDir + '/data_cfl/thanh2/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
                 dataFD_sense_echo = self.rootDir + '/data_cfl/thanh2/full_cc_slices_sense_echo/'
             elif subject == 1:
-                dataFD = self.rootDir + '/data_cfl/jinwei2/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
                 dataFD_sense_echo = self.rootDir + '/data_cfl/jinwei2/full_cc_slices_sense_echo/'
             elif subject == 2:
-                dataFD = self.rootDir + '/data_cfl/qihao2/full_cc_slices/'
+                dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
                 dataFD_sense_echo = self.rootDir + '/data_cfl/qihao2/full_cc_slices_sense_echo/'
             elif subject == 3:
                 dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
