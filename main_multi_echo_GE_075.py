@@ -62,8 +62,11 @@ if __name__ == '__main__':
     parser.add_argument('--samplingRatio', type=float, default=0.14)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
-    parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
+    parser.add_argument('--padding', type=int, default=1)  # flag to use kspace padded mGRE data
+    parser.add_argument('--normalization', type=int, default=0)  # 0 for no normalization
 
+    parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
+    parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
     parser.add_argument('--flag_2D', type=int, default=1)  # flag to use 2D undersampling (variable density)
     parser.add_argument('--necho', type=int, default=7)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
@@ -84,7 +87,6 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalization', type=int, default=0)  # 0 for no normalization
     opt = {**vars(parser.parse_args())}
     K = opt['K']
     norm_last = opt['norm_last']
@@ -114,6 +116,11 @@ if __name__ == '__main__':
     elif opt['solver'] == 0 and opt['bcrnn'] == 0:
         flag_bcrnn = 0
         flag_hidden = 0
+
+    if opt['padding'] == 1:
+        nrow = 412
+        ncol = 224
+        nslice = 512
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
@@ -246,6 +253,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 flag_temporal_pred=0,
                 flag_convFT=opt['convft'],
+                flag_padding=opt['padding'],
                 flag_multi_level=opt['multilevel'],
                 flag_bn=opt['bn'],
                 samplingRatio=opt['samplingRatio'],
@@ -483,6 +491,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 flag_temporal_pred=0,
                 flag_convFT=opt['convft'],
+                flag_padding=opt['padding'],
                 flag_multi_level=opt['multilevel'],
                 flag_bn=opt['bn'],
                 samplingRatio=opt['samplingRatio'],
@@ -591,6 +600,7 @@ if __name__ == '__main__':
                 Targets.append(targets.cpu().detach())
                 Targets_torch.append(targets_complex)
                 Recons.append(Xs_1.cpu().detach())
+                # Targets.append(targets)
 
                 M0.append(m0.cpu().detach())
                 R2s.append(r2s.cpu().detach())
@@ -622,7 +632,7 @@ if __name__ == '__main__':
                 nslice = nslice_interpolate
                 nrow = nrow_interpolate
                 ncol *= 2
-            if opt['interpolate'] == 0:
+            if opt['interpolate'] == 0 and opt['padding'] == 0:
                 if opt['lambda1'] == 1:
                     save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
                         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), 'Recons', Recons_)
@@ -671,24 +681,31 @@ if __name__ == '__main__':
             print('Successfully save iField.bin')
 
             # run MEDIN
-            if opt['interpolate'] == 0:
+            if opt['padding'] == 0:
+                if opt['interpolate'] == 0:
+                    os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                            + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                            + ' --temp ' + rootName +  '/results_QSM/'
+                            + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                            + ' --CSF ' + ' -of QR')
+                elif opt['interpolate'] == 1:
+                    os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                            + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate.txt'
+                            + ' --temp ' + rootName +  '/results_QSM/'
+                            + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                            + ' --CSF ' + ' -of QR')
+                elif opt['interpolate'] == 2:
+                    os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
+                            + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate2.txt'
+                            + ' --temp ' + rootName +  '/results_QSM/'
+                            + ' -csfm 1 ' + ' -rl 0.7 '
+                            + ' --CSF ' + ' -of QR')
+            elif opt['padding'] == 1:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                        + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                        + ' --parameter ' + rootName + '/results_QSM/parameter_padding.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
                         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR')
-            elif opt['interpolate'] == 1:
-                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                        + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate.txt'
-                        + ' --temp ' + rootName +  '/results_QSM/'
-                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR')
-            elif opt['interpolate'] == 2:
-                os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
-                        + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate2.txt'
-                        + ' --temp ' + rootName +  '/results_QSM/'
-                        + ' -csfm 1 ' + ' -rl 0.7 '
-                        + ' --CSF ' + ' -of QR')
+                        + ' --CSF ' + ' -of QR -rl 0.3')
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_07.bin', 'f4')

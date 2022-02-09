@@ -96,6 +96,7 @@ class Resnet_with_DC2(nn.Module):
         flag_hidden=1, # BCRNN hidden feature recurrency
         flag_unet=0,  # flag to use unet as denoiser
         flag_complexConv=0,
+        flag_padding=0,  # flag to use padded data for training, if yes, reduce the number of filters by factor 2
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
         slope=0.25,
@@ -126,6 +127,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_hidden = flag_hidden
         self.flag_unet = flag_unet
         self.flag_complexConv = flag_complexConv
+        self.flag_padding = flag_padding
         self.flag_multi_level = flag_multi_level
         self.flag_bn = flag_bn
         self.slope = slope
@@ -155,7 +157,10 @@ class Resnet_with_DC2(nn.Module):
             elif self.flag_BCRNN > 0:
                 n_ch = 2  # number of channels
                 nd = 5  # number of CRNN/BCRNN/CNN layers in each iteration
-                nf = 64  # number of filters
+                if self.flag_padding == 0:
+                    nf = 64  # number of filters
+                else:
+                    nf = 64
                 ks = 3  # kernel size
                 self.n_ch = n_ch
                 self.nd = nd
@@ -199,16 +204,28 @@ class Resnet_with_DC2(nn.Module):
                     self.relu = nn.ReLU(inplace=True)
                 elif self.flag_unet == 1:
                     if not self.flag_complexConv:
-                        self.denoiser = Unet(
-                            input_channels=nf,
-                            output_channels=n_ch,
-                            num_filters=[2**i for i in range(6, 9)],
-                            use_bn=flag_bn,
-                            use_deconv=1,
-                            skip_connect=False,
-                            slim=False,
-                            convFT=flag_convFT
-                        )
+                        if self.flag_padding == 0:
+                            self.denoiser = Unet(
+                                input_channels=nf,
+                                output_channels=n_ch,
+                                num_filters=[2**i for i in range(6, 9)],
+                                use_bn=flag_bn,
+                                use_deconv=1,
+                                skip_connect=False,
+                                slim=False,
+                                convFT=flag_convFT
+                            )
+                        else:
+                            self.denoiser = Unet(
+                                input_channels=nf,
+                                output_channels=n_ch,
+                                num_filters=[2**i for i in range(5, 8)],
+                                use_bn=flag_bn,
+                                use_deconv=1,
+                                skip_connect=False,
+                                slim=False,
+                                convFT=flag_convFT
+                            )
                     else:
                         self.denoiser = ComplexUnet(
                             input_channels=nf//2,

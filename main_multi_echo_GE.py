@@ -282,7 +282,7 @@ if __name__ == '__main__':
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2 or opt['loupe'] == -3:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_complex={}_bn_{}_last.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_complex={}_bn={}_last.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_complex'], opt['bn']))
             weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
             netG_dc.load_state_dict(weights_dict)
@@ -478,7 +478,7 @@ if __name__ == '__main__':
             if Validation_psnr[-1] == max(Validation_psnr):
                 torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}_bn={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex'], opt['bn']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}_bn={}_last.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_complex={}_bn={}=last.pt' \
             .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_complex'], opt['bn']))  
     
     

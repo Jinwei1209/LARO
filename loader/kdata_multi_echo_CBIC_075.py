@@ -35,11 +35,11 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 320 * 8
+                self.nsamples = 512 * 8
             elif split == 'val':
-                self.nsamples = 320
+                self.nsamples = 512
             elif split == 'test':
-                self.nsamples = 320
+                self.nsamples = 512
                 if subject == 0:
                     self.subject = 'thanh'
                 elif subject == 1:
@@ -61,33 +61,33 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         if self.split == 'train':
             subject = 0
             while (True):
-                if (idx - 320 < 0):
+                if (idx - 512 < 0):
                     break
                 else:
-                    idx -= 320
+                    idx -= 512
                     subject += 1
             if subject == 0:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei/full_cc_slices_sense_echo_pad/'
             elif subject == 1:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/dom/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/dom/full_cc_slices_sense_echo_pad/'
             elif subject == 2:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/alexey/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/alexey/full_cc_slices_sense_echo_pad/'
             elif subject == 3:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/qihao/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/qihao/full_cc_slices_sense_echo_pad/'
             elif subject == 4:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/jiahao/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/jiahao/full_cc_slices_sense_echo_pad/'
             elif subject == 5:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/chao/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/chao/full_cc_slices_sense_echo_pad/'
             elif subject == 6:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/kelly/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/kelly/full_cc_slices_sense_echo_pad/'
             elif subject == 7:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/junghun/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/junghun/full_cc_slices_sense_echo_pad/'
 
         elif self.split == 'val':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/thanh/full_cc_slices_sense_echo/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/thanh/full_cc_slices_sense_echo_pad/'
         
         elif self.split == 'test':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_pad/'
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
@@ -124,8 +124,7 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], 2, axis=0) # (2, row, col)
             brain_mask = np.repeat(brain_mask[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
         
-        if self.normalization == 0:
-            return kdata, org, csm, brain_mask
+        return kdata*self.normalization, org*self.normalization, csm, brain_mask
 
 
 
