@@ -148,7 +148,8 @@ if __name__ == '__main__':
     if opt['loupe'] < 1 and opt['loupe'] > -2:
         # for 2D random sampling 
         masks = masks[..., np.newaxis] # (nrow, ncol, 1)
-        
+        if opt['padding'] == 1:
+            masks = np.pad(masks, ((77, 77), (56, 56), (0, 0)))
         # # for 1D echo-identical sampling
         # masks = masks[..., 0, np.newaxis] # (nrow, ncol, 1)
         # masks[nrow//2-13:nrow//2+12, ncol//2-13:ncol//2+12, ...] = 1 # add calibration region
@@ -180,6 +181,8 @@ if __name__ == '__main__':
         # masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
     elif opt['loupe'] == -2 or opt['loupe'] == -3:
         masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
+        if opt['padding'] == 1:
+            masks = np.pad(masks, ((0, 0), (77, 77), (56, 56), (0, 0)))
         masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (necho, nrow, ncol, 2)
@@ -515,7 +518,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}_last.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         netG_dc.load_state_dict(weights_dict)

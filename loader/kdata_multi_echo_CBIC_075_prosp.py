@@ -37,11 +37,11 @@ class kdata_multi_echo_CBIC_075_prosp(data.Dataset):
         self.loupe = loupe
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 320 * 4
+                self.nsamples = 512 * 4
             elif split == 'val':
-                self.nsamples = 320
+                self.nsamples = 512
             elif split == 'test':
-                self.nsamples = 320
+                self.nsamples = 512
                 if subject == 0:
                     self.subject = 'thanh'
                 elif subject == 1:
@@ -64,10 +64,10 @@ class kdata_multi_echo_CBIC_075_prosp(data.Dataset):
         if self.split == 'train':
             subject = 0
             while (True):
-                if (idx - 320 < 0):
+                if (idx - 512 < 0):
                     break
                 else:
-                    idx -= 320
+                    idx -= 512
                     subject += 1
             if subject == 0:
                 dataFD = self.rootDir + '/data_cfl/thanh2/full_cc_slices/'
@@ -80,7 +80,7 @@ class kdata_multi_echo_CBIC_075_prosp(data.Dataset):
             dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
         
         elif self.split == 'test':
-            dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo/'.format(self.loupe)
+            dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo_pad/'.format(self.loupe)
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
@@ -113,8 +113,7 @@ class kdata_multi_echo_CBIC_075_prosp(data.Dataset):
         # brain tissue mask (not used for prospective testing)
         brain_mask = abs(org) > 0 
 
-        if self.normalization == 0:
-            return kdata, org, csm, brain_mask
+        return kdata*self.normalization, org*self.normalization, csm, brain_mask
 
 
 
