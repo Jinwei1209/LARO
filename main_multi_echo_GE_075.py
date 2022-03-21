@@ -63,7 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--padding', type=int, default=1)  # flag to use kspace padded mGRE data
-    parser.add_argument('--normalization', type=int, default=0)  # 0 for no normalization
+    parser.add_argument('--normalization', type=int, default=100)  # 0 for no normalization
 
     parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
@@ -682,6 +682,8 @@ if __name__ == '__main__':
                 os.remove(rootName+'/results_QSM/iField.bin')
             iField.tofile(rootName+'/results_QSM/iField.bin')
             print('Successfully save iField.bin')
+
+            torch.cuda.empty_cache()
 
             # run MEDIN
             if opt['padding'] == 0:
