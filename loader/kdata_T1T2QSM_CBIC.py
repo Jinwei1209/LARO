@@ -132,9 +132,9 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
         kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] = kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] * self.normalizations[1]
         kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] = kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] * self.normalizations[2]
 
-        org[:, :self.necho_mGRE*2, ...] = org[:, :self.necho_mGRE*2, ...] * self.normalizations[0]
-        org[:, self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] = org[:, self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] * self.normalizations[1]
-        org[:, (self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] = org[:, (self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] * self.normalizations[2]
+        org[:self.necho_mGRE*2, ...] = org[:self.necho_mGRE*2, ...] * self.normalizations[0]
+        org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] = org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] * self.normalizations[1]
+        org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] = org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] * self.normalizations[2]
         
         return kdata, org, csm, brain_mask
 

@@ -456,7 +456,6 @@ if __name__ == '__main__':
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
-            Recons_ = np.flip(Recons_, axis=0)
             save_mat(rootName+'/results/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', Recons_)
 
@@ -465,7 +464,7 @@ if __name__ == '__main__':
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             nslice = iField.shape[2]
             iField[..., 1] = - iField[..., 1]
-            iField = iField[:, :, :, 2:, :]
+            iField = iField[:, :, :, :necho-2, :]
             iField = np.flip(iField, axis=2)
             print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
