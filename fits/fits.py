@@ -373,3 +373,7 @@ def fit_complex_all(iField, TE):
 def torch_exp1j(y):
     return torch.cos(y) + 1j * torch.sin(y)
 
+
+def fit_T1_M0():
+    return 0
+    

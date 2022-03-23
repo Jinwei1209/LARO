@@ -43,9 +43,9 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
             elif split == 'test':
                 self.nsamples = 256
                 if subject == 0:
-                    self.subject = 'chao'
-                elif subject == 1:
                     self.subject = 'qihao'
+                elif subject == 1:
+                    self.subject = 'dom'
                 elif subject == 2:
                     self.subject = 'qihao'
                 elif subject == 3:

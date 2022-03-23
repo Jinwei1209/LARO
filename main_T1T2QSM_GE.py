@@ -124,8 +124,12 @@ if __name__ == '__main__':
         masks = []
  
     # flip matrix
-    flip = torch.ones([1, necho, nrow, ncol, 1]) 
-    flip = torch.cat((flip, torch.zeros(flip.shape)), -1).to(device) # (1, necho, nrow, ncol, 2)
+    flip = torch.ones([necho, nrow, ncol, 1]) 
+    flip = torch.cat((flip, torch.zeros(flip.shape)), -1).to(device)
+    flip[:, ::2, ...] = - flip[:, ::2, ...] 
+    flip[:, :, ::2, ...] = - flip[:, :, ::2, ...]
+    # add batch dimension
+    flip = flip[None, ...] # (1, necho, nrow, ncol, 2)
 
     # training
     if opt['flag_train'] == 1:
