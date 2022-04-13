@@ -19,7 +19,10 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
         nrow = 206,
         ncol = 80,
         split = 'train',
+        dataset_id = 0,  # 0: bipolar with vd9 sampling, 1: bipolar with vd11 sampling, 2: unipolar with vd11.
         subject = 0,  # 0: junghun, 1: chao, 2: alexey
+        prosp_flag = 0,
+        t2w_redesign_flag = 0,
         normalizations = [5, 10, 10],  # normalization factor for mGRE, T1w and T2w data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
@@ -33,6 +36,26 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
         self.normalizations = normalizations
         self.echo_cat = echo_cat
         self.split = split
+        self.dataset_id = dataset_id
+        if self.dataset_id == 0:
+            self.id = '1'
+            self.echo_stride = 2
+            self.necho = 7
+            self.necho_mGRE = 5
+        elif self.dataset_id == 1:
+            self.id = '2'
+            self.echo_stride = 2
+            self.necho = 7
+            self.necho_mGRE = 5
+        elif self.dataset_id == 2:
+            self.id = '3'
+            self.echo_stride = 1
+            self.necho = 11
+            self.necho_mGRE = 9
+        self.prosp_flag = prosp_flag
+        self.t2w_redesign_flag = t2w_redesign_flag
+        if self.t2w_redesign_flag == 1:
+            self.id += '_t2w_redesign'
         self.nrow = nrow
         self.ncol = ncol
         if contrast == 'MultiContrast':
@@ -57,6 +80,9 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
         self.augIndex = 0
         self.batchSize = batchSize
         self.batchIndex = 0
+        print("Use dataset: {}".format(self.dataset_id))
+        if self.prosp_flag:
+            print("Test on {} with prospective under-sampling".format(self.subject))
 
 
     def __len__(self):
@@ -75,19 +101,24 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
                     idx -= 256
                     subject += 1
             if subject == 0:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/chao/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl{}/chao/full_cc_slices_sense_echo/'.format(self.id)
             elif subject == 1:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/jiahao/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl{}/jiahao/full_cc_slices_sense_echo/'.format(self.id)
             elif subject == 2:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei/full_cc_slices_sense_echo/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl{}/hangwei/full_cc_slices_sense_echo/'.format(self.id)
             elif subject == 3:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/dom/full_cc_slices_sense_echo/'
-
+                dataFD_sense_echo = self.rootDir + '/data_cfl{}/dom/full_cc_slices_sense_echo/'.format(self.id)
+            dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'val':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/qihao/full_cc_slices_sense_echo/'
-        
+            dataFD_sense_echo = self.rootDir + '/data_cfl{}/qihao/full_cc_slices_sense_echo/'.format(self.id)
+            dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'test':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
+            if not self.prosp_flag:
+                dataFD_sense_echo = self.rootDir + '/data_cfl{}/'.format(self.id) + self.subject + '/full_cc_slices_sense_echo/'
+                dataFD_sense_echo_mask = dataFD_sense_echo
+            else:
+                dataFD_sense_echo = self.rootDir + '/data_cfl{}/'.format(self.id) + self.subject + '/kt_cc_slices_sense_echo/'
+                dataFD_sense_echo_mask = self.rootDir + '/data_cfl{}/'.format(self.id) + self.subject + '/full_cc_slices_sense_echo/'
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
@@ -97,7 +128,7 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
         self.batchIndex += 1
 
         org = readcfl(dataFD_sense_echo + 'fully_slice_{}'.format(idx))  # (row, col, echo)
-        org = np.concatenate((org[..., 0:9:2], org[..., 9:11]), axis=-1)  # use only odd echoes
+        org = np.concatenate((org[..., 0:9:self.echo_stride], org[..., 9:11]), axis=-1)  # use only odd echoes
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 
@@ -106,7 +137,7 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
 
         # Option 2: csms estimated from each echo
         csm = readcfl(dataFD_sense_echo + 'sensMaps_slice_{}'.format(idx))
-        csm = np.concatenate((csm[..., 0:9:2], csm[..., 9:11]), axis=-1)  # use only odd echoes
+        csm = np.concatenate((csm[..., 0:9:self.echo_stride], csm[..., 9:11]), axis=-1)  # use only odd echoes
         csm = np.transpose(csm, (2, 3, 0, 1))  # (coil, echo, row, col)
         for i in range(self.necho):
             csm[:, i, :, :] = csm[:, i, :, :] * np.exp(-1j * np.angle(csm[0:1, i, :, :]))
@@ -115,12 +146,12 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
 
         # Fully sampled kspace data
         kdata = readcfl(dataFD_sense_echo + 'kdata_slice_{}'.format(idx))
-        kdata = np.concatenate((kdata[..., 0:9:2], kdata[..., 9:11]), axis=-1)  # use only odd echoes
+        kdata = np.concatenate((kdata[..., 0:9:self.echo_stride], kdata[..., 9:11]), axis=-1)  # use only odd echoes
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # brain tissue mask
-        brain_mask = np.real(readcfl(dataFD_sense_echo + 'mask_slice_{}'.format(idx)))  # (row, col)
+        brain_mask = np.real(readcfl(dataFD_sense_echo_mask + 'mask_slice_{}'.format(idx)))  # (row, col)
         if self.echo_cat:
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
         else:

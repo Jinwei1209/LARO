@@ -1,10 +1,10 @@
-from numpy.core.numeric import Inf
 import torch
 import numpy as np
+import torch.nn as nn
 
 from models.dc_blocks import mlpy_in_cg, conj_in_cg, dvd_in_cg
 from skimage.restoration import unwrap_phase
-
+from numpy.core.numeric import Inf
 
 def fit_R2_LM(M, max_iter=10, tol=1e-2):
     '''
@@ -374,6 +374,86 @@ def torch_exp1j(y):
     return torch.cos(y) + 1j * torch.sin(y)
 
 
-def fit_T1_M0():
-    return 0
+class fit_T1T2M0(nn.Module):
+    '''
+        fitting of T1, T2 and M0 from MP sequence:
+
+        Inputs: 
+            (time unit: ms)
+            s: (batch, height, width, nechos)
+            TR1: repetition time of T1w and T2w acquisitions;
+            TR2: repetition time of mGRE acquisition;
+            nframes1: number of TRs in T1w and T2w acquisitions;
+            nframes2: number of TRs in mGRE acquisition;
+            alpha1: flip angle (degree) of T1w and T2w acquisitions;
+            alpha2: flip angle (degree) of mGRE acquisitions;
+            TE_T2PREP: echo time of T2 preparation
+            TD1: dead time between inversion pulse and start of T1w acquisition
+            TD2: dead time between end of mGRE acquisition and T2prep pulse
+            num_iter: number of iterations in the solver
+
+        Time points in the sequeuce:
+            M1: signal intensity at the start of T1w acquisition;
+            M2: signal intensity of T1w (s[..., -2]); 
+            M3: signal intensity of mGRE first echo (s[..., 0]);
+            M4: signal intensity right before T2prep;
+            M5: signal intensity of T2w (s[..., -1]);
+            M6: signal intensity at the end of T2w acquisition;
+        -M6: signal intensity at the begining of inversion recovery period.
+
+        Outputs:
+            T1, T2 and M0.
+
+    '''
+    def __init__(self, s, TR1, TR2, nframes1, nframes2, alpha1, alpha2, TE_T2PREP, TD1, TD2, num_iter):
+        super(fit_T1T2M0, self).__init__()
+        sz = s.size()
+        self.TR1 = TR1
+        self.TR2 = TR2
+        self.nframes1 = nframes1
+        self.nframes2 = nframes2
+        self.alpha1 = torch.tensor(alpha1 / 180 * 3.1415927410125732)
+        self.alpha2 = torch.tensor(alpha2 / 180 * 3.1415927410125732)
+        self.TE_T2PREP = torch.tensor(TE_T2PREP)
+        self.TD1 = TD1
+        self.TD2 = TD2
+        self.num_iter = num_iter
+
+        temp = torch.ones(sz[:-1]) * 1000
+        self.T1 = nn.Parameter(temp, requires_grad=True).to('cuda')
+        temp = torch.ones(sz[:-1]) * 100
+        self.T2 = nn.Parameter(temp, requires_grad=True).to('cuda')
+        temp = s[..., -1] * torch.exp(self.TE_T2PREP/100)
+        self.M0 = nn.Parameter(temp, requires_grad=True).to('cuda')
+
+    def forward(self, M2, M3, M5):
+        # # saturated net magnetization of TR1
+        # M0s = (1 - torch.exp(-self.TR1/self.T1)) / (1 - torch.cos(self.alpha1)*torch.exp(-self.TR1/self.T1)) * self.M0
+        # # saturated net magnetization of TR2
+        # M0ss = (1 - torch.exp(-self.TR2/self.T1)) / (1 - torch.cos(self.alpha2)*torch.exp(-self.TR2/self.T1)) * self.M0
+        # # effective T1 of TR1
+        # T1s = (1 - torch.exp(-self.TR1/self.T1)) / (1 - torch.cos(self.alpha1)*torch.exp(-self.TR1/self.T1)) * self.T1
+        # # effective T1 of TR2
+        # T1ss = (1 - torch.exp(-self.TR2/self.T1)) / (1 - torch.cos(self.alpha2)*torch.exp(-self.TR2/self.T1)) * self.T1
+
+        # effective T1 of TR1
+        T1s = 1 / (1/self.T1 - 1/self.TR1*torch.log(torch.cos(self.alpha1)))
+        # effective T1 of TR2
+        T1ss = 1 / (1/self.T1 - 1/self.TR2*torch.log(torch.cos(self.alpha2)))
+        # saturated net magnetization of TR1
+        M0s = T1s * self.M0 / self.T1
+        # saturated net magnetization of TR2
+        M0ss = T1ss * self.M0 / self.T1
+
+        # prediction of M2
+        M6 = M0s - (M0s - M5) * torch.exp(-self.TR1*self.nframes1/T1s)  # T2w acquisition
+        M1 = self.M0 - (self.M0 + M6) * torch.exp(-self.TD1/self.T1)  # T2w acquisition
+        M2_pred = M0s - (M0s - M1) * torch.exp(-self.TR1*self.nframes1/T1s)  # T1w acquisition
+
+        # prediction of M3
+        M3_pred = M0ss - (M0ss - M2) * torch.exp(-self.TR2*self.nframes2/T1ss)  # T1w acquisition
+        return [M2_pred, M3_pred]
+
+
+
     

@@ -18,7 +18,7 @@ from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, Fitting
 from utils.test import Metrices
 from utils.operators import Back_forward_MS, backward_MS, forward_MS
 from models.resnet_with_dc_t1t2qsm import Resnet_with_DC2
-from fits.fits import fit_R2_LM, arlo, fit_complex
+from fits.fits import fit_R2_LM, arlo, fit_complex, fit_T1T2M0
 from utils.operators import low_rank_approx, HPphase
 
 if __name__ == '__main__':
@@ -38,11 +38,23 @@ if __name__ == '__main__':
     lambda_dll2 = 1e-3
     TEs = [0.004428,0.009244,0.014060,0.018876,0.023692,0.028508,0.033324,0.038140,0.042956,0.047772,0.052588]
 
+    # parameters in the MP sequence
+    TR1 = 6.9
+    TR2 = 37.9
+    nframes1 = 128
+    nframes2 = 128
+    alpha1 = 8
+    alpha2 = 8
+    TE_T2PREP = 57.5
+    TD1 = 19.1 - 16.06 + 299
+    TD2 = 1000
+    num_iter = 2
+
     # typein parameters
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0'), 
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
-    parser.add_argument('--test_sub', type=int, default=8)  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
+    parser.add_argument('--test_sub', type=int, default=0)  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
     parser.add_argument('--K', type=int, default=2)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=2)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
@@ -50,12 +62,15 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.2)  # Under-sampling ratio
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
+    parser.add_argument('--dataset_id', type=int, default=0)  # 0: bipolar with vd9 sampling, 1: bipolar with vd11 sampling, 2: unipolar with vd11.
+    parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
+    parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
+    parser.add_argument('--t2w_redesign', type=int, default=0)  # flag to to redesign T2w under-sampling pattern to reduce blur
+
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
-    parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
-    parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 2: use instance normalization
-
+    parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 2: use instance normalization    
     parser.add_argument('--necho', type=int, default=7)  # number of echos with kspace data (generalized echoes including T1w and T2w)
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
@@ -82,8 +97,12 @@ if __name__ == '__main__':
     lambda2 = opt['lambda2']
     lambda_maskbce = opt['lambda_maskbce']  # 0.01 too large
     rank = opt['rank']
+    if opt['dataset_id'] < 2:
+        opt['necho'] = 7
+    else:
+        opt['necho'] = 11
     necho = opt['necho']
-    necho_pred = 7 - necho
+    necho_pred = 0
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -110,7 +129,7 @@ if __name__ == '__main__':
 
     if opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
-        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks{}/mask_{}_echo'.format(opt['dataset_id']+1, opt['samplingRatio'])))
         masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
         masks = torch.tensor(masks, device=device).float()
         # to complex data
@@ -122,6 +141,20 @@ if __name__ == '__main__':
         masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
     else:
         masks = []
+
+    if opt['t2w_redesign'] == 1:
+        # load fixed loupe optimized mask across echos
+        masks_ = np.real(readcfl(rootName+'/masks{}/mask_{}_echo_for_t2w'.format(opt['dataset_id']+1, opt['samplingRatio'])))
+        masks_ = masks_[..., np.newaxis] # (necho, nrow, ncol, 1)
+        masks_ = torch.tensor(masks_, device=device).float()
+        # to complex data
+        masks_ = torch.cat((masks_, torch.zeros(masks_.shape).to(device)),-1) # (necho, nrow, ncol, 2)
+        # add coil dimension
+        masks_ = masks_[None, ...] # (1, necho, nrow, ncol, 2)
+        masks_ = torch.cat(ncoil*[masks_]) # (ncoil, necho, nrow, ncol, 2)
+        # add batch dimension
+        masks_ = masks_[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+        masks[:, :, -1, :, :, :] = masks_[:, :, -1, :, :, :]
  
     # flip matrix
     flip = torch.ones([necho, nrow, ncol, 1]) 
@@ -147,6 +180,8 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiContrast', 
             split='train',
+            dataset_id=opt['dataset_id'],
+            t2w_redesign_flag=opt['t2w_redesign'],
             normalizations=opt['normalizations'],
             echo_cat=opt['echo_cat']
         )
@@ -156,6 +191,8 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiContrast', 
             split='val',
+            dataset_id=opt['dataset_id'],
+            t2w_redesign_flag=opt['t2w_redesign'],
             normalizations=opt['normalizations'],
             echo_cat=opt['echo_cat']
         )
@@ -207,12 +244,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_mc_fusion={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -353,13 +390,14 @@ if __name__ == '__main__':
 
             # save weights
             if PSNRs_val[-1] == max(PSNRs_val):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
     
     
     # for test
+    lossl2 = lossL2()
     if opt['flag_train'] == 0:
         if opt['echo_cat'] == 1:
             netG_dc = Resnet_with_DC2(
@@ -401,8 +439,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -413,11 +451,15 @@ if __name__ == '__main__':
         water, water_target = [], []
         Recons = []
         preconds = []
+        T1, M0 = [], []
 
         dataLoader_test = kdata_T1T2QSM_CBIC(
             rootDir=rootName,
             contrast='MultiContrast', 
             split='test',
+            dataset_id=opt['dataset_id'],
+            prosp_flag=opt['prosp'],
+            t2w_redesign_flag=opt['t2w_redesign'],
             subject=opt['test_sub'],
             normalizations=opt['normalizations'],
             echo_cat=opt['echo_cat']
@@ -454,6 +496,18 @@ if __name__ == '__main__':
                     Xs_1 = torch_channel_deconcate(Xs_1)
                     mags_target = torch.sqrt(targets[:, 0, ...]**2 + targets[:, 1, ...]**2).permute(0, 2, 3, 1)
 
+                # fit_T1T2M0_model = fit_T1T2M0(mags_target, TR1, TR2, nframes1, nframes2, alpha1, alpha2, TE_T2PREP, TD1, TD2, num_iter)
+                # optimizer_fit = torch.optim.Adam(fit_T1T2M0_model.parameters(), lr=1e-1, betas=(0.9, 0.999))
+                # for i in range(num_iter):
+                #     optimizer_fit.zero_grad()
+                #     [M2_pred, M3_pred] = fit_T1T2M0_model(mags_target[..., -2], mags_target[..., 0], mags_target[..., -1])
+                #     loss = lossl2(M2_pred, mags_target[..., -2]) + lossl2(M3_pred, mags_target[..., 0])
+                #     loss.backward()
+                #     optimizer_fit.step()
+                #     print("iter: {}, loss: {}", i, loss.item())
+                
+                # T1.append(fit_T1T2M0_model.T1.cpu().detach())
+                # M0.append(fit_T1T2M0_model.M0.cpu().detach())
                 Targets.append(targets.cpu().detach())
                 Recons.append(Xs_1.cpu().detach())
 
@@ -463,13 +517,22 @@ if __name__ == '__main__':
             save_mat(rootName+'/results/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', Recons_)
 
+            # # write T1 into .mat file
+            # T1 = np.squeeze(np.concatenate(T1, axis=0))
+            # save_mat(rootName+'/results/T1_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
+            #     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'T1', T1)
+
+            # # write M0 into .mat file
+            # M0 = np.squeeze(np.concatenate(M0, axis=0))
+            # save_mat(rootName+'/results/M0_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
+            #     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'M0', M0)
+
             # write into .bin file
             # (nslice, 2, necho, nrow, ncol) to (ncol, nrow, nslice, necho, 2)
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             nslice = iField.shape[2]
             iField[..., 1] = - iField[..., 1]
             iField = iField[:, :, :, :necho-2, :]
-            iField = np.flip(iField, axis=2)
             print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
                 os.remove(rootName+'/results_QSM/iField.bin')
@@ -477,14 +540,24 @@ if __name__ == '__main__':
             print('Successfully save iField.bin')
 
             # run MEDIN
-            os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                    + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-                    + ' --temp ' + rootName +  '/results_QSM/'
-                    + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                    + ' --CSF ' + ' -of QR')
+            if opt['dataset_id'] < 2:
+                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                        + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                        + ' --temp ' + rootName +  '/results_QSM/'
+                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                        + ' --CSF ' + ' -of QR  -rl 1.0')
+            else:
+                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                        + ' --parameter ' + rootName + '/results_QSM/parameter2.txt'
+                        + ' --temp ' + rootName +  '/results_QSM/'
+                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                        + ' --CSF ' + ' -of QR  -rl 1.0')
             
             # read .bin files and save into .mat files
-            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_11.bin', 'f4')
+            if opt['dataset_id'] < 2:
+                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_05.bin', 'f4')
+            else:
+                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_09.bin', 'f4')
             QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
