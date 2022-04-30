@@ -391,6 +391,7 @@ class Logger():
         solver = opt['solver']
         dataset = opt['dataset_id']
         mc_fusion = opt['mc_fusion']
+        t2redesign = opt['t2w_redesign']
 
         if(not os.path.exists(self.rootName)):
             os.mkdir(self.rootName)
@@ -399,8 +400,8 @@ class Logger():
 
         self.t0 = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
         print(self.t0)
-        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_dataset={6}_mc_fusion={7}'.format( \
-                         bcrnn, loss, K, loupe, ratio, solver, dataset, mc_fusion) + '.log'
+        self.fileName = 'bcrnn={0}_loss={1}_K={2}_loupe={3}_ratio={4}_solver={5}_dataset={6}_mc_fusion={7}_t2redesign={8}'.format( \
+                         bcrnn, loss, K, loupe, ratio, solver, dataset, mc_fusion, t2redesign) + '.log'
         self.filePath = os.path.join(self.logPath, self.fileName)
 
         if self.flagSave:

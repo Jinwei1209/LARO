@@ -144,7 +144,7 @@ if __name__ == '__main__':
     else:
         masks = []
 
-    if opt['t2w_redesign'] == 1:
+    if opt['t2w_redesign'] == 1 and opt['loupe'] != 2:
         # load fixed loupe optimized mask across echos
         masks_ = np.real(readcfl(rootName+'/masks{}/mask_{}_echo_for_t2w'.format(opt['dataset_id']+1, opt['samplingRatio'])))
         masks_ = masks_[..., np.newaxis] # (necho, nrow, ncol, 1)
@@ -227,7 +227,8 @@ if __name__ == '__main__':
                 flag_att=opt['att'],
                 flag_cp=1,
                 flag_dataset=1,
-                flag_mc_fusion=opt['mc_fusion']
+                flag_mc_fusion=opt['mc_fusion'],
+                flag_t2w_redesign=opt['t2w_redesign']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -246,12 +247,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -392,10 +393,10 @@ if __name__ == '__main__':
 
             # save weights
             if PSNRs_val[-1] == max(PSNRs_val):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
     
     
     # for test
@@ -426,7 +427,8 @@ if __name__ == '__main__':
                 flag_unet=opt['flag_unet'],
                 flag_att=opt['att'],
                 flag_dataset=1,
-                flag_mc_fusion=opt['mc_fusion']
+                flag_mc_fusion=opt['mc_fusion'],
+                flag_t2w_redesign=opt['t2w_redesign']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -441,8 +443,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()

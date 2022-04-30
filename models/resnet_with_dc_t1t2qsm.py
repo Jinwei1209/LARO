@@ -95,6 +95,7 @@ class Resnet_with_DC2(nn.Module):
         flag_unet=0,  # flag to use unet as denoiser
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
+        flag_t2w_redesign=0,
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -125,6 +126,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_unet = flag_unet
         self.flag_multi_level = flag_multi_level
         self.flag_bn = flag_bn
+        self.flag_t2w_redesign = flag_t2w_redesign
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -285,7 +287,11 @@ class Resnet_with_DC2(nn.Module):
         elif self.flag_loupe == 2:
             masks = self.samplingPmask(Pmask_rescaled)[..., None] # (necho, nrow, ncol, 1)
             # keep central calibration region to 1
-            masks[:, self.nrow//2-9:self.nrow//2+9, self.ncol//2-9:self.ncol//2+9, :] = 1
+            if self.flag_t2w_redesign == 0:
+                masks[:, self.nrow//2-9:self.nrow//2+9, self.ncol//2-9:self.ncol//2+9, :] = 1
+            else:
+                masks[:, self.nrow//2-9:self.nrow//2+9, self.ncol//2-9:self.ncol//2+9, :-2] = 1
+                masks[:, self.nrow//2-6:self.nrow//2+6, self.ncol//2-6:self.ncol//2+6, -2:] = 1
             # to complex data
             masks = torch.cat((masks, torch.zeros(masks.shape).to('cuda')),-1) # (necho, nrow, ncol, 2)
             # add coil dimension
