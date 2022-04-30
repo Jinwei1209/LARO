@@ -184,7 +184,7 @@ class Resnet_with_DC2(nn.Module):
                     self.denoiser = Unet(
                         input_channels=nf,
                         output_channels=n_ch,
-                        num_filters=[2**i for i in range(6, 9)],
+                        num_filters=[2**i for i in range(6, 10)],
                         use_bn=flag_bn,
                         use_deconv=1,
                         skip_connect=False,
@@ -194,7 +194,7 @@ class Resnet_with_DC2(nn.Module):
                     self.denoiser_t1t2 = Unet(
                         input_channels=nf,
                         output_channels=n_ch*2,
-                        num_filters=[2**i for i in range(6, 9)],
+                        num_filters=[2**i for i in range(6, 10)],
                         use_bn=flag_bn,
                         use_deconv=1,
                         skip_connect=False,

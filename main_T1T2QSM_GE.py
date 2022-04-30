@@ -87,7 +87,9 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalizations', type=list, default=[5, 10, 10])  # normalization factors of multi-contrast images
+    parser.add_argument('--normalizations', type=list, default=[5, 30, 30])  # normalization factors of multi-contrast images 
+                                                                             # ([5, 30, 30] for dataset_id=6;
+                                                                             #  [5, 10, 10] for other dataset_ids)
     opt = {**vars(parser.parse_args())}
     K = opt['K']
     norm_last = opt['norm_last']
@@ -97,9 +99,9 @@ if __name__ == '__main__':
     lambda2 = opt['lambda2']
     lambda_maskbce = opt['lambda_maskbce']  # 0.01 too large
     rank = opt['rank']
-    if opt['dataset_id'] < 2:
+    if opt['dataset_id'] != 2:  # bipolar readout of mGRE
         opt['necho'] = 7
-    else:
+    else:  # unipolar readout of mGRE
         opt['necho'] = 11
     necho = opt['necho']
     necho_pred = 0
@@ -540,7 +542,7 @@ if __name__ == '__main__':
             print('Successfully save iField.bin')
 
             # run MEDIN
-            if opt['dataset_id'] < 2:
+            if opt['dataset_id'] != 2:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
@@ -554,7 +556,7 @@ if __name__ == '__main__':
                         + ' --CSF ' + ' -of QR  -rl 1.0')
             
             # read .bin files and save into .mat files
-            if opt['dataset_id'] < 2:
+            if opt['dataset_id'] != 2:
                 QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_05.bin', 'f4')
             else:
                 QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_09.bin', 'f4')

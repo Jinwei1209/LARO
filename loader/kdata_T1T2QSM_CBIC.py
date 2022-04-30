@@ -52,6 +52,16 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
             self.echo_stride = 1
             self.necho = 11
             self.necho_mGRE = 9
+        elif self.dataset_id == 3:
+            self.id = '4'
+            self.echo_stride = 2
+            self.necho = 7
+            self.necho_mGRE = 5
+        elif self.dataset_id == 5:
+            self.id = '6'
+            self.echo_stride = 2
+            self.necho = 7
+            self.necho_mGRE = 5
         self.prosp_flag = prosp_flag
         self.t2w_redesign_flag = t2w_redesign_flag
         if self.t2w_redesign_flag == 1:
@@ -68,7 +78,7 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
                 if subject == 0:
                     self.subject = 'qihao'
                 elif subject == 1:
-                    self.subject = 'dom'
+                    self.subject = 'jiahao'
                 elif subject == 2:
                     self.subject = 'qihao'
                 elif subject == 3:
@@ -110,7 +120,7 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
                 dataFD_sense_echo = self.rootDir + '/data_cfl{}/dom/full_cc_slices_sense_echo/'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'val':
-            dataFD_sense_echo = self.rootDir + '/data_cfl{}/qihao/full_cc_slices_sense_echo/'.format(self.id)
+            dataFD_sense_echo = self.rootDir + '/data_cfl{}/jiahao/full_cc_slices_sense_echo/'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'test':
             if not self.prosp_flag:
