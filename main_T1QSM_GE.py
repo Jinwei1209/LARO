@@ -1,5 +1,5 @@
 """
-    Experiment on T1w+T2w+mGRE kspace data reconstruction from GE scanner
+    Experiment on 0.75*0.75*1.0 T1w+mGRE kspace data reconstruction from GE scanner
 """
 import os
 import time
@@ -12,7 +12,7 @@ import numpy as np
 from torch.optim.lr_scheduler import MultiStepLR
 from IPython.display import clear_output
 from torch.utils import data
-from loader.kdata_T1T2QSM_CBIC import kdata_T1T2QSM_CBIC
+from loader.kdata_T1QSM_CBIC_075 import kdata_T1QSM_CBIC_075
 from utils.data import r2c, save_mat, save_nii, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
@@ -33,8 +33,8 @@ if __name__ == '__main__':
     PSNRs_val = []
     Validation_loss = []
     ncoil = 1
-    nrow = 206
-    ncol = 80
+    nrow = 386
+    ncol = 340
     lambda_dll2 = 1e-3
     TEs = [0.004428,0.009244,0.014060,0.018876,0.023692,0.028508,0.033324,0.038140,0.042956,0.047772,0.052588]
 
@@ -63,12 +63,12 @@ if __name__ == '__main__':
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
-    parser.add_argument('--dataset_id', type=int, default=0)  # 0: bipolar with vd9 sampling, 1: bipolar with vd11 sampling, 2: unipolar with vd11.
+    parser.add_argument('--dataset_id', type=int, default=0)  # 0: new2 of T1w+mGRE dataset
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
     parser.add_argument('--t2w_redesign', type=int, default=0)  # flag to to redesign T2w under-sampling pattern to reduce blur
-    
-    parser.add_argument('--t1w_only', type=int, default=0)  # flag to reconstruct T1w+QSM
+    parser.add_argument('--t1w_only', type=int, default=1)  # flag to reconstruct T1w+QSM
+
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
     parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 2: use instance normalization    
@@ -88,9 +88,8 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalizations', type=list, default=[5, 30, 30])  # normalization factors of multi-contrast images 
-                                                                             # ([5, 30, 30] for dataset_id=5;
-                                                                             #  [5, 10, 10] for other dataset_ids)
+    parser.add_argument('--normalizations', type=list, default=[5, 15])  # normalization factors of T1w+mGRE images 
+                                                       
     opt = {**vars(parser.parse_args())}
     K = opt['K']
     norm_last = opt['norm_last']
@@ -100,10 +99,7 @@ if __name__ == '__main__':
     lambda2 = opt['lambda2']
     lambda_maskbce = opt['lambda_maskbce']  # 0.01 too large
     rank = opt['rank']
-    if opt['dataset_id'] != 2:  # bipolar readout of mGRE
-        opt['necho'] = 7
-    else:  # unipolar readout of mGRE
-        opt['necho'] = 11
+    opt['necho'] = 9
     necho = opt['necho']
     necho_pred = 0
     # concatenate echo dimension to the channel dimension for TV regularization
@@ -126,7 +122,7 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data4/Jinwei/T1T2QSM'
+    rootName = '/data4/Jinwei/T1w_QSM_raw_CBIC_075'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
@@ -178,7 +174,7 @@ if __name__ == '__main__':
 
         loss_cem = CrossEntropyMask(radius=30)  # cross entropy loss for mask
 
-        dataLoader = kdata_T1T2QSM_CBIC(
+        dataLoader = kdata_T1QSM_CBIC_075(
             rootDir=rootName,
             contrast='MultiContrast', 
             split='train',
@@ -189,7 +185,7 @@ if __name__ == '__main__':
         )
         trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
-        dataLoader_val = kdata_T1T2QSM_CBIC(
+        dataLoader_val = kdata_T1QSM_CBIC_075(
             rootDir=rootName,
             contrast='MultiContrast', 
             split='val',
@@ -459,7 +455,7 @@ if __name__ == '__main__':
         preconds = []
         T1, M0 = [], []
 
-        dataLoader_test = kdata_T1T2QSM_CBIC(
+        dataLoader_test = kdata_T1QSM_CBIC_075(
             rootDir=rootName,
             contrast='MultiContrast', 
             split='test',
@@ -538,7 +534,7 @@ if __name__ == '__main__':
             iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             nslice = iField.shape[2]
             iField[..., 1] = - iField[..., 1]
-            iField = iField[:, :, :, :necho-2, :]
+            iField = iField[:, :, :, :necho-1, :]
             print('iField size is: ', iField.shape)
             if os.path.exists(rootName+'/results_QSM/iField.bin'):
                 os.remove(rootName+'/results_QSM/iField.bin')

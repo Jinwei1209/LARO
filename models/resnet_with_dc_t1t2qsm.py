@@ -96,6 +96,7 @@ class Resnet_with_DC2(nn.Module):
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
         flag_t2w_redesign=0,
+        flag_t1w_only=0,
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -127,6 +128,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_multi_level = flag_multi_level
         self.flag_bn = flag_bn
         self.flag_t2w_redesign = flag_t2w_redesign
+        self.flag_t1w_only = flag_t1w_only
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -164,7 +166,10 @@ class Resnet_with_DC2(nn.Module):
                 if self.flag_BCRNN == 1:
                     print('Use BCRNN')
                     self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn, flag_hidden)
-                    self.featureExtractor_t1t2 = CRNNcell(n_ch*2, nf, ks, flag_hidden=0)
+                    if self.flag_t1w_only == 0:
+                        self.featureExtractor_t1t2 = CRNNcell(n_ch*2, nf, ks, flag_hidden=0)
+                    else:
+                        self.featureExtractor_t1t2 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)
 
                 if self.flag_unet == 0:
                     self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
@@ -193,16 +198,28 @@ class Resnet_with_DC2(nn.Module):
                         slim=False,
                         convFT=flag_convFT
                     )
-                    self.denoiser_t1t2 = Unet(
-                        input_channels=nf,
-                        output_channels=n_ch*2,
-                        num_filters=[2**i for i in range(6, 10)],
-                        use_bn=flag_bn,
-                        use_deconv=1,
-                        skip_connect=False,
-                        slim=False,
-                        convFT=flag_convFT
-                    )
+                    if self.flag_t1w_only == 0:
+                        self.denoiser_t1t2 = Unet(
+                            input_channels=nf,
+                            output_channels=n_ch*2,
+                            num_filters=[2**i for i in range(6, 10)],
+                            use_bn=flag_bn,
+                            use_deconv=1,
+                            skip_connect=False,
+                            slim=False,
+                            convFT=flag_convFT
+                        )
+                    else:
+                        self.denoiser_t1t2 = Unet(
+                            input_channels=nf,
+                            output_channels=n_ch*1,
+                            num_filters=[2**i for i in range(6, 10)],
+                            use_bn=flag_bn,
+                            use_deconv=1,
+                            skip_connect=False,
+                            slim=False,
+                            convFT=flag_convFT
+                        )
             
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
         
