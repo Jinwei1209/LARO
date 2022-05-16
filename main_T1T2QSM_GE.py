@@ -32,7 +32,7 @@ if __name__ == '__main__':
     errL2_dc_sum = 0
     PSNRs_val = []
     Validation_loss = []
-    ncoil = 1
+    ncoil = 8
     nrow = 206
     ncol = 80
     lambda_dll2 = 1e-3

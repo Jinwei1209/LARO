@@ -22,7 +22,7 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
         dataset_id = 0,  # 0: new2 of T1w+mGRE dataset
         subject = 0,  # 0: junghun, 1: chao, 2: alexey
         prosp_flag = 0,
-        t2w_redesign_flag = 0,
+        padding_flag = 0,
         normalizations = [5, 15],  # normalization factor for mGRE and T1w data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
@@ -43,18 +43,20 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
             self.necho = 9
             self.necho_mGRE = 8
         self.prosp_flag = prosp_flag
-        self.t2w_redesign_flag = t2w_redesign_flag
-        if self.t2w_redesign_flag == 1:
-            self.id += '_t2w_redesign'
+        self.padding_flag = padding_flag
+        if self.padding_flag:
+            self.nslice = 480
+        else:
+            self.nslice = 320
         self.nrow = nrow
         self.ncol = ncol
         if contrast == 'MultiContrast':
             if split == 'train':
-                self.nsamples = 480*1
+                self.nsamples = self.nslice*1
             elif split == 'val':
-                self.nsamples = 480
+                self.nsamples = self.nslice
             elif split == 'test':
-                self.nsamples = 480
+                self.nsamples = self.nslice
                 if subject == 0:
                     self.subject = 'qihao'
                 elif subject == 1:
@@ -85,10 +87,10 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
         if self.split == 'train':
             subject = 0
             while (True):
-                if (idx - 480 < 0):
+                if (idx - self.nslice < 0):
                     break
                 else:
-                    idx -= 480
+                    idx -= self.nslice
                     subject += 1
             if subject == 0:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/jiahao/full_cc_slices_sense_echo'.format(self.id)
@@ -117,9 +119,12 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
             self.augmentation = self.augmentations[self.augIndex]
         self.batchIndex += 1
 
-        org1 = readcfl(dataFD_sense_echo + '_pad_1-4/fully_slice_{}'.format(idx))  # (row, col, echo)
-        org2 = readcfl(dataFD_sense_echo + '_pad_5-9/fully_slice_{}'.format(idx))  # (row, col, echo)
-        org = np.concatenate((org1, org2), axis=-1)  # concatenate data split into two folders
+        if self.padding_flag:
+            org1 = readcfl(dataFD_sense_echo + '_pad_1-4/fully_slice_{}'.format(idx))  # (row, col, echo)
+            org2 = readcfl(dataFD_sense_echo + '_pad_5-9/fully_slice_{}'.format(idx))  # (row, col, echo)
+            org = np.concatenate((org1, org2), axis=-1)  # concatenate data split into two folders
+        else:
+            org = readcfl(dataFD_sense_echo + '/fully_slice_{}'.format(idx))  # (row, col, echo)
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 
@@ -127,9 +132,12 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
             org = np.transpose(org, (0, 3, 1, 2)) # (2, echo, row, col)
 
         # Option 2: csms estimated from each echo
-        csm1 = readcfl(dataFD_sense_echo + '_pad_1-4/sensMaps_slice_{}'.format(idx))
-        csm2 = readcfl(dataFD_sense_echo + '_pad_5-9/sensMaps_slice_{}'.format(idx))
-        csm = np.concatenate((csm1, csm2), axis=-1)  # concatenate data split into two folders
+        if self.padding_flag:
+            csm1 = readcfl(dataFD_sense_echo + '_pad_1-4/sensMaps_slice_{}'.format(idx))
+            csm2 = readcfl(dataFD_sense_echo + '_pad_5-9/sensMaps_slice_{}'.format(idx))
+            csm = np.concatenate((csm1, csm2), axis=-1)  # concatenate data split into two folders
+        else:
+            csm = readcfl(dataFD_sense_echo + '/sensMaps_slice_{}'.format(idx))
         csm = np.transpose(csm, (2, 3, 0, 1))  # (coil, echo, row, col)
         for i in range(self.necho):
             csm[:, i, :, :] = csm[:, i, :, :] * np.exp(-1j * np.angle(csm[0:1, i, :, :]))
@@ -137,14 +145,20 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
         csm = c2r_kdata(csm) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # Fully sampled kspace data
-        kdata1 = readcfl(dataFD_sense_echo + '_pad_1-4/kdata_slice_{}'.format(idx))
-        kdata2 = readcfl(dataFD_sense_echo + '_pad_5-9/kdata_slice_{}'.format(idx))
-        kdata = np.concatenate((kdata1, kdata2), axis=-1)  # concatenate data split into two folders
+        if self.padding_flag:
+            kdata1 = readcfl(dataFD_sense_echo + '_pad_1-4/kdata_slice_{}'.format(idx))
+            kdata2 = readcfl(dataFD_sense_echo + '_pad_5-9/kdata_slice_{}'.format(idx))
+            kdata = np.concatenate((kdata1, kdata2), axis=-1)  # concatenate data split into two folders
+        else:
+            kdata = readcfl(dataFD_sense_echo + '/kdata_slice_{}'.format(idx))
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # brain tissue mask
-        brain_mask = np.real(readcfl(dataFD_sense_echo_mask + '_pad_1-4/mask_slice_{}'.format(idx)))  # (row, col)
+        if self.padding_flag:
+            brain_mask = np.real(readcfl(dataFD_sense_echo_mask + '_pad_1-4/mask_slice_{}'.format(idx)))  # (row, col)
+        else:
+            brain_mask = np.real(readcfl(dataFD_sense_echo_mask + '/mask_slice_{}'.format(idx)))  # (row, col)
         if self.echo_cat:
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
         else:

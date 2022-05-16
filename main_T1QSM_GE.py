@@ -32,7 +32,7 @@ if __name__ == '__main__':
     errL2_dc_sum = 0
     PSNRs_val = []
     Validation_loss = []
-    ncoil = 1
+    ncoil = 8
     nrow = 386
     ncol = 340
     lambda_dll2 = 1e-3
@@ -66,13 +66,14 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_id', type=int, default=0)  # 0: new2 of T1w+mGRE dataset
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
-    parser.add_argument('--t2w_redesign', type=int, default=0)  # flag to to redesign T2w under-sampling pattern to reduce blur
     parser.add_argument('--t1w_only', type=int, default=1)  # flag to reconstruct T1w+QSM
+    parser.add_argument('--padding', type=int, default=1)  # flag to pad k-space data
 
+    parser.add_argument('--t2w_redesign', type=int, default=0)  # flag to to redesign T2w under-sampling pattern to reduce blur
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
     parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 2: use instance normalization    
-    parser.add_argument('--necho', type=int, default=7)  # number of echos with kspace data (generalized echoes including T1w and T2w)
+    parser.add_argument('--necho', type=int, default=9)  # number of echos with kspace data (generalized echoes including T1w and T2w)
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
     parser.add_argument('--rank', type=int, default=0)  #  rank of low rank approximation loss (e.g. 10)
@@ -109,6 +110,13 @@ if __name__ == '__main__':
         niter = 2000
     else:
         niter = 100
+    
+    if opt['padding'] == 0:
+        nrow = 258
+        ncol = 170
+    else:
+        nrow = 386
+        ncol = 340
 
     # flag to use hidden state recurrent pass in BCRNN layer
     if opt['solver'] == 1 and opt['bcrnn'] == 0:
@@ -179,7 +187,7 @@ if __name__ == '__main__':
             contrast='MultiContrast', 
             split='train',
             dataset_id=opt['dataset_id'],
-            t2w_redesign_flag=opt['t2w_redesign'],
+            padding_flag=opt['padding'],
             normalizations=opt['normalizations'],
             echo_cat=opt['echo_cat']
         )
@@ -190,7 +198,7 @@ if __name__ == '__main__':
             contrast='MultiContrast', 
             split='val',
             dataset_id=opt['dataset_id'],
-            t2w_redesign_flag=opt['t2w_redesign'],
+            padding_flag=opt['padding'],
             normalizations=opt['normalizations'],
             echo_cat=opt['echo_cat']
         )
@@ -244,12 +252,12 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
+                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -390,10 +398,10 @@ if __name__ == '__main__':
 
             # save weights
             if PSNRs_val[-1] == max(PSNRs_val):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
     
     
     # for test
@@ -441,8 +449,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_t2redesign={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['t2w_redesign']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt' \
+                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
         netG_dc.eval()
@@ -461,7 +469,7 @@ if __name__ == '__main__':
             split='test',
             dataset_id=opt['dataset_id'],
             prosp_flag=opt['prosp'],
-            t2w_redesign_flag=opt['t2w_redesign'],
+            padding_flag=opt['padding'],
             subject=opt['test_sub'],
             normalizations=opt['normalizations'],
             echo_cat=opt['echo_cat']
@@ -516,8 +524,8 @@ if __name__ == '__main__':
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
-            save_mat(rootName+'/results/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
-                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', Recons_)
+            save_mat(rootName+'/results/T1w_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
+                .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', Recons_[..., necho-1])
 
             # # write T1 into .mat file
             # T1 = np.squeeze(np.concatenate(T1, axis=0))
@@ -542,24 +550,21 @@ if __name__ == '__main__':
             print('Successfully save iField.bin')
 
             # run MEDIN
-            if opt['dataset_id'] != 2:
+            if opt['padding'] == 1:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
                         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR  -rl 1.0 -la')
+                        + ' --CSF ' + ' -of QR  -rl 0.3')
             else:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                        + ' --parameter ' + rootName + '/results_QSM/parameter2.txt'
+                        + ' --parameter ' + rootName + '/results_QSM/parameter_ori.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
                         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR  -rl 1.0')
+                        + ' --CSF ' + ' -of QR  -rl 0.6')
             
             # read .bin files and save into .mat files
-            if opt['dataset_id'] != 2:
-                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_05.bin', 'f4')
-            else:
-                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_09.bin', 'f4')
+            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_08.bin', 'f4')
             QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
