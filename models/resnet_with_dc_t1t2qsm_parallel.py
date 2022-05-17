@@ -68,7 +68,8 @@ class Resnet_with_DC2(nn.Module):
         # random=0, # flag to multiply the input data with a random complex number
         flag_cp=0,
         flag_dataset=1,  # 1: 'CBIC', 0: 'MS'
-        flag_mc_fusion=1,  # flag to fuse 
+        flag_mc_fusion=1,  # flag to fuse
+        split_K=[2, 4, 6],  # split K unrolls into several chunks 
     ):
         super(Resnet_with_DC2, self).__init__()
         self.resnet_block = []
@@ -101,6 +102,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_cp = flag_cp
         self.flag_dataset = flag_dataset
         self.flag_mc_fusion = flag_mc_fusion
+        self.split_K = split_K
 
         if self.flag_solver <= 1:
             if self.flag_BCRNN == 0:
@@ -560,6 +562,33 @@ class Resnet_with_DC2(nn.Module):
                 Xs = []
                 uk = torch.zeros(n_batch, n_ch, width, height, n_seq+2).to('cuda')
                 for i in range(1, self.K+1):
+                    if i <= self.split_K[0]:
+                        x_start = x_start.to('cuda:0')
+                        x = x.to('cuda:0')
+                        uk = uk.to('cuda:0')
+                        # self.lambda_dll2 = self.lambda_dll2.to('cuda:0')
+                        self.bcrnn.to('cuda:0')
+                        self.featureExtractor_t1t2.to('cuda:0')
+                        self.denoiser.to('cuda:0')
+                        self.denoiser_t1t2.to('cuda:0')
+                    elif i <= self.split_K[1]:
+                        x_start = x_start.to('cuda:1')
+                        x = x.to('cuda:1')
+                        uk = uk.to('cuda:1')
+                        # self.lambda_dll2 = self.lambda_dll2.to('cuda:1')
+                        self.bcrnn.to('cuda:1')
+                        self.featureExtractor_t1t2.to('cuda:1')
+                        self.denoiser.to('cuda:1')
+                        self.denoiser_t1t2.to('cuda:1')
+                    elif i <= self.split_K[2]:
+                        x_start = x_start.to('cuda:2')
+                        x = x.to('cuda:2')
+                        uk = uk.to('cuda:2')
+                        # self.lambda_dll2 = self.lambda_dll2.to('cuda:2')
+                        self.bcrnn.to('cuda:2')
+                        self.featureExtractor_t1t2.to('cuda:2')
+                        self.denoiser.to('cuda:2')
+                        self.denoiser_t1t2.to('cuda:2')
                     # update auxiliary variable v
                     x_ = (x+uk/self.lambda_dll2).permute(4, 0, 1, 2, 3) # (n_seq+2, n, 2, nx, ny)
                     x_ = x_.contiguous()

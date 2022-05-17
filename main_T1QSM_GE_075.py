@@ -17,7 +17,8 @@ from utils.data import r2c, save_mat, save_nii, readcfl, memory_pre_alloc, torch
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
 from utils.operators import Back_forward_MS, backward_MS, forward_MS
-from models.resnet_with_dc_t1t2qsm import Resnet_with_DC2
+# from models.resnet_with_dc_t1t2qsm import Resnet_with_DC2
+from models.resnet_with_dc_t1t2qsm_parallel import Resnet_with_DC2
 from fits.fits import fit_R2_LM, arlo, fit_complex, fit_T1T2M0
 from utils.operators import low_rank_approx, HPphase
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
-    parser.add_argument('--dataset_id', type=int, default=0)  # 0: new2 of T1w+mGRE dataset
+    parser.add_argument('--dataset_id', type=int, default=0)  # 0: new2 of T1w+mGRE dataset (#1)
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
     parser.add_argument('--t1w_only', type=int, default=1)  # flag to reconstruct T1w+QSM
@@ -138,6 +139,8 @@ if __name__ == '__main__':
         # load fixed loupe optimized mask across echos
         masks = np.real(readcfl(rootName+'/masks{}/mask_{}_echo'.format(opt['dataset_id']+1, opt['samplingRatio'])))
         masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
+        if opt['padding'] == 1:
+            masks = np.pad(masks, ((0, 0), (64, 64), (85, 85), (0, 0)))
         masks = torch.tensor(masks, device=device).float()
         # to complex data
         masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (necho, nrow, ncol, 2)
@@ -252,11 +255,11 @@ if __name__ == '__main__':
             )
         netG_dc.to(device)
         if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=1_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
             netG_dc.load_state_dict(weights_dict)
         elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=1_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
                         .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
             netG_dc.load_state_dict(weights_dict)
 
