@@ -17,8 +17,8 @@ from utils.data import r2c, save_mat, save_nii, readcfl, memory_pre_alloc, torch
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
 from utils.operators import Back_forward_MS, backward_MS, forward_MS
-# from models.resnet_with_dc_t1t2qsm import Resnet_with_DC2
-from models.resnet_with_dc_t1t2qsm_parallel import Resnet_with_DC2
+from models.resnet_with_dc_t1t2qsm import Resnet_with_DC2
+# from models.resnet_with_dc_t1t2qsm_parallel import Resnet_with_DC2
 from fits.fits import fit_R2_LM, arlo, fit_complex, fit_T1T2M0
 from utils.operators import low_rank_approx, HPphase
 
@@ -131,7 +131,7 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data4/Jinwei/T1w_QSM_raw_CBIC_075'
+    rootName = '/data2/Jinwei/T1w_QSM_raw_CBIC_075'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
