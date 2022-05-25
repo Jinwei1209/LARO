@@ -165,9 +165,9 @@ class Resnet_with_DC2(nn.Module):
                     flag_slim = False
                 else:
                     unet_first_level = 5
-                    unet_last_level = 8
+                    unet_last_level = 9  # 8/9
                     flag_slim = False
-                    nf = 64
+                    nf = 63  # 64/63
                 self.n_ch = n_ch
                 self.nd = nd
                 self.nf = nf

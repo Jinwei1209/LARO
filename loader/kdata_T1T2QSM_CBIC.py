@@ -120,7 +120,7 @@ class kdata_T1T2QSM_CBIC(data.Dataset):
                 dataFD_sense_echo = self.rootDir + '/data_cfl{}/dom/full_cc_slices_sense_echo/'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'val':
-            dataFD_sense_echo = self.rootDir + '/data_cfl{}/jiahao/full_cc_slices_sense_echo/'.format(self.id)
+            dataFD_sense_echo = self.rootDir + '/data_cfl{}/qihao/full_cc_slices_sense_echo/'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'test':
             if not self.prosp_flag:

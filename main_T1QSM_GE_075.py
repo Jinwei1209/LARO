@@ -552,13 +552,15 @@ if __name__ == '__main__':
             iField.tofile(rootName+'/results_QSM/iField.bin')
             print('Successfully save iField.bin')
 
+            torch.cuda.empty_cache()
+
             # run MEDIN
             if opt['padding'] == 1:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
                         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR  -rl 0.3')
+                        + ' --CSF ' + ' -of QR  -rl 0.2222')
             else:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter_ori.txt'

@@ -110,7 +110,7 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
                 dataFD_sense_echo_mask = dataFD_sense_echo
             else:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/'.format(self.id) + self.subject + '/under_cc_slices_sense_echo'
-                dataFD_sense_echo_mask = self.rootDir + '/data_cfl/{}/'.format(self.id) + 'jiahao' + '/full_cc_slices_sense_echo'
+                dataFD_sense_echo_mask = self.rootDir + '/data_cfl/{}/'.format(self.id) + self.subject + '/under_cc_slices_sense_echo'
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
@@ -121,6 +121,7 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
 
         if self.padding_flag:
             org1 = readcfl(dataFD_sense_echo + '_pad_1-3/fully_slice_{}'.format(idx))  # (row, col, echo)
+            brain_mask_large = abs(org1[..., 0]) > 0
             org2 = readcfl(dataFD_sense_echo + '_pad_4-6/fully_slice_{}'.format(idx))  # (row, col, echo)
             org3 = readcfl(dataFD_sense_echo + '_pad_7-9/fully_slice_{}'.format(idx))  # (row, col, echo)
             org = np.concatenate((org1, org2, org3), axis=-1)  # concatenate data split into two folders
@@ -160,6 +161,7 @@ class kdata_T1QSM_CBIC_075(data.Dataset):
         # brain tissue mask
         if self.padding_flag:
             brain_mask = np.real(readcfl(dataFD_sense_echo_mask + '_pad_1-3/mask_slice_{}'.format(idx)))  # (row, col)
+            brain_mask = brain_mask_large
         else:
             brain_mask = np.real(readcfl(dataFD_sense_echo_mask + '/mask_slice_{}'.format(idx)))  # (row, col)
         if self.echo_cat:
