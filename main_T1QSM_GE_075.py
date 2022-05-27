@@ -560,7 +560,7 @@ if __name__ == '__main__':
                         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
                         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR  -rl 0.2222')
+                        + ' --CSF ' + ' -of QR  -rl 0.45')
             else:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter_ori.txt'

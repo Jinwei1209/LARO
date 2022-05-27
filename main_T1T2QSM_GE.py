@@ -126,7 +126,7 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data4/Jinwei/T1T2QSM'
+    rootName = '/data2/Jinwei/T1T2QSM'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 

@@ -176,9 +176,10 @@ class Resnet_with_DC2(nn.Module):
                     print('Use BCRNN')
                     self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn, flag_hidden)
                     if self.flag_t1w_only == 0:
-                        self.featureExtractor_t1t2 = CRNNcell(n_ch*2, nf, ks, flag_hidden=0)
+                        self.featureExtractor_t1 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)
+                        self.featureExtractor_t2 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)
                     else:
-                        self.featureExtractor_t1t2 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)
+                        self.featureExtractor_t1t2 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)  # name like "t1t2" because old code use "t1t2"
 
                 if self.flag_unet == 0:
                     self.conv1_x = nn.Conv2d(nf, nf, ks, padding = ks//2)
@@ -208,9 +209,29 @@ class Resnet_with_DC2(nn.Module):
                         convFT=flag_convFT
                     )
                     if self.flag_t1w_only == 0:
-                        self.denoiser_t1t2 = Unet(
+                        # self.denoiser_t1t2 = Unet(
+                        #     input_channels=nf,
+                        #     output_channels=n_ch*2,
+                        #     num_filters=[2**i for i in range(unet_first_level, unet_last_level)],
+                        #     use_bn=flag_bn,
+                        #     use_deconv=1,
+                        #     skip_connect=False,
+                        #     slim=flag_slim,
+                        #     convFT=flag_convFT
+                        # )
+                        self.denoiser_t1 = Unet(
                             input_channels=nf,
-                            output_channels=n_ch*2,
+                            output_channels=n_ch*1,
+                            num_filters=[2**i for i in range(unet_first_level, unet_last_level)],
+                            use_bn=flag_bn,
+                            use_deconv=1,
+                            skip_connect=False,
+                            slim=flag_slim,
+                            convFT=flag_convFT
+                        )
+                        self.denoiser_t2 = Unet(
+                            input_channels=nf,
+                            output_channels=n_ch*1,
                             num_filters=[2**i for i in range(unet_first_level, unet_last_level)],
                             use_bn=flag_bn,
                             use_deconv=1,
@@ -219,6 +240,16 @@ class Resnet_with_DC2(nn.Module):
                             convFT=flag_convFT
                         )
                     else:
+                        # self.denoiser_t1t2 = Unet(
+                        #     input_channels=nf,
+                        #     output_channels=n_ch*1,
+                        #     num_filters=[2**i for i in range(unet_first_level, unet_last_level)],
+                        #     use_bn=flag_bn,
+                        #     use_deconv=1,
+                        #     skip_connect=False,
+                        #     slim=flag_slim,
+                        #     convFT=flag_convFT
+                        # )
                         self.denoiser_t1t2 = Unet(
                             input_channels=nf,
                             output_channels=n_ch*1,
@@ -615,33 +646,70 @@ class Resnet_with_DC2(nn.Module):
                             net['t%d_x0'%i] = self.bcrnn(x_[:-1, ...], test)
                     # net['t%d_t1t2_0'%i] = self.featureExtractor_t1t2(torch.cat((x_[0, ...], x_[1, ...]), 1), None)
                     if self.flag_t1w_only == 0:
-                        net['t%d_t1t2_0'%i] = self.featureExtractor_t1t2(torch.cat((x_[-2, ...], x_[-1, ...]), 1), None)
+                        # net['t%d_t1t2_0'%i] = self.featureExtractor_t1t2(torch.cat((x_[-2, ...], x_[-1, ...]), 1), None)
+                        net['t%d_t1_0'%i] = self.featureExtractor_t1(x_[-2, ...], None)
+                        net['t%d_t2_0'%i] = self.featureExtractor_t2(x_[-1, ...], None)
                     else:
-                        net['t%d_t1t2_0'%i] = self.featureExtractor_t1t2(x_[-1, ...], None)
+                        # net['t%d_t1t2_0'%i] = self.featureExtractor_t1(x_[-1, ...], None)
+                        net['t%d_t1_0'%i] = self.featureExtractor_t1t2(x_[-1, ...], None)
 
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
-                    net['t%d_t1t2_0'%i] = net['t%d_t1t2_0'%i].view(-1, self.nf, width, height)
+                    # net['t%d_t1t2_0'%i] = net['t%d_t1t2_0'%i].view(-1, self.nf, width, height)
+                    net['t%d_t1_0'%i] = net['t%d_t1_0'%i].view(-1, self.nf, width, height)
+                    if self.flag_t1w_only == 0:
+                        net['t%d_t2_0'%i] = net['t%d_t2_0'%i].view(-1, self.nf, width, height)
 
                     if self.flag_unet == 1:
                         if x_.requires_grad and self.flag_cp:
                             if self.flag_mc_fusion == 1:
                                 # concatenate t1t2 features to all multi-echo recurrent features
-                                net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
+                                # net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
+                                if self.flag_t1w_only == 0:
+                                    net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                else:
+                                    net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1_0'%i])
                                 # concatenate 1st echo features to t1t2 features
-                                net['t%d_t1t2_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
+                                # net['t%d_t1t2_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
+                                if self.flag_t1w_only == 0:
+                                    net['t%d_t1_4'%i] = checkpoint(self.denoiser_t1, net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                    net['t%d_t2_4'%i] = checkpoint(self.denoiser_t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                else:
+                                    net['t%d_t1_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i])
                             else:
                                 net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i])
-                                net['t%d_t1t2_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_t1t2_0'%i])
+                                if self.flag_t1w_only == 0:
+                                    net['t%d_t1_4'%i] = checkpoint(self.denoiser_t1, net['t%d_t1_0'%i])
+                                    net['t%d_t2_4'%i] = checkpoint(self.denoiser_t2, net['t%d_t2_0'%i])
+                                else:
+                                    net['t%d_t1_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_t1_0'%i])
                         else:
                             if self.flag_mc_fusion == 1:
-                                net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
-                                net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
+                                # net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
+                                # net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
+                                if self.flag_t1w_only == 0:
+                                    net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                else:
+                                    net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1_0'%i])
+                                if self.flag_t1w_only == 0:
+                                    net['t%d_t1_4'%i] = self.denoiser_t1(net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                    net['t%d_t2_4'%i] = self.denoiser_t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                else:
+                                    net['t%d_t1_4'%i] = self.denoiser_t1t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i])
                             else:
+                                # net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
+                                # net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_t1t2_0'%i])
                                 net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
-                                net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_t1t2_0'%i])
+                                if self.flag_t1w_only == 0:
+                                    net['t%d_t1_4'%i] = self.denoiser_t1(net['t%d_t1_0'%i])
+                                    net['t%d_t2_4'%i] = self.denoiser_t2(net['t%d_t2_0'%i])
+                                else:
+                                    net['t%d_t1_4'%i] = self.denoiser_t1t2(net['t%d_t1_0'%i])
                         if self.flag_t1w_only == 0:
                             # concatenate denoised t1w and t2w
-                            net['t%d_t1t2_4'%i] = torch.cat((net['t%d_t1t2_4'%i][:, 0:2], net['t%d_t1t2_4'%i][:, 2:4]), 0)
+                            # net['t%d_t1t2_4'%i] = torch.cat((net['t%d_t1t2_4'%i][:, 0:2, ...], net['t%d_t1t2_4'%i][:, 2:4, ...]), 0)
+                            net['t%d_t1t2_4'%i] = torch.cat((net['t%d_t1_4'%i], net['t%d_t2_4'%i]), 0)
+                        else:
+                            net['t%d_t1t2_4'%i] = net['t%d_t1_4'%i]
                     
                     x_ = x_.view(-1, n_ch, width, height)
                     # net['t%d_out'%i] = x_ - torch.cat((net['t%d_t1t2_4'%i], net['t%d_x4'%i]), 0)
