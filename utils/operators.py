@@ -264,7 +264,13 @@ class Back_forward_multiEcho():
             coilComb = torch_channel_concate(coilComb, self.necho) # (batch, 2*echo, row, col)
         if use_dll2 == 1:
             if self.rank == 0:
-                coilComb = coilComb + self.lambda_dll2 * img
+                if self.lambda_dll2.size()[0] == 1:
+                    coilComb = coilComb + self.lambda_dll2 * img
+                elif self.lambda_dll2.size()[0] == 2:
+                    coilComb = coilComb + torch.cat((self.lambda_dll2[0] * img[:, :-2, ...], self.lambda_dll2[1] * img[:, -2:, ...]), 1)
+                elif self.lambda_dll2.size()[0] == 3:
+                    coilComb = coilComb + torch.cat((self.lambda_dll2[0] * img[:, :-4, ...], self.lambda_dll2[1] * img[:, -4:-2, ...], 
+                                                     self.lambda_dll2[2] * img[:, -2:, ...]), 1)
             elif self.rank > 0:
                 coilComb = coilComb + self.lambda_dll2 * img
 

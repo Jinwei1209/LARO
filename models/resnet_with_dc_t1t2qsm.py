@@ -97,6 +97,7 @@ class Resnet_with_DC2(nn.Module):
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
         flag_t2w_redesign=0,
         flag_t1w_only=0,
+        flag_diff_lambdas=0,  # flag to use different lambdas for each contrast
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -129,6 +130,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_bn = flag_bn
         self.flag_t2w_redesign = flag_t2w_redesign
         self.flag_t1w_only = flag_t1w_only
+        self.flag_diff_lambdas = flag_diff_lambdas
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -160,8 +162,8 @@ class Resnet_with_DC2(nn.Module):
                 nf = 64  # number of filters
                 ks = 3  # kernel size
                 if self.flag_t1w_only == 0:
-                    unet_first_level = 6
-                    unet_last_level = 10
+                    unet_first_level = 5  # 5/6 for 111/112 data
+                    unet_last_level = 8  # 9/10 for 111/112 data
                     flag_slim = False
                 else:
                     unet_first_level = 5
@@ -260,8 +262,10 @@ class Resnet_with_DC2(nn.Module):
                             slim=flag_slim,
                             convFT=flag_convFT
                         )
-            
-            self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+            if not self.flag_diff_lambdas:
+                self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=True)
+            else:
+                self.lambda_dll2 = nn.Parameter(torch.ones(3-self.flag_t1w_only)*lambda_dll2, requires_grad=True)
         
         elif self.flag_solver == 2:
             self.lambda_dll2 = nn.Parameter(torch.ones(1)*lambda_dll2, requires_grad=False)
@@ -630,7 +634,13 @@ class Resnet_with_DC2(nn.Module):
                 uk = torch.zeros(n_batch, n_ch, width, height, n_seq+2).to('cuda')
                 for i in range(1, self.K+1):
                     # update auxiliary variable v
-                    x_ = (x+uk/self.lambda_dll2).permute(4, 0, 1, 2, 3) # (n_seq+2, n, 2, nx, ny)
+                    if self.lambda_dll2.size()[0] == 1:
+                        x_ = (x+uk/self.lambda_dll2).permute(4, 0, 1, 2, 3) # (n_seq+2, n, 2, nx, ny)
+                    elif self.lambda_dll2.size()[0] == 2:
+                        x_ = (x+torch.cat((uk[..., :-1]/self.lambda_dll2[0], uk[..., -1:]/self.lambda_dll2[1]), -1)).permute(4, 0, 1, 2, 3) # (n_seq+2, n, 2, nx, ny)
+                    elif self.lambda_dll2.size()[0] == 3:
+                        x_ = (x+torch.cat((uk[..., :-2]/self.lambda_dll2[0], uk[..., -2:-1]/self.lambda_dll2[1],
+                                           uk[..., -1:]/self.lambda_dll2[2]), -1)).permute(4, 0, 1, 2, 3) # (n_seq+2, n, 2, nx, ny)
                     x_ = x_.contiguous()
                     if x_.requires_grad and self.flag_cp:
                         # net['t%d_x0'%i] = checkpoint(self.bcrnn, x_[2:, ...])
@@ -717,9 +727,21 @@ class Resnet_with_DC2(nn.Module):
  
                     # update x using CG block
                     uk_ = uk.permute(4, 0, 1, 2, 3).view(-1, n_ch, width, height)
-                    x0 = net['t%d_out'%i] - uk_/self.lambda_dll2  # (n_seq, 2, nx, ny)
+                    if self.lambda_dll2.size()[0] == 1:
+                        x0 = net['t%d_out'%i] - uk_/self.lambda_dll2  # (n_seq, 2, nx, ny)
+                    elif self.lambda_dll2.size()[0] == 2:
+                        x0 = net['t%d_out'%i] - torch.cat((uk_[:-1, ...]/self.lambda_dll2[0], uk_[-1:, ...]/self.lambda_dll2[1]), 0)  # (n_seq, 2, nx, ny)
+                    elif self.lambda_dll2.size()[0] == 3:
+                        x0 = net['t%d_out'%i] - torch.cat((uk_[:-2, ...]/self.lambda_dll2[0], uk_[-2:-1, ...]/self.lambda_dll2[1],
+                                                           uk_[-1:, ...]/self.lambda_dll2[2]), 0)  # (n_seq, 2, nx, ny)
                     x0_ = torch_channel_concate(x0[None, ...].permute(0, 2, 1, 3, 4), self.necho+self.necho_pred).contiguous()
-                    rhs = x_start + self.lambda_dll2*x0_[:, :self.necho*2, ...]
+                    if self.lambda_dll2.size()[0] == 1:
+                        rhs = x_start + self.lambda_dll2*x0_[:, :self.necho*2, ...]
+                    elif self.lambda_dll2.size()[0] == 2:
+                        rhs = x_start + torch.cat((self.lambda_dll2[0]*x0_[:, :-2, ...], self.lambda_dll2[1]*x0_[:, -2:, ...]), 1)
+                    elif self.lambda_dll2.size()[0] == 3:
+                        rhs = x_start + torch.cat((self.lambda_dll2[0]*x0_[:, :-4, ...], self.lambda_dll2[1]*x0_[:, -4:-2, ...],
+                                                   self.lambda_dll2[2]*x0_[:, -2:, ...]), 1)
                     dc_layer = DC_layer_multiEcho(A, rhs, echo_cat=self.echo_cat, necho=self.necho,
                                                   flag_precond=self.flag_precond, precond=self.precond)
                     x = dc_layer.CG_iter()
@@ -736,7 +758,15 @@ class Resnet_with_DC2(nn.Module):
                         # Xs.append(torch_channel_concate(net['t%d_out'%i][None, ...].permute(0, 2, 1, 3, 4), self.necho+self.necho_pred))
                     x = torch_channel_deconcate(x).permute(0, 2, 1, 3, 4).view(-1, n_ch, width, height) # (n_seq, 2, nx, ny)
                     # update dual variable uk
-                    uk = uk_ + self.lambda_dll2*(x - net['t%d_out'%i])
+                    if self.lambda_dll2.size()[0] == 1:
+                        uk = uk_ + self.lambda_dll2*(x - net['t%d_out'%i])
+                    elif self.lambda_dll2.size()[0] == 2:
+                        x = x - net['t%d_out'%i]
+                        uk = uk_ + torch.cat((self.lambda_dll2[0]*x[:-1, ...], self.lambda_dll2[1]*x[-1:, ...]), 0)
+                    elif self.lambda_dll2.size()[0] == 3:
+                        x = x - net['t%d_out'%i]
+                        uk = uk_ + torch.cat((self.lambda_dll2[0]*x[:-2, ...], self.lambda_dll2[1]*x[-2:-1, ...],
+                                              self.lambda_dll2[2]*x[-1:, ...]), 0)
 
                     x = x[None, ...].permute(0, 2, 3, 4, 1).contiguous()
                     uk = uk[None, ...].permute(0, 2, 3, 4, 1).contiguous()
