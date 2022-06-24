@@ -60,17 +60,18 @@ if __name__ == '__main__':
     parser.add_argument('--loupe', type=int, default=2)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
-    parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
-    parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
-                                                          # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--dataset_id', type=int, default=0)  # 0: new4 of T1w+mGRE+T2w dataset (#1)
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
+    parser.add_argument('--diff_lambdas', type=int, default=1)  # flag to use different lambdas for each contrast    
+
+
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
     parser.add_argument('--t1w_only', type=int, default=0)  # flag to reconstruct T1w+QSM
     parser.add_argument('--padding', type=int, default=1)  # flag to pad k-space data
-    parser.add_argument('--diff_lambdas', type=int, default=0)  # flag to different lambdas for each contrast
-
+    parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
+    parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
+                                                          # 2 for TV Quasi-newton, 3 for TV ADMM.
     parser.add_argument('--t2w_redesign', type=int, default=0)  # flag to to redesign T2w under-sampling pattern to reduce blur
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
@@ -91,10 +92,13 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalizations', type=list, default=[50, 125, 100])  # normalization factors of [mGRE, T1w, T2w] images
-                                                                                # default [50, 100, 125] 
-                                                       
+    parser.add_argument('--normalizations', type=list, default=[50, 100, 125])  # normalization factors of [mGRE, T1w, T2w] images
+                                                                                # default [50, 100, 125]
+                                                                                # dataset8 for diff_lambda=1: [30, 125, 100]
+                                                 
     opt = {**vars(parser.parse_args())}
+    # for i in range(3):
+    #     opt['normalizations'][i] = opt['normalizations'][i] / 2.1  # used in dataset7 trained on 3 subs
     K = opt['K']
     norm_last = opt['norm_last']
     flag_temporal_conv = opt['temporal_conv']
@@ -133,7 +137,7 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data2/Jinwei/T1T2QSM'
+    rootName = '/data3/Jinwei/T1T2QSM'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
@@ -568,7 +572,7 @@ if __name__ == '__main__':
                         + ' --parameter ' + rootName + '/results_QSM/parameter_1iso.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
                         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR  -rl 0.45')
+                        + ' --CSF ' + ' -of QR  -rl 0.35')
             else:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter_ori.txt'

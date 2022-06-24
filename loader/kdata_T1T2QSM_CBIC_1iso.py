@@ -59,11 +59,11 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
             elif split == 'test':
                 self.nsamples = self.nslice
                 if subject == 0:
-                    self.subject = 'qihao5'
+                    self.subject = 'qihao8'
                 elif subject == 1:
                     self.subject = 'hangwei1'
                 elif subject == 2:
-                    self.subject = 'dom5'
+                    self.subject = 'qihao7'
                 elif subject == 3:
                     self.subject = 'dom1'
                 print("Test on {}".format(self.subject))
@@ -94,16 +94,16 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
                     idx -= self.nslice
                     subject += 1
             if subject == 0:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao5/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao8/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 1:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/chao/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/jiahao7/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 2:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/hangwei/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/chao7/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 3:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/dom/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'val':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao5/full_cc_slices_sense_echo'.format(self.id)
+            dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao7/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'test':
             if not self.prosp_flag:
@@ -111,7 +111,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
                 dataFD_sense_echo_mask = dataFD_sense_echo
             else:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/'.format(self.id) + self.subject + '/under_cc_slices_sense_echo'
-                dataFD_sense_echo_mask = self.rootDir2 + '/data_cfl/{}/'.format(self.id) + 'jiahao' + '/full_cc_slices_sense_echo'
+                dataFD_sense_echo_mask = self.rootDir2 + '/data_cfl/{}/'.format(self.id) + 'qihao6' + '/full_cc_slices_sense_echo'
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
