@@ -60,15 +60,15 @@ if __name__ == '__main__':
     parser.add_argument('--loupe', type=int, default=2)  # -2: fixed learned mask across echos
                                                          # -1: manually designed mask, 0 fixed learned mask, 
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
-    parser.add_argument('--dataset_id', type=int, default=0)  # 0: new4 of T1w+mGRE+T2w dataset (#1)
+    parser.add_argument('--dataset_id', type=int, default=8)  # 0: new4 of T1w+mGRE+T2w dataset (#1)
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
-    parser.add_argument('--diff_lambdas', type=int, default=1)  # flag to use different lambdas for each contrast    
-
+    parser.add_argument('--diff_lambdas', type=int, default=0)  # flag to use different lambdas for each contrast    
+    parser.add_argument('--padding', type=int, default=1)  # flag to pad k-space data
+    parser.add_argument('--nml_factor', type=float, default=1.0)  # Scale the normalization factor for better reconstruction
 
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
     parser.add_argument('--t1w_only', type=int, default=0)  # flag to reconstruct T1w+QSM
-    parser.add_argument('--padding', type=int, default=1)  # flag to pad k-space data
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
@@ -92,13 +92,12 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalizations', type=list, default=[50, 100, 100])  # normalization factors of [mGRE, T1w, T2w] images
-                                                                                # default [50, 100, 125]
-                                                                                # dataset8 for diff_lambda=1: [30, 125, 100]
+    parser.add_argument('--normalizations', type=list, default=[50, 100, 75])  # normalization factors of [mGRE, T1w, T2w] images
+                                                                                # default [50, 100, 100] for dataset8, diff_lambdas=0
                                                  
     opt = {**vars(parser.parse_args())}
-    # for i in range(3):
-    #     opt['normalizations'][i] = opt['normalizations'][i] / 2.1  # used in dataset7 trained on 3 subs
+    for i in range(3):
+        opt['normalizations'][i] = opt['normalizations'][i] / opt['nml_factor']
     K = opt['K']
     norm_last = opt['norm_last']
     flag_temporal_conv = opt['temporal_conv']
@@ -121,6 +120,7 @@ if __name__ == '__main__':
     if opt['padding'] == 0:
         nrow = 206
         ncol = 160
+        opt['normalizations'] = [5, 20, 20]
     else:
         nrow = 350
         ncol = 290
@@ -539,7 +539,10 @@ if __name__ == '__main__':
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
-            mcs = np.concatenate((Recons_[..., 0:1], Recons_[..., necho-2:necho-1], Recons_[..., necho-1:necho]), axis=-1)
+            if opt['padding'] == 1:
+                mcs = np.concatenate((Recons_[..., 0:1], Recons_[..., necho-2:necho-1], Recons_[..., necho-1:necho]), axis=-1)
+            else:
+                mcs = Recons_
             save_mat(rootName+'/results/mc_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', mcs)
 

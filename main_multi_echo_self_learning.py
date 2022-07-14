@@ -15,7 +15,7 @@ from torch.utils import data
 from loader.kdata_multi_echo_GE import kdata_multi_echo_GE
 from loader.kdata_multi_echo_CBIC import kdata_multi_echo_CBIC
 from loader.kdata_multi_echo_CBIC_prosp import kdata_multi_echo_CBIC_prosp
-from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger, c2r_kdata
+from utils.data import r2c, cplx_mlpy, load_mat, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger, c2r_kdata
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
 from utils.operators import backward_multiEcho, forward_multiEcho
@@ -44,7 +44,6 @@ if __name__ == '__main__':
     # typein parameters
     parser = argparse.ArgumentParser(description='Multi_echo_GE')
     parser.add_argument('--gpu_id', type=str, default='0')
-    parser.add_argument('--ss_ratio', type=float, default=0.4)  # ratio of under-sampled kdata to define loss function
     parser.add_argument('--flag_train', type=int, default=1)  # 1 for training, 0 for testing
     parser.add_argument('--test_sub', type=int, default=0)  # 0: junghun, 1: chao, 2: alexey, 3: liangdong
     parser.add_argument('--K', type=int, default=10)  # number of unrolls
@@ -82,6 +81,10 @@ if __name__ == '__main__':
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
     parser.add_argument('--normalization', type=int, default=0)  # 0 for no normalization
+    parser.add_argument('--dataset_id', type=int, default=0)
+    parser.add_argument('--mc_fusion', type=int, default=0)
+    parser.add_argument('--t2w_redesign', type=int, default=0)
+
     opt = {**vars(parser.parse_args())}
     K = opt['K']
     norm_last = opt['norm_last']
@@ -100,6 +103,11 @@ if __name__ == '__main__':
         niter = 500
     else:
         niter = 100
+
+    # for self-supervised training sampling pattern generation
+    Ny = 206  
+    Nz = 80
+    mean_value2 = np.floor(190*1.6)*11/Ny/Nz
 
     # flag to use hidden state recurrent pass in BCRNN layer
     if opt['solver'] == 1 and opt['bcrnn'] == 0:
@@ -139,6 +147,9 @@ if __name__ == '__main__':
     # principle vectors
     U = readcfl(rootName+'/data_cfl/dictionary/U')
     U = torch.tensor(c2r_kdata(U)).to(device)
+
+    # Pmask2 for generating half of the under-sampled mask during self-supervised training
+    Pmask2 = load_mat(rootName+'/data_cfl/Pmask2.mat', 'Pmask2')
 
     # training
     if opt['flag_train'] == 1:
@@ -250,16 +261,31 @@ if __name__ == '__main__':
 
                 # training use under-sampled kdata only
                 kdatas = kdatas.to(device)
-                kdatas = kdatas * masks
+                kdatas = cplx_mlpy(kdatas, masks)
 
-                # generate mask for DC and loss (uniform sampling)
-                samples = torch.rand(masks.shape).to(device)
-                masks_loss = (torch.ceil(opt['ss_ratio'] - samples)).to(device) * masks
-                masks_dc = (torch.ceil(samples - opt['ss_ratio'])).to(device) * masks
+                # generate masks_dc for DC from Pmask2
+                u = np.random.rand(Ny, Nz, necho)
+                masks_dc = Pmask2 > u
+                masks_dc = masks_dc.transpose(2, 0, 1)  # (necho, nrow, ncol)
+                masks_dc = masks_dc[..., np.newaxis] # (necho, nrow, ncol, 1)
+                masks_dc = torch.tensor(masks_dc, device=device).float()
+                # to complex data
+                masks_dc = torch.cat((masks_dc, torch.zeros(masks_dc.shape).to(device)),-1) # (necho, nrow, ncol, 2)
+                # add coil dimension
+                masks_dc = masks_dc[None, ...] # (1, necho, nrow, ncol, 2)
+                masks_dc = torch.cat(ncoil*[masks_dc]) # (ncoil, necho, nrow, ncol, 2)
+                # add batch dimension
+                masks_dc = masks_dc[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+                # multiply masks
+                masks_dc = cplx_mlpy(masks, masks_dc)
+
+                # kdata mask in loss uses all under-sampled data
+                masks_loss = masks
+                # print("Under-sampling ratio of masks_dc (input) for all echoes: {}".format(torch.mean(masks_dc[..., 0], dim=(0, 1, 3, 4))))
 
                 # kdata for DC and loss
-                kdatas_loss = kdatas * masks_loss
-                kdatas_dc = kdatas * masks_dc
+                kdatas_loss = cplx_mlpy(kdatas, masks_loss)
+                kdatas_dc = cplx_mlpy(kdatas, masks_dc)
 
                 if gen_iterations%display_iters == 0:
 
@@ -368,10 +394,10 @@ if __name__ == '__main__':
 
             # save weights
             if Validation_psnr[-1] == max(Validation_psnr):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_SS={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['ss_ratio']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_SS={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['ss_ratio']))  
+                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_ss.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_ss_last.pt' \
+            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))  
     
     
     # for test
@@ -417,8 +443,8 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_SS={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['ss_ratio']))
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_ss.pt' \
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)

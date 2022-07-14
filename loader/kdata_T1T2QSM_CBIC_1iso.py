@@ -35,11 +35,15 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
         self.necho = necho
         self.necho_mGRE = necho_mGRE
         self.normalizations = normalizations
+        self.scales = [3, 1.5, 3, 0.75]  # order: [chao8, hangwei8, dom8, jiahao8]
         self.echo_cat = echo_cat
         self.split = split
         self.dataset_id = dataset_id
         # if self.dataset_id == 0:
-        self.id = 'new4'
+        if padding_flag == 1:
+            self.id = 'new4'
+        else:
+            self.id = 'new4_no_padding'
         self.echo_stride = 1
         self.necho = 11
         self.necho_mGRE = 9
@@ -53,7 +57,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiContrast':
             if split == 'train':
-                self.nsamples = self.nslice * 1
+                self.nsamples = self.nslice * 4
             elif split == 'val':
                 self.nsamples = self.nslice
             elif split == 'test':
@@ -61,11 +65,11 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
                 if subject == 0:
                     self.subject = 'qihao8'
                 elif subject == 1:
-                    self.subject = 'hangwei1'
+                    self.subject = 'jiahao8'
                 elif subject == 2:
-                    self.subject = 'qihao7'
+                    self.subject = 'dom8'
                 elif subject == 3:
-                    self.subject = 'dom1'
+                    self.subject = 'jiahao8'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -94,16 +98,16 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
                     idx -= self.nslice
                     subject += 1
             if subject == 0:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao8/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/chao8/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 1:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/jiahao7/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/hangwei8/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 2:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/chao7/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/dom8/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 3:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/dom/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/jiahao8/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'val':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao7/full_cc_slices_sense_echo'.format(self.id)
+            dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao8/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
         elif self.split == 'test':
             if not self.prosp_flag:
@@ -122,7 +126,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
 
         if self.padding_flag:
             org1 = readcfl(dataFD_sense_echo + '_pad_1-4/fully_slice_{}'.format(idx))  # (row, col, echo)
-            # brain_mask_large = abs(org1[..., 0]) > 0
+            brain_mask_large = abs(org1[..., 0]) > 0
             org2 = readcfl(dataFD_sense_echo + '_pad_5-8/fully_slice_{}'.format(idx))  # (row, col, echo)
             org3 = readcfl(dataFD_sense_echo + '_pad_9-11/fully_slice_{}'.format(idx))  # (row, col, echo)
             org = np.concatenate((org1, org2, org3), axis=-1)  # concatenate data split into two folders
@@ -162,7 +166,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
         # brain tissue mask
         if self.padding_flag:
             brain_mask = np.real(readcfl(dataFD_sense_echo_mask + '_pad_1-4/mask_slice_{}'.format(idx)))  # (row, col)
-            # brain_mask = brain_mask_large
+            brain_mask = brain_mask_large
         else:
             brain_mask = np.real(readcfl(dataFD_sense_echo_mask + '/mask_slice_{}'.format(idx)))  # (row, col)
         if self.echo_cat:
@@ -172,13 +176,13 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
             brain_mask = np.repeat(brain_mask[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
 
         # normalize
-        kdata[:, :self.necho_mGRE, ...] = kdata[:, :self.necho_mGRE, ...] * self.normalizations[0]
-        kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] = kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] * self.normalizations[1]
-        kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] = kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] * self.normalizations[2]
+        kdata[:, :self.necho_mGRE, ...] = kdata[:, :self.necho_mGRE, ...] * self.normalizations[0] * self.scales[subject]
+        kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] = kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] * self.normalizations[1] * self.scales[subject]
+        kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] = kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] * self.normalizations[2] * self.scales[subject]
 
-        org[:self.necho_mGRE*2, ...] = org[:self.necho_mGRE*2, ...] * self.normalizations[0]
-        org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] = org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] * self.normalizations[1]
-        org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] = org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] * self.normalizations[2]
+        org[:self.necho_mGRE*2, ...] = org[:self.necho_mGRE*2, ...] * self.normalizations[0] * self.scales[subject]
+        org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] = org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] * self.normalizations[1] * self.scales[subject]
+        org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] = org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] * self.normalizations[2] * self.scales[subject]
 
         return kdata, org, csm, brain_mask
 

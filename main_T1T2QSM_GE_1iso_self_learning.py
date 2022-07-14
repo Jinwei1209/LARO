@@ -13,10 +13,10 @@ from torch.optim.lr_scheduler import MultiStepLR
 from IPython.display import clear_output
 from torch.utils import data
 from loader.kdata_T1T2QSM_CBIC_1iso import kdata_T1T2QSM_CBIC_1iso
-from utils.data import r2c, save_mat, save_nii, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
+from utils.data import r2c, cplx_mlpy, load_mat, save_mat, save_nii, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
 from utils.test import Metrices
-from utils.operators import Back_forward_MS, backward_MS, forward_MS
+from utils.operators import Back_forward_MS, backward_MS, forward_MS, forward_multiEcho
 from models.resnet_with_dc_t1t2qsm import Resnet_with_DC2
 # from models.resnet_with_dc_t1t2qsm_parallel import Resnet_with_DC2
 from fits.fits import fit_R2_LM, arlo, fit_complex, fit_T1T2M0
@@ -63,12 +63,11 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_id', type=int, default=0)  # 0: new4 of T1w+mGRE+T2w dataset (#1)
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--diff_lambdas', type=int, default=1)  # flag to use different lambdas for each contrast    
-
+    parser.add_argument('--padding', type=int, default=1)  # flag to pad k-space data
 
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
     parser.add_argument('--t1w_only', type=int, default=0)  # flag to reconstruct T1w+QSM
-    parser.add_argument('--padding', type=int, default=1)  # flag to pad k-space data
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
@@ -83,7 +82,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda1', type=float, default=0.0)  # weighting of r2s reconstruction loss
     parser.add_argument('--lambda2', type=float, default=0.0)  # weighting of p1 reconstruction loss
     parser.add_argument('--lambda_maskbce', type=float, default=0.0)  # weighting of Maximal cross entropy in masks
-    parser.add_argument('--loss', type=int, default=0)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
+    parser.add_argument('--loss', type=int, default=2)  # 0: SSIM loss, 1: L1 loss, 2: L2 loss
     parser.add_argument('--weights_dir', type=str, default='weights_ablation')
     parser.add_argument('--echo_cat', type=int, default=1)  # flag to concatenate echo dimension into channel
     parser.add_argument('--norm_last', type=int, default=0)  # 0: norm+relu, 1: relu+norm
@@ -121,9 +120,18 @@ if __name__ == '__main__':
     if opt['padding'] == 0:
         nrow = 206
         ncol = 160
+        opt['normalizations'] = [5, 20, 20]
+        # for self-supervised training sampling pattern generation
+        Ny = 206  
+        Nz = 160
+        mean_value2 = np.floor(96*1.8)*43/Ny/Nz
     else:
         nrow = 350
         ncol = 290
+        # for self-supervised training sampling pattern generation
+        Ny = 206  
+        Nz = 160
+        mean_value2 = np.floor(96*1.8)*43/Ny/Nz
 
     # flag to use hidden state recurrent pass in BCRNN layer
     if opt['solver'] == 1 and opt['bcrnn'] == 0:
@@ -137,7 +145,7 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    rootName = '/data3/Jinwei/T1T2QSM'
+    rootName = '/data2/Jinwei/T1T2QSM'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
@@ -178,6 +186,9 @@ if __name__ == '__main__':
     flip[:, :, ::2, ...] = - flip[:, :, ::2, ...]
     # add batch dimension
     flip = flip[None, ...] # (1, necho, nrow, ncol, 2)
+
+    # Pmask2 for generating half of the under-sampled mask during self-supervised training
+    Pmask2 = load_mat(rootName+'/data_cfl/new4/Pmask2.mat', 'Pmask2')
 
     # training
     if opt['flag_train'] == 1:
@@ -261,12 +272,8 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         netG_dc.to(device)
-        if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K=1_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
-                        .format(opt['bcrnn'], opt['diff_lambdas'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
-            netG_dc.load_state_dict(weights_dict)
-        elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K=1_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_last.pt'
+        if (opt['loupe'] == -2) and (opt['K'] > 1):
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K=1_loupe=-2_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_ss_last.pt'
                         .format(opt['bcrnn'], opt['diff_lambdas'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
             netG_dc.load_state_dict(weights_dict)
 
@@ -295,6 +302,36 @@ if __name__ == '__main__':
 
                 if torch.sum(brain_masks) == 0:
                     continue
+
+                # training use under-sampled kdata only
+                kdatas = kdatas.to(device)
+                kdatas = cplx_mlpy(kdatas, masks)
+
+                # generate masks_dc for DC from Pmask2
+                u = np.random.rand(Ny, Nz, necho)
+                masks_dc = Pmask2 > u
+                masks_dc = masks_dc.transpose(2, 0, 1)  # (necho, nrow, ncol)
+                masks_dc = masks_dc[..., np.newaxis] # (necho, nrow, ncol, 1)
+                if opt['padding'] == 1:
+                    masks_dc = np.pad(masks_dc, ((0, 0), (72, 72), (65, 65), (0, 0)))
+                masks_dc = torch.tensor(masks_dc, device=device).float()
+                # to complex data
+                masks_dc = torch.cat((masks_dc, torch.zeros(masks_dc.shape).to(device)),-1) # (necho, nrow, ncol, 2)
+                # add coil dimension
+                masks_dc = masks_dc[None, ...] # (1, necho, nrow, ncol, 2)
+                masks_dc = torch.cat(ncoil*[masks_dc]) # (ncoil, necho, nrow, ncol, 2)
+                # add batch dimension
+                masks_dc = masks_dc[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+                # multiply masks
+                masks_dc = cplx_mlpy(masks, masks_dc)
+
+                # kdata mask in loss uses all under-sampled data
+                masks_loss = masks
+                # print("Under-sampling ratio of masks_dc (input) for all echoes: {}".format(torch.mean(masks_dc[..., 0], dim=(0, 1, 3, 4))))
+
+                # kdata for DC and loss
+                kdatas_loss = cplx_mlpy(kdatas, masks_loss)
+                kdatas_dc = cplx_mlpy(kdatas, masks_dc)
 
                 if gen_iterations%display_iters == 0:
 
@@ -338,25 +375,15 @@ if __name__ == '__main__':
 
                 optimizerG_dc.zero_grad()
                 if opt['temporal_pred'] == 1:
-                    Xs = netG_dc(kdatas, csms, None, masks, flip, x_input=None)
+                    Xs = netG_dc(kdatas_dc, csms, None, masks_dc, flip, x_input=None)
                 else:
-                    Xs = netG_dc(kdatas, csms, None, masks, flip)
+                    Xs = netG_dc(kdatas_dc, csms, None, masks_dc, flip)
 
-                if lambda1 == 1:
-                    # compute paremeters label
-                    tmp = torch_channel_deconcate(targets)
-                    mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
-                    [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
-                    # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-                    [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
                 lossl2_sum = 0
-                for i in range(len(Xs)):
-                    if opt['loss'] == 0:
-                        # ssim loss
-                        lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
-                    elif opt['loss'] > 0:
-                        # L1 or L2 loss
-                        lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
+                for i in range(necho):
+                    # L1 or L2 loss
+                    lossl2_sum += 1e5 * loss(forward_multiEcho(Xs[-1], csms, masks_loss, flip)[:, :, i, ...], kdatas_loss[:, :, i, ...])
+                                #   / torch.norm(kdatas_loss[:, :, i, ...])**2
 
                 lossl2_sum.backward()
                 optimizerG_dc.step()
@@ -414,7 +441,7 @@ if __name__ == '__main__':
             # if PSNRs_val[-1] == max(PSNRs_val):
             #     torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt' \
             #     .format(opt['bcrnn'], opt['diff_lambdas'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_last.pt' \
+            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_ss_last.pt' \
             .format(opt['bcrnn'], opt['diff_lambdas'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
     
     
@@ -464,7 +491,7 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_last.pt' \
+        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K={}_loupe={}_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_ss_last.pt' \
                     .format(opt['bcrnn'], opt['diff_lambdas'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
         netG_dc.load_state_dict(weights_dict)
         netG_dc.to(device)
@@ -539,7 +566,10 @@ if __name__ == '__main__':
             # write into .mat file
             Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
-            mcs = np.concatenate((Recons_[..., 0:1], Recons_[..., necho-2:necho-1], Recons_[..., necho-1:necho]), axis=-1)
+            if opt['padding'] == 1:
+                mcs = np.concatenate((Recons_[..., 0:1], Recons_[..., necho-2:necho-1], Recons_[..., necho-1:necho]), axis=-1)
+            else:
+                mcs = Recons_
             save_mat(rootName+'/results/mc_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', mcs)
 
