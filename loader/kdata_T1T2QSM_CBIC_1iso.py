@@ -65,7 +65,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
                 if subject == 0:
                     self.subject = 'qihao8'
                 elif subject == 1:
-                    self.subject = 'jiahao8'
+                    self.subject = 'qihao10_2'
                 elif subject == 2:
                     self.subject = 'dom8'
                 elif subject == 3:
@@ -106,9 +106,11 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
             elif subject == 3:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/jiahao8/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
+            scale = self.scales[subject]
         elif self.split == 'val':
             dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao8/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
+            scale = 1
         elif self.split == 'test':
             if not self.prosp_flag:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/'.format(self.id) + self.subject + '/full_cc_slices_sense_echo'
@@ -116,6 +118,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
             else:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/'.format(self.id) + self.subject + '/under_cc_slices_sense_echo'
                 dataFD_sense_echo_mask = self.rootDir2 + '/data_cfl/{}/'.format(self.id) + 'qihao6' + '/full_cc_slices_sense_echo'
+            scale = 1
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
@@ -176,13 +179,13 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
             brain_mask = np.repeat(brain_mask[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
 
         # normalize
-        kdata[:, :self.necho_mGRE, ...] = kdata[:, :self.necho_mGRE, ...] * self.normalizations[0] * self.scales[subject]
-        kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] = kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] * self.normalizations[1] * self.scales[subject]
-        kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] = kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] * self.normalizations[2] * self.scales[subject]
+        kdata[:, :self.necho_mGRE, ...] = kdata[:, :self.necho_mGRE, ...] * self.normalizations[0] * scale
+        kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] = kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] * self.normalizations[1] * scale
+        kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] = kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] * self.normalizations[2] * scale
 
-        org[:self.necho_mGRE*2, ...] = org[:self.necho_mGRE*2, ...] * self.normalizations[0] * self.scales[subject]
-        org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] = org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] * self.normalizations[1] * self.scales[subject]
-        org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] = org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] * self.normalizations[2] * self.scales[subject]
+        org[:self.necho_mGRE*2, ...] = org[:self.necho_mGRE*2, ...] * self.normalizations[0] * scale
+        org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] = org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] * self.normalizations[1] * scale
+        org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] = org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] * self.normalizations[2] * scale
 
         return kdata, org, csm, brain_mask
 
