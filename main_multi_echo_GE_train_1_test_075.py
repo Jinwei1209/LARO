@@ -60,11 +60,11 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  #  0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.14)  # Under-sampling ratio
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--padding', type=int, default=0)  # flag to use kspace padded mGRE data
-    parser.add_argument('--normalization', type=int, default=100)  # 0 for no normalization
+    parser.add_argument('--normalization', type=float, default=1.8)  # 2.5/1.8 for FA=15/25
 
     parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
@@ -208,272 +208,6 @@ if __name__ == '__main__':
     U = readcfl(rootName+'/data_cfl/dictionary/U')
     U = torch.tensor(c2r_kdata(U)).to(device)
 
-    # training
-    if opt['flag_train'] == 1:
-        # memory_pre_alloc(opt['gpu_id'])
-        if opt['loss'] == 0:
-            loss = SSIM()
-        elif opt['loss'] == 1:
-            loss = lossL1()
-        elif opt['loss'] == 2:
-            loss = lossL2()
-
-        loss_cem = CrossEntropyMask(radius=30)  # cross entropy loss for mask
-
-        dataLoader = kdata_multi_echo_CBIC_075(
-            rootDir=rootName,
-            contrast='MultiEcho', 
-            split='train',
-            normalization=opt['normalization'],
-            echo_cat=opt['echo_cat']
-        )
-        trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
-
-        dataLoader_val = kdata_multi_echo_CBIC_075(  
-            rootDir=rootName,
-            contrast='MultiEcho', 
-            split='val',
-            normalization=opt['normalization'],
-            echo_cat=opt['echo_cat']
-        )
-        valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
-
-        if opt['echo_cat'] == 1:
-            netG_dc = Resnet_with_DC2(
-                input_channels=2*necho,
-                filter_channels=32*necho,
-                necho=necho,
-                necho_pred=necho_pred,
-                lambda_dll2=lambda_dll2,
-                nrow=nrow,
-                ncol=ncol,
-                ncoil=ncoil,
-                K=K,
-                U=U,
-                rank=opt['rank'],
-                echo_cat=1,
-                flag_2D=opt['flag_2D'],
-                flag_solver=opt['solver'],
-                flag_precond=opt['precond'],
-                flag_loupe=opt['loupe'],
-                flag_temporal_pred=0,
-                flag_convFT=opt['convft'],
-                flag_padding=opt['padding'],
-                flag_multi_level=opt['multilevel'],
-                flag_bn=opt['bn'],
-                samplingRatio=opt['samplingRatio'],
-                norm_last=norm_last,
-                flag_temporal_conv=flag_temporal_conv,
-                flag_BCRNN=flag_bcrnn,
-                flag_hidden=flag_hidden,
-                flag_unet=opt['flag_unet'],
-                flag_att=opt['att'],
-                flag_cp=1
-            )
-        else:
-            netG_dc = Resnet_with_DC2(
-                input_channels=2,
-                filter_channels=32,
-                lambda_dll2=lambda_dll2,
-                ncoil=ncoil,
-                K=K,
-                echo_cat=0,
-                flag_solver=opt['solver'],
-                flag_precond=opt['precond'],
-                flag_loupe=opt['loupe'],
-                samplingRatio=opt['samplingRatio']
-            )
-        netG_dc.to(device)
-        if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=1_ratio={}_solver={}_unet={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_unet']))
-            weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
-            netG_dc.load_state_dict(weights_dict)
-        elif opt['loupe'] == -2 or opt['loupe'] == -3:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=2_loupe=2_ratio={}_solver={}_unet={}_last.pt'
-                        .format(opt['bcrnn'], 0, opt['samplingRatio'], opt['solver'], opt['flag_unet']))
-            weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
-            netG_dc.load_state_dict(weights_dict)
-
-        # optimizer
-        optimizerG_dc = torch.optim.Adam(netG_dc.parameters(), lr=lrG_dc, betas=(0.9, 0.999))
-        ms = [0.2, 0.4, 0.6, 0.8]
-        ms = [np.floor(m * niter).astype(int) for m in ms]
-        scheduler = MultiStepLR(optimizerG_dc, milestones = ms, gamma = 0.2)
-
-        # logger
-        logger = Logger(rootName+'/'+opt['weights_dir'], opt)
-
-        while epoch < niter:
-
-            epoch += 1
-
-            # training phase
-            netG_dc.train()
-            metrices_train = Metrices()
-            for idx, (kdatas, targets, csms, brain_masks) in enumerate(trainLoader):
-                kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
-                csms = csms[:, :, :necho, ...]  # temporal undersampling
-                if opt['temporal_pred'] == 0:
-                    targets = targets[:, :2*necho, ...]  # temporal undersampling
-                    brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
-
-                if torch.sum(brain_masks) == 0:
-                    continue
-
-                if gen_iterations%display_iters == 0:
-
-                    print('epochs: [%d/%d], batchs: [%d/%d], time: %ds'
-                    % (epoch, niter, idx, dataLoader.nsamples//batch_size, time.time()-t0))
-
-                    print('bcrnn: {}, loss: {}, K: {}, loupe: {}, solver: {}, rank: {}'.format( \
-                            opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['solver'], opt['rank']))
-                    
-                    if opt['loupe'] > 0:
-                        print('Sampling ratio cal: %f, Sampling ratio setup: %f, Pmask: %f' 
-                        % (torch.mean(netG_dc.Mask), netG_dc.samplingRatio, torch.mean(netG_dc.Pmask)))
-                    else:
-                        print('Sampling ratio cal: %f' % (torch.mean(netG_dc.Mask)))
-
-                    if opt['solver'] < 3:
-                        print('netG_dc --- loss_L2_dc: %f, lambda_dll2: %f, lambda_lowrank: %f'
-                            % (errL2_dc_sum/display_iters, netG_dc.lambda_dll2, netG_dc.lambda_lowrank))
-                    else:
-                        print('netG_dc --- loss_L2_dc: %f, lambda_tv: %f, rho_penalty: %f'
-                            % (errL2_dc_sum/display_iters, netG_dc.lambda_tv, netG_dc.rho_penalty))
-
-                    print('Average PSNR in Training dataset is %.2f' 
-                    % (np.mean(np.asarray(metrices_train.PSNRs[-1-display_iters*batch_size:]))))
-                    if epoch > 1:
-                        print('Average PSNR in Validation dataset is %.2f' 
-                        % (np.mean(np.asarray(metrices_val.PSNRs))))
-                    
-                    print(' ')
-
-                    errL2_dc_sum = 0
-
-                kdatas = kdatas.to(device)
-                targets = targets.to(device)
-                csms = csms.to(device)
-                brain_masks = brain_masks.to(device)
-
-                optimizerG_dc.zero_grad()
-                if opt['temporal_pred'] == 1:
-                    Xs = netG_dc(kdatas, csms, None, masks, flip, x_input=None)
-                else:
-                    Xs = netG_dc(kdatas, csms, None, masks, flip)
-
-                if lambda1 == 1:
-                    # compute paremeters label
-                    tmp = torch_channel_deconcate(targets)
-                    mags_target = torch.sqrt(tmp[:, 0, ...]**2 + tmp[:, 1, ...]**2).permute(0, 2, 3, 1)
-                    [r2s_targets, water_target] = arlo(TEs, mags_target, flag_water=1)
-                    # [r2s_targets, water_target] = fit_R2_LM(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-                    [p1_targets, p0_target] = fit_complex(tmp.permute(0, 3, 4, 1, 2), max_iter=1)
-                lossl2_sum = 0
-                for i in range(len(Xs)):
-                    if opt['loss'] == 0:
-                        if lambda1 == 0:
-                            # ssim loss
-                            lossl2_sum -= loss(Xs[i]*brain_masks, targets*brain_masks)
-                        # # low rank loss
-                        # lossl2_sum -= lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
-                        elif lambda1 == 1:
-                            # compute parameters
-                            Xsi = torch_channel_deconcate(Xs[i])
-                            mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
-                            [r2s, water] = arlo(TEs, mags, flag_water=1)
-                            # [r2s, water] = fit_R2_LM(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                            [p1, p0] = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=1)
-                            # parameter estimation loss
-                            lossl2_sum -= lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                            # lossl2_sum -= lambda1 * loss(water[:, None, ...]*brain_masks_erode[:, 0:1, ...], water_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                            lossl2_sum -= lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                            # lossl2_sum -= lambda2 * loss(p0[:, None, ...]*brain_masks_erode[:, 0:1, ...], p0_target[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                    elif opt['loss'] > 0:
-                        # L1 or L2 loss
-                        lossl2_sum += loss(Xs[i]*brain_masks, targets*brain_masks)
-                        # lossl2_sum += lambda0 * loss(low_rank_approx(Xs[i], kdatas, csm_lowres, k=rank)*brain_masks, targets*brain_masks)
-                        # # compute r2s and field
-                        # Xsi = torch_channel_deconcate(Xs[i])
-                        # mags = torch.sqrt(Xsi[:, 0, ...]**2 + Xsi[:, 1, ...]**2).permute(0, 2, 3, 1)
-                        # r2s = arlo(TEs, mags)
-                        # p1 = fit_complex(Xsi.permute(0, 3, 4, 1, 2), max_iter=0)
-                        # # parameter estimation loss
-                        # lossl2_sum += lambda1 * loss(r2s[:, None, ...]*brain_masks_erode[:, 0:1, ...], r2s_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                        # lossl2_sum += lambda2 * loss(p1[:, None, ...]*brain_masks_erode[:, 0:1, ...], p1_targets[:, None, ...]*brain_masks_erode[:, 0:1, ...])
-                
-                # # maximal cross entropy mask loss
-                # lossl2_sum -= lambda_maskbce * loss_cem(netG_dc.Pmask_rescaled)
-                lossl2_sum.backward()
-                optimizerG_dc.step()
-
-                errL2_dc_sum += lossl2_sum.item()
-
-                # calculating metrices
-                metrices_train.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
-                gen_iterations += 1
-
-            if opt['loupe'] < 1:
-                scheduler.step(epoch)
-            
-            # validation phase
-            netG_dc.eval()
-            metrices_val = Metrices()
-            loss_total_list = []
-            with torch.no_grad():  # to solve memory exploration issue
-                for idx, (kdatas, targets, csms, brain_masks) in enumerate(valLoader):
-                    kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
-                    csms = csms[:, :, :necho, ...]  # temporal undersampling
-                    if opt['temporal_pred'] == 0:
-                        targets = targets[:, :2*necho, ...]  # temporal undersampling
-                        brain_masks = brain_masks[:, :2*necho, ...]  # temporal undersampling
-
-                    if torch.sum(brain_masks) == 0:
-                        continue
-
-                    kdatas = kdatas.to(device)
-                    targets = targets.to(device)
-                    csms = csms.to(device)
-                    brain_masks = brain_masks.to(device)
-
-                    if opt['temporal_pred'] == 1:
-                        Xs = netG_dc(kdatas, csms, None, masks, flip, x_input=None)
-                    else:
-                        Xs = netG_dc(kdatas, csms, None, masks, flip)
-
-                    metrices_val.get_metrices(Xs[-1]*brain_masks, targets*brain_masks)
-                    # targets = np.asarray(targets.cpu().detach())
-                    # brain_masks = np.asarray(brain_masks.cpu().detach())
-                    # temp = 0
-                    # for i in range(len(Xs)):
-                    #     X = np.asarray(Xs[i].cpu().detach())
-                    #     temp += abs(X - targets) * brain_masks
-                    # X = np.asarray(Xs[-1].cpu().detach())
-                    # temp += abs(X - targets) * brain_masks
-                    # lossl2_sum = np.mean(temp)
-                    lossl2_sum = loss(Xs[-1]*brain_masks, targets*brain_masks)
-                    loss_total_list.append(lossl2_sum)
-
-                print('\n Validation loss: %f \n' 
-                    % (sum(loss_total_list) / float(len(loss_total_list))))
-                Validation_loss.append(sum(loss_total_list) / float(len(loss_total_list)))
-                Validation_psnr.append(np.mean(np.asarray(metrices_val.PSNRs)))
-            
-            # save log
-            logger.print_and_save('Epoch: [%d/%d], PSNR in training: %.2f' 
-            % (epoch, niter, np.mean(np.asarray(metrices_train.PSNRs))))
-            logger.print_and_save('Epoch: [%d/%d], PSNR in validation: %.2f, loss in validation: %.10f' 
-            % (epoch, niter, np.mean(np.asarray(metrices_val.PSNRs)), Validation_loss[-1]))
-
-            # save weights
-            if Validation_psnr[-1] == max(Validation_psnr):
-                torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
-            torch.save(netG_dc.state_dict(), rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}_last.pt' \
-            .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))  
-    
-    
     # for test
     if opt['flag_train'] == 0:
         if opt['echo_cat'] == 1:
@@ -521,7 +255,7 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         weights_dict = torch.load(rootName_weight+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], 0.1, opt['solver'], opt['flag_unet']))
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(necho, nrow, ncol), requires_grad=True)
         netG_dc.load_state_dict(weights_dict)
@@ -544,7 +278,8 @@ if __name__ == '__main__':
                 split='test',
                 subject=opt['test_sub'],
                 normalization=opt['normalization'],
-                echo_cat=opt['echo_cat']
+                echo_cat=opt['echo_cat'],
+                nslice=nslice
             )
         elif opt['prosp'] == 1:
             dataLoader_test = kdata_multi_echo_CBIC_075_prosp(
@@ -691,29 +426,11 @@ if __name__ == '__main__':
             # run MEDIN
             if opt['padding'] == 0:
                 if opt['interpolate'] == 0:
-                    os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                    os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
                             + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                             + ' --temp ' + rootName +  '/results_QSM/'
-                            + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                            + ' -csfm 1 '
                             + ' --CSF ' + ' -of QR')
-                elif opt['interpolate'] == 1:
-                    os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                            + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate.txt'
-                            + ' --temp ' + rootName +  '/results_QSM/'
-                            + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                            + ' --CSF ' + ' -of QR')
-                elif opt['interpolate'] == 2:
-                    os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
-                            + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate2.txt'
-                            + ' --temp ' + rootName +  '/results_QSM/'
-                            + ' -csfm 1 ' + ' -rl 0.7 '
-                            + ' --CSF ' + ' -of QR')
-            elif opt['padding'] == 1:
-                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                        + ' --parameter ' + rootName + '/results_QSM/parameter_padding.txt'
-                        + ' --temp ' + rootName +  '/results_QSM/'
-                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR -rl 0.3')
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_07.bin', 'f4')
@@ -740,19 +457,3 @@ if __name__ == '__main__':
             elif opt['lambda1'] == 0:
                 sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
                     .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), adict)
-            
-            
-            # # # write into .mat file
-            # # Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
-            # # Inputs = np.transpose(Inputs, [0, 2, 3, 1])
-            # # Targets = r2c(np.concatenate(Targets, axis=0), opt['echo_cat'])
-            # # Targets = np.transpose(Targets, [0, 2, 3, 1])
-            # # Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
-            # # Recons = np.transpose(Recons, [0, 2, 3, 1])
-
-            # # save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
-            # # save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-            # # save_mat(rootName+'/results/Recons_echo_cat={}_solver={}_K={}_loupe={}.mat' \
-            # #   .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Recons', Recons)
-
-

@@ -22,6 +22,7 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
+        nslice = 512,
         augmentations = [None]
     ):
 
@@ -33,13 +34,14 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         self.split = split
         self.nrow = nrow
         self.ncol = ncol
+        self.nslice = nslice
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = 512 * 8
+                self.nsamples = self.nslice * 8
             elif split == 'val':
-                self.nsamples = 512
+                self.nsamples = self.nslice
             elif split == 'test':
-                self.nsamples = 512
+                self.nsamples = self.nslice
                 if subject == 0:
                     self.subject = 'thanh'
                 elif subject == 1:
@@ -61,10 +63,10 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         if self.split == 'train':
             subject = 0
             while (True):
-                if (idx - 512 < 0):
+                if (idx - self.nslice < 0):
                     break
                 else:
-                    idx -= 512
+                    idx -= self.nslice
                     subject += 1
             if subject == 0:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei/full_cc_slices_sense_echo_pad/'
@@ -87,7 +89,9 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
             dataFD_sense_echo = self.rootDir + '/data_cfl/thanh/full_cc_slices_sense_echo_pad/'
         
         elif self.split == 'test':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_pad/'
+            # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_pad/'
+            # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_ellipt/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_ellipt_fa=25/'
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0

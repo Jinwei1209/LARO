@@ -18,7 +18,8 @@ class kdata_multi_echo_GE(data.Dataset):
     dataRange = {
         'train': ['200', '800'], 
         'val': ['0', '200'],
-        'test': ['800', '1000']
+        # 'test': ['800', '1000']
+        'test': ['200', '400']
     }
     
 
@@ -39,7 +40,6 @@ class kdata_multi_echo_GE(data.Dataset):
         self.necho = necho
         self.normalization = normalization
         self.echo_cat = echo_cat
-        self.norm_list = [0.3032, 0.2220, 0.4013, 0.2890, 0.2306]
         if contrast == 'MultiEcho':
             self.startIdx = int(self.dataRange[split][0])
             self.endIdx = int(self.dataRange[split][1])
@@ -51,7 +51,7 @@ class kdata_multi_echo_GE(data.Dataset):
         self.batchSize = batchSize
         self.batchIndex = 0
 
-        self.gen_target()
+        # self.gen_target()
 
 
     def gen_target(self):
@@ -121,9 +121,9 @@ class kdata_multi_echo_GE(data.Dataset):
         org = readcfl(self.dataFD + 'fully_slice_{}'.format(idx))  # (row, col, echo)
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
-        org_gen = self.orgs_gen[idx, ...]
-        org_gen = c2r(org_gen, self.echo_cat)
-        # org_gen = org
+        # org_gen = self.orgs_gen[idx, ...]
+        # org_gen = c2r(org_gen, self.echo_cat)
+        org_gen = org
 
         if self.echo_cat == 0:
             org = np.transpose(org, (0, 3, 1, 2)) # (2, echo, row, col)
@@ -144,17 +144,8 @@ class kdata_multi_echo_GE(data.Dataset):
         else:
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], 2, axis=0) # (2, row, col)
             brain_mask = np.repeat(brain_mask[:, np.newaxis, ...], self.necho, axis=1)# (2, echo, row, col)
-        
-        if self.normalization == 0:
-            return kdata, org, org_gen, csm, brain_mask
 
-        elif self.normalization == 1:
-            index = idx // 200
-            return kdata/self.norm_list[index], org/self.norm_list[index], org_gen/self.norm_list[index], csm, brain_mask  # for the fully-sampled paras
-            # return kdata/self.norm_list[index], org/self.norm_list[index], org_gen, csm, brain_mask
-
-
-
+        return kdata*self.normalization, org*self.normalization, csm, brain_mask
 
 
         
