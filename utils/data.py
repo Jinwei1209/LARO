@@ -389,9 +389,12 @@ class Logger():
         loupe = opt['loupe']
         ratio = opt['samplingRatio']
         solver = opt['solver']
-        dataset = opt['dataset_id']
-        mc_fusion = opt['mc_fusion']
-        t2redesign = opt['t2w_redesign']
+        # dataset = opt['dataset_id']
+        # mc_fusion = opt['mc_fusion']
+        # t2redesign = opt['t2w_redesign']
+        dataset = 0
+        mc_fusion = 1
+        t2redesign = 0
 
         if(not os.path.exists(self.rootName)):
             os.mkdir(self.rootName)

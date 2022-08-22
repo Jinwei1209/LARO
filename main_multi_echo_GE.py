@@ -4,6 +4,7 @@
 import os
 import time
 import torch
+import torch.nn as nn
 import math
 import argparse
 import scipy.io as sio
@@ -38,6 +39,7 @@ if __name__ == '__main__':
     ncoil = 8
     nrow = 206
     ncol = 80
+    nocl_weight = ncol
     nslice = 200
     lambda_dll2 = 1e-3
     TEs = [0.001972, 0.005356, 0.008740, 0.012124, 0.015508, 0.018892, 0.022276, 0.025660, 0.029044, 0.032428]
@@ -60,6 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
+    parser.add_argument('--scanner', type=int, default=0)  # 0: GE scanner; 1: Siemens scanner
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution
     parser.add_argument('--bn', type=int, default=2)  # flag to use group normalization: 
                                                       # 0: no normalization, 
@@ -97,7 +100,9 @@ if __name__ == '__main__':
     lambda_maskbce = opt['lambda_maskbce']  # 0.01 too large
     rank = opt['rank']
     necho = opt['necho']
-    necho_pred = 10 - necho
+    # necho_pred = 10 - necho
+    necho_pred = 0
+    TEs = TEs[:necho]
     # concatenate echo dimension to the channel dimension for TV regularization
     if opt['solver'] > 1:
         opt['echo_cat'] = 1
@@ -105,6 +110,9 @@ if __name__ == '__main__':
         niter = 500
     else:
         niter = 100
+
+    if opt['scanner'] == 1:
+        ncol = 88
 
     # flag to use hidden state recurrent pass in BCRNN layer
     if opt['solver'] == 1 and opt['bcrnn'] == 0:
@@ -136,6 +144,11 @@ if __name__ == '__main__':
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))  # equal ratios from same PDF
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_test'.format(opt['samplingRatio'])))  # equal ratios from same PDF, prospective qihao
         masks = np.real(readcfl(rootName+'/masks2/mask_{}_echo'.format(opt['samplingRatio'])))
+        if opt['scanner'] == 1:
+            masks = np.real(readcfl(rootName+'/masks2/mask_{}_echo_Siemens'.format(opt['samplingRatio'])))
+            # npad = ((0, 0), (0, 0), (4, 4))
+            # masks = np.pad(masks, pad_width=npad, mode='constant', constant_values=0)
+        masks = masks[:necho, :, :]
     elif opt['loupe'] == -3:
         # masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))
         masks = np.real(readcfl(rootName+'/masks2/mask_{}_ssim_echo'.format(opt['samplingRatio'])))
@@ -510,7 +523,8 @@ if __name__ == '__main__':
                 flag_BCRNN=flag_bcrnn,
                 flag_hidden=flag_hidden,
                 flag_unet=opt['flag_unet'],
-                flag_att=opt['att']
+                flag_att=opt['att'],
+                flag_scanner=opt['scanner']
             )
         else:
             netG_dc = Resnet_with_DC2(
@@ -528,6 +542,7 @@ if __name__ == '__main__':
         weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}_last.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
+        weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(necho, nrow, nocl_weight), requires_grad=True)
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -548,15 +563,18 @@ if __name__ == '__main__':
         if opt['prosp'] == 0:
             dataLoader_test = kdata_multi_echo_CBIC(
                 rootDir=rootName,
+                necho=necho,
                 contrast='MultiEcho', 
                 split='test',
                 subject=opt['test_sub'],
                 normalization=opt['normalization'],
-                echo_cat=opt['echo_cat']
+                echo_cat=opt['echo_cat'],
+                scanner=opt['scanner']
             )
         elif opt['prosp'] == 1:
             dataLoader_test = kdata_multi_echo_CBIC_prosp(
                 rootDir=rootName,
+                necho=necho,
                 contrast='MultiEcho', 
                 split='test',
                 subject=opt['test_sub'],
@@ -694,11 +712,25 @@ if __name__ == '__main__':
 
             # run MEDIN
             if opt['interpolate'] == 0:
-                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-                        + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-                        + ' --temp ' + rootName +  '/results_QSM/'
-                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR')
+                if necho == 7:  # for revision
+                    os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
+                            + ' --parameter ' + rootName + '/results_QSM/parameter_7.txt'
+                            + ' --temp ' + rootName +  '/results_QSM/'
+                            # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                            + ' --CSF ' + ' -of QR')
+                else:
+                    if opt['scanner'] == 0:
+                        os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
+                                + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
+                                + ' --temp ' + rootName +  '/results_QSM/'
+                                # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                                + ' --CSF ' + ' -of QR')
+                    elif opt['scanner'] == 1:
+                        os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
+                                + ' --parameter ' + rootName + '/results_QSM/parameter_siemens.txt'
+                                + ' --temp ' + rootName +  '/results_QSM/'
+                                # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                                + ' --CSF ' + ' -of QR')
             elif opt['interpolate'] == 1:
                 os.system('medi ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter_interpolate.txt'
@@ -707,7 +739,10 @@ if __name__ == '__main__':
                         + ' --CSF ' + ' -of QR')
             
             # read .bin files and save into .mat files
-            QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
+            if necho == 7:
+                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_07.bin', 'f4')
+            else:
+                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
             QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
 
             iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')

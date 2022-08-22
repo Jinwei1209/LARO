@@ -46,6 +46,8 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
                     self.subject = 'thanh'
                 elif subject == 1:
                     self.subject = 'liangdong'
+                elif subject == 5:
+                    self.subject = 'jiahao'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -90,8 +92,9 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         
         elif self.split == 'test':
             # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_pad/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
             # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_ellipt/'
-            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_ellipt_fa=25/'
+            # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_ellipt_fa=25/'
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0

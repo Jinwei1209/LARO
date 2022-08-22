@@ -347,7 +347,7 @@ if __name__ == '__main__':
                 # P.append(p.cpu().detach())
 
             # write into .mat file
-            Recons_ = np.squeeze(r2c(np.concatenate(Targets, axis=0), opt['echo_cat']))
+            Recons_ = np.squeeze(r2c(np.concatenate(Recons, axis=0), opt['echo_cat']))
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             if opt['interpolate'] == 1:
                 kdata = np.fft.fftshift(np.fft.fftn(Recons_, axes=(0, 1, 2)), axes=(0, 1, 2))
@@ -405,7 +405,7 @@ if __name__ == '__main__':
 
             # write into .bin file
             # (nslice, 2, 7, 258, 112) to (112, 258, nslice, 7, 2)
-            iField = np.transpose(np.concatenate(Targets, axis=0), [4, 3, 0, 2, 1])
+            iField = np.transpose(np.concatenate(Recons, axis=0), [4, 3, 0, 2, 1])
             if opt['interpolate'] > 0:
                 Recons_ = np.transpose(Recons_, [0, 3, 1, 2])
                 iField = np.concatenate((Recons_.real[:, np.newaxis, ...], Recons_.imag[:, np.newaxis, ...]), axis=1)

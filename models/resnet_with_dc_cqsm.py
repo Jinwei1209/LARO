@@ -17,7 +17,7 @@ from models.BCRNN import BCRNNlayer, Conv2dFT, MultiLevelBCRNNlayer
 from models.BCLSTM import BCLSTMlayer
 from fits.fits import fit_R2_LM, fit_complex, arlo
 from utils.data import *
-from utils.operators import *
+from utils.operators_cqsm import *
 from torch.utils.checkpoint import checkpoint
 
 

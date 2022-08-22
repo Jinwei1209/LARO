@@ -255,7 +255,7 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         weights_dict = torch.load(rootName_weight+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
-                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
+                .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], 0.1, opt['solver'], opt['flag_unet']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
         weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(necho, nrow, ncol), requires_grad=True)
         netG_dc.load_state_dict(weights_dict)
@@ -289,7 +289,8 @@ if __name__ == '__main__':
                 subject=opt['test_sub'],
                 loupe=opt['loupe'],
                 normalization=opt['normalization'],
-                echo_cat=opt['echo_cat']
+                echo_cat=opt['echo_cat'],
+                nslice=nslice
             )
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 

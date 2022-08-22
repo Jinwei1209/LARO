@@ -4,6 +4,7 @@
 import os
 import time
 import torch
+import torch.nn as nn
 import math
 import argparse
 import scipy.io as sio
@@ -18,11 +19,10 @@ from loader.kdata_me_cardiac import kdata_me_cardiac
 from loader.kdata_multi_echo_CBIC_prosp import kdata_multi_echo_CBIC_prosp
 from utils.data import r2c, save_mat, readcfl, memory_pre_alloc, torch_channel_deconcate, torch_channel_concate, Logger, c2r_kdata
 from utils.loss import lossL1, lossL2, SSIM, snr_gain, CrossEntropyMask, FittingError
-from utils.test import Metrices
-from utils.operators import backward_multiEcho, Back_forward_multiEcho
-from models.resnet_with_dc import Resnet_with_DC2
+from utils.test_cqsm import Metrices
+from utils.operators_cqsm import backward_multiEcho, Back_forward_multiEcho
+from models.resnet_with_dc_cqsm import Resnet_with_DC2
 from fits.fits import fit_R2_LM, arlo, fit_complex, fit_complex_all
-from utils.operators import low_rank_approx
 
 if __name__ == '__main__':
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalization', type=int, default=0)  # 0 for no normalization
+    parser.add_argument('--normalization', type=int, default=1)  # 0 for no normalization
     opt = {**vars(parser.parse_args())}
     K = opt['K']
     norm_last = opt['norm_last']
@@ -113,9 +113,11 @@ if __name__ == '__main__':
         flag_hidden = 0
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
-    # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
-    # rootName = '/data/Jinwei/QSM_raw_CBIC'
+
     rootName = '/data3/Jiahao/cardiacQSM'
+    # rootName_weight = '/data/Jinwei/QSM_raw_CBIC'
+    rootName_weight = '/data3/Jiahao/cardiacQSM'
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # torch.manual_seed(0)
 
@@ -131,8 +133,8 @@ if __name__ == '__main__':
         # load fixed loupe optimized mask across echos
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))  # equal ratios from same PDF
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_test'.format(opt['samplingRatio'])))  # equal ratios from same PDF, prospective qihao
-        # masks = np.real(readcfl(rootName+'/masks2/mask_{}_echo'.format(opt['samplingRatio'])))
-        masks = np.real(readcfl(rootName+'/masks/mask_even_odd_echoes'))
+        masks = np.real(readcfl(rootName+'/masks/mask_{}_echo'.format(opt['samplingRatio'])))
+        # masks = np.real(readcfl(rootName+'/masks/mask_even_odd_echoes'))
     elif opt['loupe'] == -3:
         # masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))
         masks = np.real(readcfl(rootName+'/masks2/mask_{}_ssim_echo'.format(opt['samplingRatio'])))
@@ -527,9 +529,10 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
+        weights_dict = torch.load(rootName_weight+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
+        weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(necho, nrow, ncol), requires_grad=True)
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -594,7 +597,7 @@ if __name__ == '__main__':
                 brain_masks = brain_masks.to(device)
 
                 # inputs = backward_multiEcho(kdatas, csms, masks, flip,
-                                            # opt['echo_cat'])
+                #                             opt['echo_cat'], necho)
                 if opt['temporal_pred'] == 1:
                     Xs_1 = netG_dc(kdatas, csms, csm_lowres, masks, flip, x_input=None)[-1]
                 else:
@@ -636,88 +639,3 @@ if __name__ == '__main__':
             Recons_ = np.transpose(Recons_, [0, 2, 3, 1])
             save_mat(rootName+'/results_ablation2/iField_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
                 .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), 'Recons', Recons_)
-
-            # M0 = np.concatenate(M0, axis=0)
-            # R2s = np.concatenate(R2s, axis=0)
-            # F0 = np.concatenate(F0, axis=0)
-            # P = np.concatenate(P, axis=0)
-            # adict = {}
-            # adict['m0'], adict['r2s'], adict['f0'], adict['p'] = M0, R2s, F0, P
-            # sio.savemat(rootName+'/results_ablation/four_parameters.mat', adict)
-
-            # Targets_torch = torch.cat(Targets_torch, dim=0)
-            # [M0, R2s, F0, P] = fit_complex_all(Targets_torch, TEs)
-            # M0 = M0.cpu().detach().numpy()
-            # R2s = R2s.cpu().detach().numpy()
-            # F0 = F0.cpu().detach().numpy()
-            # P = P.cpu().detach().numpy()
-            # adict = {}
-            # adict['m0'], adict['r2s'], adict['f0'], adict['p'] = M0, R2s, F0, P
-            # sio.savemat(rootName+'/results_ablation/four_parameters_3d.mat', adict)
-
-
-            # R2s_target = np.concatenate(R2s_target, axis=0)
-            # save_mat(rootName+'/results_ablation/R2s_target.mat', 'R2s_target', R2s_target)
-            # water_target = np.concatenate(water_target, axis=0)
-            # save_mat(rootName+'/results_ablation/water_target.mat', 'water_target', water_target)
-
-            # # write into .bin file
-            # # (nslice, 2, 10, 206, 80) to (80, 206, nslice, 10, 2)
-            # print('iField size is: ', np.concatenate(LLRs, axis=0).shape)
-            # iField = np.transpose(np.concatenate(LLRs, axis=0), [4, 3, 0, 2, 1])
-            # iField[:, :, 1::2, :, :] = - iField[:, :, 1::2, :, :]
-            # iField[..., 1] = - iField[..., 1]
-            # print('iField size is: ', iField.shape)
-            # if os.path.exists(rootName+'/results_QSM/iField.bin'):
-            #     os.remove(rootName+'/results_QSM/iField.bin')
-            # iField.tofile(rootName+'/results_QSM/iField.bin')
-            # print('Successfully save iField.bin')
-
-            # # run MEDIN
-            # os.system('medi ' + rootName + '/results_QSM/iField.bin' 
-            #         + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
-            #         + ' --temp ' + rootName +  '/results_QSM/'
-            #         + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-            #         + ' --CSF ' + ' -of QR')
-            
-            # # read .bin files and save into .mat files
-            # QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
-            # QSM = np.transpose(QSM.reshape([80, 206, nslice]), [2, 1, 0])
-
-            # iMag = np.fromfile(rootName+'/results_QSM/iMag.bin', 'f4')
-            # iMag = np.transpose(iMag.reshape([80, 206, nslice]), [2, 1, 0])
-
-            # RDF = np.fromfile(rootName+'/results_QSM/RDF.bin', 'f4')
-            # RDF = np.transpose(RDF.reshape([80, 206, nslice]), [2, 1, 0])
-
-            # R2star = np.fromfile(rootName+'/results_QSM/R2star.bin', 'f4')
-            # R2star = np.transpose(R2star.reshape([80, 206, nslice]), [2, 1, 0])
-
-            # Mask = np.fromfile(rootName+'/results_QSM/Mask.bin', 'f4')
-            # Mask = np.transpose(Mask.reshape([80, 206, nslice]), [2, 1, 0]) > 0
-
-            # adict = {}
-            # adict['QSM'], adict['iMag'], adict['RDF'] = QSM, iMag, RDF
-            # adict['R2star'], adict['Mask'] = R2star, Mask
-            # if opt['lambda1'] == 1:
-            #     sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_.mat' \
-            #         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub']), adict)
-            # elif opt['lambda1'] == 0:
-            #     sio.savemat(rootName+'/results_ablation2/QSM_bcrnn={}_loupe={}_solver={}_sub={}_ratio={}.mat' \
-            #         .format(opt['bcrnn'], opt['loupe'], opt['solver'], opt['test_sub'], opt['samplingRatio']), adict)
-            
-            
-            # # # write into .mat file
-            # # Inputs = r2c(np.concatenate(Inputs, axis=0), opt['echo_cat'])
-            # # Inputs = np.transpose(Inputs, [0, 2, 3, 1])
-            # # Targets = r2c(np.concatenate(Targets, axis=0), opt['echo_cat'])
-            # # Targets = np.transpose(Targets, [0, 2, 3, 1])
-            # # Recons = r2c(np.concatenate(Recons, axis=0), opt['echo_cat'])
-            # # Recons = np.transpose(Recons, [0, 2, 3, 1])
-
-            # # save_mat(rootName+'/results/Inputs.mat', 'Inputs', Inputs)
-            # # save_mat(rootName+'/results/Targets.mat', 'Targets', Targets)
-            # # save_mat(rootName+'/results/Recons_echo_cat={}_solver={}_K={}_loupe={}.mat' \
-            # #   .format(opt['echo_cat'], opt['solver'], opt['K'], opt['loupe']), 'Recons', Recons)
-
-

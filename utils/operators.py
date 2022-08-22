@@ -194,7 +194,7 @@ class backward_forward_CardiacQSM():
 
 class Back_forward_multiEcho():
     '''
-        forward and backward imaging model operator for multi echo GRE data 
+        forward and backward imaging model operator for multi echo GRE data (scanner: 0 (GE) / 1 (Siemens))
         (echo dim as in the channel dim in CNN model)
     '''
     def __init__(
@@ -209,7 +209,8 @@ class Back_forward_multiEcho():
         kdata = None,
         csm_lowres = None,
         U = None, 
-        rank = 0
+        rank = 0,
+        scanner = 0,
     ):
         self.nrows = csm.size()[3]
         self.ncols = csm.size()[4]
@@ -224,6 +225,7 @@ class Back_forward_multiEcho():
         self.kdata = kdata
         self.csm_lowres = csm_lowres
         self.rank = rank
+        self.scanner = scanner
         if self.rank > 0:
             self.Ur = U[:, :self.rank, :]  # (echo, rank, 2)
 
@@ -243,6 +245,10 @@ class Back_forward_multiEcho():
             image = torch_channel_deconcate(img)  # (batch, 2, echo, row, col)
         else:
             image = img
+        if self.scanner == 1:
+            image = torch.flip(image, dims=[4])  # for Siemens data
+            image = fft_shift_col(image, self.ncols, 1)  # for Siemens data
+            image[:, 1, ...] = - image[:, 1, ...]  # for Siemens data
         image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
         temp = cplx_mlpy(image, self.flip) # for GE kdata
         temp = temp[:, None, ...] # multiply order matters (in torch implementation)
@@ -260,6 +266,10 @@ class Back_forward_multiEcho():
         )
         coilComb = cplx_mlpy(coilComb, self.flip) # for GE kdata
         coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
+        if self.scanner == 1:
+            coilComb = fft_shift_col(coilComb, self.ncols, 1)  # for Siemens data
+            coilComb = torch.flip(coilComb, dims=[4])  # for Siemens data
+            coilComb[:, 1, ...] = - coilComb[:, 1, ...]  # for Siemens data
         if self.echo_cat:
             coilComb = torch_channel_concate(coilComb, self.necho) # (batch, 2*echo, row, col)
         if use_dll2 == 1:
@@ -453,9 +463,10 @@ class Back_forward_multiEcho_compressor():
         elif self.flag_compressor == 2:
             return 0
 
-def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1, necho=10):
+def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1, necho=10, scanner=0):
     """
-    backward operator for multi-echo GE data
+    backward operator for multi-echo GRE data
+    scanner: 0 (GE) / 1 (Siemens)
     """
     nrows = kdata.size()[3]
     ncols = kdata.size()[4]
@@ -470,14 +481,19 @@ def backward_multiEcho(kdata, csm, mask, flip, echo_cat=1, necho=10):
     )
     coilComb = cplx_mlpy(coilComb, flip)
     coilComb = coilComb.permute(0, 4, 1, 2, 3) # (batch, 2, echo, row, col)
+    if scanner == 1:
+        coilComb = fft_shift_col(coilComb, ncols, 1)  # for Siemens data
+        coilComb = torch.flip(coilComb, dims=[4])  # for Siemens data
+        coilComb[:, 1, ...] = - coilComb[:, 1, ...]  # for Siemens data
     if echo_cat:
         coilComb = torch_channel_concate(coilComb, necho) # (batch, 2*echo, row, col)
     return coilComb
 
 def backward_multiEcho_compressor(kdata, csm, mask, flip, U, rank,
-                                  flag_compressor=0, echo_cat=1, necho=10):
+                                  flag_compressor=0, echo_cat=1, necho=10, scanner=0):
     """
-    backward operator for multi-echo GE data with a temporal compressor 
+    backward operator for multi-echo GRE data with a temporal compressor
+    scanner: 0 (GE) / 1 (Siemens)
     """
     nrows = kdata.size()[3]
     ncols = kdata.size()[4]
@@ -503,16 +519,25 @@ def backward_multiEcho_compressor(kdata, csm, mask, flip, U, rank,
         image = image.view(-1, nrows, ncols, nechos, 2)  # (batch, row, col, echo, 2)
         
         coilComb = image.permute(0, 4, 3, 1, 2) # (batch, 2, echo, row, col)
+        if scanner == 1:
+            coilComb = fft_shift_col(coilComb, ncols, 1)  # for Siemens data
+            coilComb = torch.flip(coilComb, dims=[4])  # for Siemens data
+            coilComb[:, 1, ...] = - coilComb[:, 1, ...]  # for Siemens data
         if echo_cat:
             coilComb = torch_channel_concate(coilComb, necho) # (batch, 2*echo, row, col)
         return coilComb
 
-def forward_multiEcho(image, csm, mask, flip, echo_cat=1):
+def forward_multiEcho(image, csm, mask, flip, echo_cat=1, scanner=0):
     """
-        forward operator for multi-echo GE data
+        forward operator for multi-echo GRE data
+        scanner: 0 (GE) / 1 (Siemens)
     """
     if echo_cat:
         image = torch_channel_deconcate(image)  # (batch, 2, echo, row, col)
+    if scanner == 1:
+        image = torch.flip(image, dims=[4])  # for Siemens data
+        image = fft_shift_col(image, ncols, 1)  # for Siemens data
+        image[:, 1, ...] = - image[:, 1, ...]  # for Siemens data
     image = image.permute(0, 2, 3, 4, 1) # (batch, echo, row, col, 2)
     nrows = csm.size()[3]
     ncols = csm.size()[4]

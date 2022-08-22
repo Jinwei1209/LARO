@@ -8,7 +8,7 @@ from utils.operators import *
 
 class kdata_multi_echo_GE(data.Dataset):
     '''
-        Dataloader of multi-echo GRE data from GE scanner (12-coil scanner)
+        Dataloader of multi-echo GRE data from DHK GE scanner (12-coil scanner)
     '''
 
     folderMatcher = {

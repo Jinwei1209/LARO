@@ -99,6 +99,7 @@ class Resnet_with_DC2(nn.Module):
         flag_padding=0,  # flag to use padded data for training, if yes, reduce the number of filters by factor 2
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
+        flag_scanner=0, # 0: GE, 1: Siemens
         slope=0.25,
         passSigmoid=0,
         stochasticSampling=1,
@@ -130,6 +131,7 @@ class Resnet_with_DC2(nn.Module):
         self.flag_padding = flag_padding
         self.flag_multi_level = flag_multi_level
         self.flag_bn = flag_bn
+        self.flag_scanner = flag_scanner
         self.slope = slope
         self.passSigmoid = passSigmoid
         self.stochasticSampling = stochasticSampling
@@ -415,7 +417,7 @@ class Resnet_with_DC2(nn.Module):
             self.Mask = masks[0, 0, 0, :, :, 0]
         # input
         if self.flag_dataset:
-            x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat, self.necho)
+            x = backward_multiEcho(kdatas, csms, masks, flip, self.echo_cat, self.necho, self.flag_scanner)
             # if self.rank:
             #     x = backward_multiEcho_compressor(kdatas, csms, masks, flip, self.U, self.rank,
             #                                       self.flag_compressor, self.echo_cat, self.necho)
@@ -449,7 +451,7 @@ class Resnet_with_DC2(nn.Module):
         if self.flag_solver == 0:
             if self.flag_BCRNN == 0:
                 if self.flag_dataset:
-                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
+                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho, scanner=self.flag_scanner)
                 else:
                     A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
                 Xs = []
@@ -505,7 +507,7 @@ class Resnet_with_DC2(nn.Module):
                 for j in range(self.nd-1):
                     net['t0_x%d'%j]=hid_init
                 if self.flag_dataset:
-                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
+                    A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho, scanner=self.flag_scanner)
                 else:
                     A = Back_forward_MS(csms, masks, flip, self.lambda_dll2, echo_cat=self.echo_cat, necho=self.necho)
                 Xs = []
@@ -576,7 +578,7 @@ class Resnet_with_DC2(nn.Module):
                 if self.flag_dataset:
                     A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
                                             self.lambda_lowrank, self.echo_cat, self.necho,
-                                            kdata=kdatas, csm_lowres=csm_lowres, U=self.U, rank=self.rank)
+                                            kdata=kdatas, csm_lowres=csm_lowres, U=self.U, rank=self.rank, scanner=self.flag_scanner)
                     # if self.rank:
                     #     A = Back_forward_multiEcho_compressor(csms, masks, flip, self.lambda_dll2, 
                     #                         self.echo_cat, self.necho, kdata=kdatas, 
@@ -637,7 +639,7 @@ class Resnet_with_DC2(nn.Module):
                 if self.flag_dataset:
                     A = Back_forward_multiEcho(csms, masks, flip, self.lambda_dll2, 
                                             self.lambda_lowrank, self.echo_cat, self.necho,
-                                            kdata=kdatas, csm_lowres=csm_lowres, U=self.U, rank=self.rank)
+                                            kdata=kdatas, csm_lowres=csm_lowres, U=self.U, rank=self.rank, scanner=self.flag_scanner)
                     # if self.rank:
                     #     A = Back_forward_multiEcho_compressor(csms, masks, flip, self.lambda_dll2, 
                     #                         self.echo_cat, self.necho, kdata=kdatas, 
@@ -749,7 +751,7 @@ class Resnet_with_DC2(nn.Module):
         # TV Quasi-newton
         elif self.flag_solver == 2:
             A = Back_forward_multiEcho(csms, masks, flip, 
-                                    self.lambda_dll2, self.echo_cat)
+                                    self.lambda_dll2, self.echo_cat, scanner=self.flag_scanner)
             Xs = []
             for i in range(self.K):
                 rhs = x_start - A.AtA(x, use_dll2=3)
@@ -765,7 +767,7 @@ class Resnet_with_DC2(nn.Module):
         # TV ADMM
         elif self.flag_solver == 3:
             A = Back_forward_multiEcho(csms, masks, flip, 
-                                    self.rho_penalty, self.echo_cat)
+                                    self.rho_penalty, self.echo_cat, scanner=self.flag_scanner)
             Xs = []
             wk = torch.zeros(x_start.size()+(2,)).to('cuda')
             etak = torch.zeros(x_start.size()+(2,)).to('cuda')

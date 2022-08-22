@@ -3,7 +3,7 @@ import numpy as np
 from torch.utils import data
 from utils.data import *
 from utils.loss import *
-from utils.operators import *
+from utils.operators_cqsm import *
 
 
 class kdata_me_cardiac(data.Dataset):

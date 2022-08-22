@@ -118,9 +118,11 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
             dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices_sense_echo/'
         
         elif self.split == 'test':
-            dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo/'.format(self.loupe)
+            # dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo/'.format(self.loupe)
+            # dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo_FA=25/'.format(self.loupe)
+            dataFD_prosp = self.rootDir + '/data_cfl/' + self.subject + '/10_loupe={}_cc_slices_sense_echo_Necho=7/'.format(self.loupe)
             # dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
-            dataFD = self.rootDir + '/data_cfl/alexey2/full_cc_slices/'
+            dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
 
         idx += 30
 
@@ -132,6 +134,7 @@ class kdata_multi_echo_CBIC_prosp(data.Dataset):
         self.batchIndex += 1
 
         org = readcfl(dataFD + 'fully_slice_{}'.format(idx))  # (row, col, echo)
+        org = org[..., :self.necho]
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 

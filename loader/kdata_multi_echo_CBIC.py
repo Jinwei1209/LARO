@@ -8,7 +8,7 @@ from utils.operators import *
 
 class kdata_multi_echo_CBIC(data.Dataset):
     '''
-        Dataloader of multi-echo GRE data from GE scanner (CBIC scanner)
+        Dataloader of multi-echo GRE data from CBIC scanners (scanner: 0 (GE) / 1 (Siemens))
     '''
 
     def __init__(self,
@@ -22,7 +22,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
-        augmentations = [None]
+        augmentations = [None],
+        scanner = 0,
     ):
 
         self.rootDir = rootDir
@@ -33,6 +34,9 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.split = split
         self.nrow = nrow
         self.ncol = ncol
+        self.scanner = scanner
+        scanners = ['GE', 'Siemens']
+        print("kspace data on {} scanner".format(scanners[self.scanner]))
         if contrast == 'MultiEcho':
             if split == 'train':
                 self.nsamples = 1600
@@ -48,6 +52,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
                     self.subject = 'alexey2'
                 elif subject == 3:
                     self.subject = 'liangdong2'
+                elif subject == 5:
+                    self.subject = 'jiahao2'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -132,9 +138,15 @@ class kdata_multi_echo_CBIC(data.Dataset):
         elif self.split == 'test':
             # dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
             dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
-            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_FA=25/'
+            if self.scanner == 1:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_Siemens/'
+            # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
 
         idx += 30
+
+        if self.scanner == 1:
+            idx += 120  # for Siemens scanner, +150 in total for idx
 
         if (self.batchIndex == self.batchSize):
             self.batchIndex = 0
@@ -144,6 +156,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
         self.batchIndex += 1
 
         org = readcfl(dataFD_sense_echo + 'fully_slice_{}'.format(idx))  # (row, col, echo)
+        org = org[..., :self.necho]
         org =  c2r(org, self.echo_cat)  # echo_cat == 1: (2*echo, row, col) with first dimension real&imag concatenated for all echos 
                                         # echo_cat == 0: (2, row, col, echo)
 
@@ -160,6 +173,7 @@ class kdata_multi_echo_CBIC(data.Dataset):
 
         # Option 2: csms estimated from each echo
         csm = readcfl(dataFD_sense_echo + 'sensMaps_slice_{}'.format(idx))
+        csm = csm[..., :self.necho]
         csm = np.transpose(csm, (2, 3, 0, 1))  # (coil, echo, row, col)
         for i in range(self.necho):
             csm[:, i, :, :] = csm[:, i, :, :] * np.exp(-1j * np.angle(csm[0:1, i, :, :]))
@@ -167,19 +181,23 @@ class kdata_multi_echo_CBIC(data.Dataset):
         csm = c2r_kdata(csm) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # Coil sensitivity maps from central kspace data
-        csm_lowres = readcfl(dataFD + 'sensMaps_lowres_slice_{}'.format(idx))
+        csm_lowres = readcfl(dataFD + 'sensMaps_lowres_slice_{}'.format(idx%256))
+        csm_lowres = csm_lowres[..., :self.necho]
         csm_lowres = np.transpose(csm_lowres, (2, 0, 1))[:, np.newaxis, ...]  # (coil, 1, row, col)
         csm_lowres = np.repeat(csm_lowres, self.necho, axis=1)  # (coil, echo, row, col)
         csm_lowres = c2r_kdata(csm_lowres) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # Fully sampled kspace data
         kdata = readcfl(dataFD_sense_echo + 'kdata_slice_{}'.format(idx))
+        kdata = kdata[..., :self.necho]
         kdata = np.transpose(kdata, (2, 3, 0, 1))  # (coil, echo, row, col)
         kdata = c2r_kdata(kdata) # (coil, echo, row, col, 2) with last dimension real&imag
 
         # brain tissue mask
         brain_mask = np.real(readcfl(dataFD_sense_echo + 'mask_slice_{}'.format(idx)))  # (row, col)
-        brain_mask_erode = np.real(readcfl(dataFD + 'mask_erode_slice_{}'.format(idx)))  # (row, col)
+        brain_mask = brain_mask[..., :self.necho]
+        brain_mask_erode = np.real(readcfl(dataFD + 'mask_erode_slice_{}'.format(idx%256)))  # (row, col)
+        brain_mask_erode = brain_mask_erode[..., :self.necho]
         if self.echo_cat:
             brain_mask = np.repeat(brain_mask[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
             brain_mask_erode = np.repeat(brain_mask_erode[np.newaxis, ...], self.necho*2, axis=0) # (2*echo, row, col)
@@ -191,6 +209,8 @@ class kdata_multi_echo_CBIC(data.Dataset):
         
         if self.normalization == 0:
             return kdata, org, recon_input, csm, csm_lowres, brain_mask, brain_mask_erode
+        else:
+            return kdata*0.5e7, org*0.5e7, recon_input, csm, csm_lowres, brain_mask, brain_mask_erode
 
 
 
