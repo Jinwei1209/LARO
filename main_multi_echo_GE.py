@@ -39,7 +39,7 @@ if __name__ == '__main__':
     ncoil = 8
     nrow = 206
     ncol = 80
-    nocl_weight = ncol
+    ncol_weight = ncol
     nslice = 200
     lambda_dll2 = 1e-3
     TEs = [0.001972, 0.005356, 0.008740, 0.012124, 0.015508, 0.018892, 0.022276, 0.025660, 0.029044, 0.032428]
@@ -135,10 +135,14 @@ if __name__ == '__main__':
         # load fixed loupe optimized mask
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))[0, :, :]
         masks = np.real(readcfl(rootName+'/masks2/mask_{}_ssim'.format(opt['samplingRatio'])))
+        if opt['scanner'] == 1:
+            masks = np.real(readcfl(rootName+'/masks2/mask_{}_ssim_Siemens'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -1:
         # load manually designed mask
         # masks = np.real(readcfl(rootName+'/masks/mask_{}m_echo'.format(opt['samplingRatio'])))[0, :, :]
         masks = np.real(readcfl(rootName+'/masks2/mask_{}m'.format(opt['samplingRatio'])))
+        if opt['scanner'] == 1:
+            masks = np.real(readcfl(rootName+'/masks2/mask_{}m_Siemens'.format(opt['samplingRatio'])))
     elif opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
         # masks = np.real(readcfl(rootName+'/masks/mask_{}_ssim_echo_new'.format(opt['samplingRatio'])))  # equal ratios from same PDF
@@ -542,7 +546,11 @@ if __name__ == '__main__':
         weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}_last.pt' \
                 .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         weights_dict['lambda_lowrank'] = torch.tensor([lambda_dll2])
-        weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(necho, nrow, nocl_weight), requires_grad=True)
+        if opt['loupe'] == -2:
+            weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(necho, nrow, ncol_weight), requires_grad=True)
+        elif (opt['loupe'] == 0 or opt['loupe'] == -1):
+            weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(nrow, ncol_weight), requires_grad=True)
+
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -716,18 +724,19 @@ if __name__ == '__main__':
                     os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
                             + ' --parameter ' + rootName + '/results_QSM/parameter_7.txt'
                             + ' --temp ' + rootName +  '/results_QSM/'
-                            # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                            # + ' --GPU ' + ' --device ' + opt['gpu_id']
                             + ' --CSF ' + ' -of QR')
                 else:
                     if opt['scanner'] == 0:
                         os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
                                 + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                                 + ' --temp ' + rootName +  '/results_QSM/'
-                                # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                                # + ' --GPU ' + ' --device ' + opt['gpu_id']
+                                # + ' -m ' + rootName + '/results_QSM/Mask_3rdecho' # for FA=25 
                                 + ' --CSF ' + ' -of QR')
                     elif opt['scanner'] == 1:
                         os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
-                                + ' --parameter ' + rootName + '/results_QSM/parameter_siemens.txt'
+                                + ' --parameter ' + rootName + '/results_QSM/parameter_siemens2_10.txt'
                                 + ' --temp ' + rootName +  '/results_QSM/'
                                 # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
                                 + ' --CSF ' + ' -of QR')
@@ -741,7 +750,9 @@ if __name__ == '__main__':
             # read .bin files and save into .mat files
             if necho == 7:
                 QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_07.bin', 'f4')
-            else:
+            elif necho == 8:
+                QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_08.bin', 'f4')
+            elif necho == 10:
                 QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_10.bin', 'f4')
             QSM = np.transpose(QSM.reshape([ncol, nrow, nslice]), [2, 1, 0])
 

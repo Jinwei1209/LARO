@@ -138,9 +138,10 @@ class kdata_multi_echo_CBIC(data.Dataset):
         elif self.split == 'test':
             # dataFD = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices/'
             dataFD = self.rootDir + '/data_cfl/jiahao2/full_cc_slices/'
+            # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
             dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_FA=25/'
             if self.scanner == 1:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_Siemens/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_Siemens2/'
             # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo/'
 
         idx += 30
@@ -210,7 +211,9 @@ class kdata_multi_echo_CBIC(data.Dataset):
         if self.normalization == 0:
             return kdata, org, recon_input, csm, csm_lowres, brain_mask, brain_mask_erode
         else:
-            return kdata*0.5e7, org*0.5e7, recon_input, csm, csm_lowres, brain_mask, brain_mask_erode
+            # return kdata*0.5e7, org*0.5e7, recon_input, csm, csm_lowres, brain_mask, brain_mask_erode  # for Siemens
+            return kdata*0.62e7, org*0.62e7, recon_input, csm, csm_lowres, brain_mask, brain_mask_erode  # for Siemens2
+
 
 
 
