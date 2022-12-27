@@ -96,7 +96,9 @@ class Resnet_with_DC2(nn.Module):
         flag_multi_level=0,  # flag to extract multi-level features and put into U-net
         flag_bn=2,  # flag to use group normalization: 0: no normalization, 2: use group normalization
         flag_t2w_redesign=0,
-        flag_t1w_only=0,
+        flag_t1w_only=0,  # 1: 1 t1w image, 0 t2w image;
+                          # 0: 1 t1w image, 1 t2w image;
+                          #-1: 2 t1w image, 1 t2w image 
         flag_diff_lambdas=0,  # flag to use different lambdas for each contrast
         slope=0.25,
         passSigmoid=0,
@@ -161,7 +163,7 @@ class Resnet_with_DC2(nn.Module):
                 nd = 5  # number of CRNN/BCRNN/CNN layers in each iteration
                 nf = 64  # number of filters
                 ks = 3  # kernel size
-                if self.flag_t1w_only == 0:
+                if self.flag_t1w_only <= 0:
                     unet_first_level = 5  # 5/6 for 111/112 data
                     unet_last_level = 8  # 9/10 for 111/112 data
                     flag_slim = False
@@ -177,8 +179,8 @@ class Resnet_with_DC2(nn.Module):
                 if self.flag_BCRNN == 1:
                     print('Use BCRNN')
                     self.bcrnn = BCRNNlayer(n_ch, nf, ks, flag_convFT, flag_bn, flag_hidden)
-                    if self.flag_t1w_only == 0:
-                        self.featureExtractor_t1 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)
+                    if self.flag_t1w_only <= 0:
+                        self.featureExtractor_t1 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)  # for all T1w images
                         self.featureExtractor_t2 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)
                     else:
                         self.featureExtractor_t1t2 = CRNNcell(n_ch*1, nf, ks, flag_hidden=0)  # name like "t1t2" because old code use "t1t2"
@@ -210,7 +212,7 @@ class Resnet_with_DC2(nn.Module):
                         slim=flag_slim,
                         convFT=flag_convFT
                     )
-                    if self.flag_t1w_only == 0:
+                    if self.flag_t1w_only <= 0:
                         # self.denoiser_t1t2 = Unet(
                         #     input_channels=nf,
                         #     output_channels=n_ch*2,
@@ -644,21 +646,21 @@ class Resnet_with_DC2(nn.Module):
                     x_ = x_.contiguous()
                     if x_.requires_grad and self.flag_cp:
                         # net['t%d_x0'%i] = checkpoint(self.bcrnn, x_[2:, ...])
-                        if self.flag_t1w_only == 0:
-                            net['t%d_x0'%i] = checkpoint(self.bcrnn, x_[:-2, ...])
+                        if self.flag_t1w_only <= 0:
+                            net['t%d_x0'%i] = checkpoint(self.bcrnn, x_[:-2+self.flag_t1w_only, ...])
                         else:
                             net['t%d_x0'%i] = checkpoint(self.bcrnn, x_[:-1, ...])
                     else:
                         # net['t%d_x0'%i] = self.bcrnn(x_[2:, ...], test)
-                        if self.flag_t1w_only == 0:
-                            net['t%d_x0'%i] = self.bcrnn(x_[:-2, ...], test)
+                        if self.flag_t1w_only <= 0:
+                            net['t%d_x0'%i] = self.bcrnn(x_[:-2+self.flag_t1w_only, ...], test)
                         else:
                             net['t%d_x0'%i] = self.bcrnn(x_[:-1, ...], test)
                     # net['t%d_t1t2_0'%i] = self.featureExtractor_t1t2(torch.cat((x_[0, ...], x_[1, ...]), 1), None)
-                    if self.flag_t1w_only == 0:
+                    if self.flag_t1w_only <= 0:
                         # net['t%d_t1t2_0'%i] = self.featureExtractor_t1t2(torch.cat((x_[-2, ...], x_[-1, ...]), 1), None)
-                        net['t%d_t1_0'%i] = self.featureExtractor_t1(x_[-2, ...], None)
-                        net['t%d_t2_0'%i] = self.featureExtractor_t2(x_[-1, ...], None)
+                        net['t%d_t1_0'%i] = self.featureExtractor_t1(x_[-2-self.flag_t1w_only:-1, 0, ...], None)
+                        net['t%d_t2_0'%i] = self.featureExtractor_t2(x_[-1:, 0, ...], None)
                     else:
                         # net['t%d_t1t2_0'%i] = self.featureExtractor_t1(x_[-1, ...], None)
                         net['t%d_t1_0'%i] = self.featureExtractor_t1t2(x_[-1, ...], None)
@@ -666,7 +668,7 @@ class Resnet_with_DC2(nn.Module):
                     net['t%d_x0'%i] = net['t%d_x0'%i].view(-1, self.nf, width, height)
                     # net['t%d_t1t2_0'%i] = net['t%d_t1t2_0'%i].view(-1, self.nf, width, height)
                     net['t%d_t1_0'%i] = net['t%d_t1_0'%i].view(-1, self.nf, width, height)
-                    if self.flag_t1w_only == 0:
+                    if self.flag_t1w_only <= 0:
                         net['t%d_t2_0'%i] = net['t%d_t2_0'%i].view(-1, self.nf, width, height)
 
                     if self.flag_unet == 1:
@@ -674,20 +676,20 @@ class Resnet_with_DC2(nn.Module):
                             if self.flag_mc_fusion == 1:
                                 # concatenate t1t2 features to all multi-echo recurrent features
                                 # net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
-                                if self.flag_t1w_only == 0:
-                                    net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                if self.flag_t1w_only <= 0:
+                                    net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + torch.sum(net['t%d_t1_0'%i], dim=0, keepdim=True) + net['t%d_t2_0'%i])
                                 else:
                                     net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i] + net['t%d_t1_0'%i])
                                 # concatenate 1st echo features to t1t2 features
                                 # net['t%d_t1t2_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
-                                if self.flag_t1w_only == 0:
+                                if self.flag_t1w_only <= 0:
                                     net['t%d_t1_4'%i] = checkpoint(self.denoiser_t1, net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
-                                    net['t%d_t2_4'%i] = checkpoint(self.denoiser_t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                    net['t%d_t2_4'%i] = checkpoint(self.denoiser_t2, net['t%d_x0'%i][0:1, ...] + torch.sum(net['t%d_t1_0'%i], dim=0, keepdim=True) + net['t%d_t2_0'%i])
                                 else:
                                     net['t%d_t1_4'%i] = checkpoint(self.denoiser_t1t2, net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i])
                             else:
                                 net['t%d_x4'%i] = checkpoint(self.denoiser, net['t%d_x0'%i])
-                                if self.flag_t1w_only == 0:
+                                if self.flag_t1w_only <= 0:
                                     net['t%d_t1_4'%i] = checkpoint(self.denoiser_t1, net['t%d_t1_0'%i])
                                     net['t%d_t2_4'%i] = checkpoint(self.denoiser_t2, net['t%d_t2_0'%i])
                                 else:
@@ -696,25 +698,25 @@ class Resnet_with_DC2(nn.Module):
                             if self.flag_mc_fusion == 1:
                                 # net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1t2_0'%i])
                                 # net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1t2_0'%i])
-                                if self.flag_t1w_only == 0:
-                                    net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                if self.flag_t1w_only <= 0:
+                                    net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + torch.sum(net['t%d_t1_0'%i], dim=0, keepdim=True) + net['t%d_t2_0'%i])
                                 else:
                                     net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i] + net['t%d_t1_0'%i])
-                                if self.flag_t1w_only == 0:
+                                if self.flag_t1w_only <= 0:
                                     net['t%d_t1_4'%i] = self.denoiser_t1(net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
-                                    net['t%d_t2_4'%i] = self.denoiser_t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i] + net['t%d_t2_0'%i])
+                                    net['t%d_t2_4'%i] = self.denoiser_t2(net['t%d_x0'%i][0:1, ...] + torch.sum(net['t%d_t1_0'%i], dim=0, keepdim=True) + net['t%d_t2_0'%i])
                                 else:
                                     net['t%d_t1_4'%i] = self.denoiser_t1t2(net['t%d_x0'%i][0:1, ...] + net['t%d_t1_0'%i])
                             else:
                                 # net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
                                 # net['t%d_t1t2_4'%i] = self.denoiser_t1t2(net['t%d_t1t2_0'%i])
                                 net['t%d_x4'%i] = self.denoiser(net['t%d_x0'%i])
-                                if self.flag_t1w_only == 0:
+                                if self.flag_t1w_only <= 0:
                                     net['t%d_t1_4'%i] = self.denoiser_t1(net['t%d_t1_0'%i])
                                     net['t%d_t2_4'%i] = self.denoiser_t2(net['t%d_t2_0'%i])
                                 else:
                                     net['t%d_t1_4'%i] = self.denoiser_t1t2(net['t%d_t1_0'%i])
-                        if self.flag_t1w_only == 0:
+                        if self.flag_t1w_only <= 0:
                             # concatenate denoised t1w and t2w
                             # net['t%d_t1t2_4'%i] = torch.cat((net['t%d_t1t2_4'%i][:, 0:2, ...], net['t%d_t1t2_4'%i][:, 2:4, ...]), 0)
                             net['t%d_t1t2_4'%i] = torch.cat((net['t%d_t1_4'%i], net['t%d_t2_4'%i]), 0)

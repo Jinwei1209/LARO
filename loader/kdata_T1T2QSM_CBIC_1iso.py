@@ -16,6 +16,8 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
         contrast = 'MultiContrast',
         necho = 7, # number of echos in total
         necho_mGRE = 5,  # number of echos of mGRE data
+        necho_t1w = 1,  # number of T1w images
+        necho_t2w = 1,  # number of T2w images
         nrow = 206,
         ncol = 80,
         split = 'train',
@@ -30,12 +32,14 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
     ):
 
         self.rootDir = rootDir
-        self.rootDir2 = '/data2/Jinwei/T1T2QSM'
+        self.rootDir2 = '/data3/Jinwei/T1T2QSM'
         self.contrast = contrast
         self.necho = necho
+        self.necho_t1w = necho_t1w
+        self.necho_t2w = necho_t2w
         self.necho_mGRE = necho_mGRE
         self.normalizations = normalizations
-        self.scales = [3, 1.5, 3, 0.75]  # order: [chao8, hangwei8, dom8, jiahao8]
+        # self.scales = [3, 1.5, 3, 0.75]  # order: [chao8, hangwei8, dom8, jiahao8]
         self.echo_cat = echo_cat
         self.split = split
         self.dataset_id = dataset_id
@@ -45,7 +49,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
         else:
             self.id = 'new4_no_padding'
         self.echo_stride = 1
-        self.necho = 11
+        self.necho = 11+necho_t1w-1
         self.necho_mGRE = 9
         self.prosp_flag = prosp_flag
         self.padding_flag = padding_flag
@@ -57,19 +61,35 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
         self.ncol = ncol
         if contrast == 'MultiContrast':
             if split == 'train':
-                self.nsamples = self.nslice * 4
+                self.nsamples = self.nslice * 8
             elif split == 'val':
                 self.nsamples = self.nslice
             elif split == 'test':
                 self.nsamples = self.nslice
                 if subject == 0:
-                    self.subject = 'qihao8'
+                    self.subject = 'liangdong13'
                 elif subject == 1:
-                    self.subject = 'qihao10_2'
+                    self.subject = 'chao13'
                 elif subject == 2:
-                    self.subject = 'dom8'
+                    self.subject = 'hangwei13'
                 elif subject == 3:
-                    self.subject = 'jiahao8'
+                    self.subject = 'jiahao13'
+                elif subject == 4:
+                    self.subject = 'dom13'
+                elif subject == 5:
+                    self.subject = 'alexey13'
+                elif subject == 6:
+                    self.subject = 'qihao13'
+                elif subject == 7:
+                    self.subject = 'carly13'
+                elif subject == 8:
+                    self.subject = 'mert13'
+                elif subject == 9:
+                    self.subject = 'kelly13'
+                elif subject == 10:
+                    self.subject = 'thanh13'
+                elif subject == 11:
+                    self.subject = 'daniel13'
                 print("Test on {}".format(self.subject))
         self.augmentations = augmentations
         self.augmentation = self.augmentations[0]
@@ -98,15 +118,23 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
                     idx -= self.nslice
                     subject += 1
             if subject == 0:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/chao8/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/chao13/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 1:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/hangwei8/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/hangwei13/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 2:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/dom8/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/jiahao13/full_cc_slices_sense_echo'.format(self.id)
             elif subject == 3:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/jiahao8/full_cc_slices_sense_echo'.format(self.id)
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/dom13/full_cc_slices_sense_echo'.format(self.id)
+            elif subject == 4:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao13/full_cc_slices_sense_echo'.format(self.id)
+            elif subject == 5:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/liangdong13/full_cc_slices_sense_echo'.format(self.id)
+            elif subject == 6:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/kelly13/full_cc_slices_sense_echo'.format(self.id)
+            elif subject == 7:
+                dataFD_sense_echo = self.rootDir + '/data_cfl/{}/mert13/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
-            scale = self.scales[subject]
+            scale = 1
         elif self.split == 'val':
             dataFD_sense_echo = self.rootDir + '/data_cfl/{}/qihao8/full_cc_slices_sense_echo'.format(self.id)
             dataFD_sense_echo_mask = dataFD_sense_echo
@@ -117,7 +145,7 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
                 dataFD_sense_echo_mask = dataFD_sense_echo
             else:
                 dataFD_sense_echo = self.rootDir + '/data_cfl/{}/'.format(self.id) + self.subject + '/under_cc_slices_sense_echo'
-                dataFD_sense_echo_mask = self.rootDir2 + '/data_cfl/{}/'.format(self.id) + 'qihao6' + '/full_cc_slices_sense_echo'
+                dataFD_sense_echo_mask = self.rootDir2 + '/data_cfl/{}/'.format(self.id) + 'jiahao13' + '/full_cc_slices_sense_echo'
             scale = 1
 
         if (self.batchIndex == self.batchSize):
@@ -180,12 +208,12 @@ class kdata_T1T2QSM_CBIC_1iso(data.Dataset):
 
         # normalize
         kdata[:, :self.necho_mGRE, ...] = kdata[:, :self.necho_mGRE, ...] * self.normalizations[0] * scale
-        kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] = kdata[:, self.necho_mGRE:self.necho_mGRE+1, ...] * self.normalizations[1] * scale
-        kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] = kdata[:, self.necho_mGRE+1:self.necho_mGRE+2, ...] * self.normalizations[2] * scale
+        kdata[:, self.necho_mGRE:self.necho_mGRE+self.necho_t1w, ...] = kdata[:, self.necho_mGRE:self.necho_mGRE+self.necho_t1w, ...] * self.normalizations[1] * scale
+        kdata[:, self.necho_mGRE+self.necho_t1w:self.necho_mGRE+self.necho_t1w+self.necho_t2w, ...] = kdata[:, self.necho_mGRE+self.necho_t1w:self.necho_mGRE+self.necho_t1w+self.necho_t2w, ...] * self.normalizations[2] * scale
 
         org[:self.necho_mGRE*2, ...] = org[:self.necho_mGRE*2, ...] * self.normalizations[0] * scale
-        org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] = org[self.necho_mGRE*2:(self.necho_mGRE+1)*2, ...] * self.normalizations[1] * scale
-        org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] = org[(self.necho_mGRE+1)*2:(self.necho_mGRE+2)*2, ...] * self.normalizations[2] * scale
+        org[self.necho_mGRE*2:(self.necho_mGRE+self.necho_t1w)*2, ...] = org[self.necho_mGRE*2:(self.necho_mGRE+self.necho_t1w)*2, ...] * self.normalizations[1] * scale
+        org[(self.necho_mGRE+self.necho_t1w)*2:(self.necho_mGRE+self.necho_t1w+self.necho_t2w)*2, ...] = org[(self.necho_mGRE+self.necho_t1w)*2:(self.necho_mGRE+self.necho_t1w+self.necho_t2w)*2, ...] * self.normalizations[2] * scale
 
         return kdata, org, csm, brain_mask
 

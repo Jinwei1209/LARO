@@ -8,6 +8,7 @@ import math
 import argparse
 import scipy.io as sio
 import numpy as np
+import torch.nn as nn
 
 from torch.optim.lr_scheduler import MultiStepLR
 from IPython.display import clear_output
@@ -56,9 +57,11 @@ if __name__ == '__main__':
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
-    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
+    parser.add_argument('--samplingRatio', type=float, default=0.23)  # Under-sampling ratio
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
-
+    parser.add_argument('--trainset_type', type=int, default=1)  # 0: healthy; 1: MS patients
+    
+    parser.add_argument('--pre_trained_healthy', type=int, default=0)  # flag to use CBIC healthy data as pre-trained
     parser.add_argument('--necho', type=int, default=11)  # number of echos with kspace data
     parser.add_argument('--temporal_pred', type=int, default=0)  # flag to use a 2nd recon network with temporal under-sampling
     parser.add_argument('--lambda0', type=float, default=0.0)  # weighting of low rank approximation loss
@@ -95,6 +98,9 @@ if __name__ == '__main__':
     else:
         niter = 100
 
+    if opt['trainset_type'] == 0:
+        opt['weights_dir'] = 'weights_ablation3'
+
     # flag to use hidden state recurrent pass in BCRNN layer
     if opt['solver'] == 1 and opt['bcrnn'] == 0:
         flag_bcrnn = 1
@@ -109,6 +115,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = opt['gpu_id']
     # rootName = '/data/Jinwei/Multi_echo_slice_recon_GE'
     rootName = '/data/Jinwei/QSM_iField_MS'
+    rootName_weight = '/data/Jinwei/QSM_raw_CBIC'
     QSM_folders = ['0001', '0017', '0018', '0038', '0040', '0042', \
                    '0046', '0048', '0076', '0084', '0087']
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -193,6 +200,7 @@ if __name__ == '__main__':
             rootDir=rootName,
             contrast='MultiEcho', 
             split='train',
+            trainset_type=opt['trainset_type'],
             normalization=opt['normalization'],
             echo_cat=opt['echo_cat']
         )
@@ -494,8 +502,13 @@ if __name__ == '__main__':
                 flag_loupe=opt['loupe'],
                 samplingRatio=opt['samplingRatio']
             )
-        weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
-                    .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
+        if opt['pre_trained_healthy']:
+            weights_dict = torch.load(rootName_weight+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
+                        .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], 0.1, opt['solver'], opt['flag_unet']))
+            weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(necho, nrow, ncol), requires_grad=True)
+        else:
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K={}_loupe={}_ratio={}_solver={}_unet={}.pt' \
+                        .format(opt['bcrnn'], opt['loss'], opt['K'], opt['loupe'], opt['samplingRatio'], opt['solver'], opt['flag_unet']))
         # if opt['temporal_pred'] == 1:
         #     print('Temporal Prediction with {} Echos'.format(necho))
         #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_loss={}_K=10_loupe=0_ratio={}_solver={}_echo={}_temporal={}_.pt'
@@ -525,7 +538,11 @@ if __name__ == '__main__':
 
         with torch.no_grad():
             for idx, (kdatas, targets, recon_input, csms, csm_lowres, brain_masks, brain_masks_erode) in enumerate(testLoader):
-                kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
+                if opt['pre_trained_healthy']:
+                    kdatas = kdatas[:, :, :necho, ...] / 3
+                else:
+                    kdatas = kdatas[:, :, :necho, ...]  # temporal undersampling
+
                 csms = csms[:, :, :necho, ...]  # temporal undersampling
                 csm_lowres = csm_lowres[:, :, :necho, ...]  # temporal undersampling
                 recon_input = recon_input[:, :2*necho, ...]  # temporal undersampling
@@ -629,8 +646,8 @@ if __name__ == '__main__':
                     + ' --parameter ' + rootName + '/results_QSM/parameter.txt'
                     + ' --temp ' + rootName +  '/results_QSM/'
                     + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                    + ' --CSF ' + ' -of QR'
-                    + ' --mask Mask{}.bin'.format(opt['test_sub']+1))
+                    + ' --CSF ' + ' -of QR')
+                    # + ' --mask ' + rootName + '/results_QSM/Mask{}.bin'.format(opt['test_sub']+1))
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_11.bin', 'f4')

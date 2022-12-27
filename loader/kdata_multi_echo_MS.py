@@ -19,6 +19,7 @@ class kdata_multi_echo_MS(data.Dataset):
         nrow = 206,
         ncol = 68,
         split = 'train',
+        trainset_type = 1, # 0: healthy; 1: MS patients
         subject = 0,  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
         normalization = 0,  # flag to normalize the data
         echo_cat = 1, # flag to concatenate echo dimension into channel
@@ -32,6 +33,7 @@ class kdata_multi_echo_MS(data.Dataset):
         self.normalization = normalization
         self.echo_cat = echo_cat
         self.split = split
+        self.trainset_type = trainset_type
         self.nrow = nrow
         self.ncol = ncol
         if contrast == 'MultiEcho':
@@ -64,19 +66,35 @@ class kdata_multi_echo_MS(data.Dataset):
         self.Mask = np.zeros((self.nsamples, self.nrow, self.ncol, self.necho))
         self.Mask_erode = np.zeros((self.nsamples, self.nrow, self.ncol, self.necho))
         if split == 'train':
-            print('Loading training dataset')
-            for i in range(6, 12):
-                print('case: {}'.format(i))
-                iField = load_mat(self.rootDir+'/data/iField{}.mat'.format(i), 'iField')
-                iField = np.transpose(iField, (1, 0, 2, 3))[30:230, 25:231, ...]
-                Mask = load_mat(self.rootDir+'/data/Mask{}.mat'.format(i), 'Mask')
-                Mask = np.transpose(Mask, (1, 0, 2))[30:230, 25:231, ...]
-                Mask = np.repeat(Mask[..., np.newaxis], self.necho, axis=-1)
-                Mask_erode = load_mat(self.rootDir+'/data/Mask_erode{}.mat'.format(i), 'Mask_erode')
-                Mask_erode = np.transpose(Mask_erode, (1, 0, 2))[30:230, 25:231, ...]
-                Mask_erode = np.repeat(Mask_erode[..., np.newaxis], self.necho, axis=-1)
-                self.iField[200*(i-6):200*(i-5), ...] = iField / np.max(abs(iField[Mask==1]))
-                self.Mask[200*(i-6):200*(i-5), ...] = Mask
+            if self.trainset_type == 1:
+                print('Loading training dataset of MS')
+                for i in range(6, 12):
+                    print('case: {}'.format(i))
+                    iField = load_mat(self.rootDir+'/data/iField{}.mat'.format(i), 'iField')
+                    iField = np.transpose(iField, (1, 0, 2, 3))[30:230, 25:231, ...]
+                    Mask = load_mat(self.rootDir+'/data/Mask{}.mat'.format(i), 'Mask')
+                    Mask = np.transpose(Mask, (1, 0, 2))[30:230, 25:231, ...]
+                    Mask = np.repeat(Mask[..., np.newaxis], self.necho, axis=-1)
+                    Mask_erode = load_mat(self.rootDir+'/data/Mask_erode{}.mat'.format(i), 'Mask_erode')
+                    Mask_erode = np.transpose(Mask_erode, (1, 0, 2))[30:230, 25:231, ...]
+                    Mask_erode = np.repeat(Mask_erode[..., np.newaxis], self.necho, axis=-1)
+                    self.iField[200*(i-6):200*(i-5), ...] = iField / np.max(abs(iField[Mask==1]))
+                    self.Mask[200*(i-6):200*(i-5), ...] = Mask
+            else:
+                print('Loading training dataset of healthy')
+                for i in range(1, 7):
+                    print('case: {}'.format(i))
+                    iField = load_mat(self.rootDir+'/data/iField_healthy{}.mat'.format(i), 'iField')
+                    iField = np.transpose(iField, (1, 0, 2, 3))[30:230, 25:231, ...]
+                    Mask = load_mat(self.rootDir+'/data/Mask_healthy{}.mat'.format(i), 'Mask')
+                    Mask = np.transpose(Mask, (1, 0, 2))[30:230, 25:231, ...]
+                    Mask = np.repeat(Mask[..., np.newaxis], self.necho, axis=-1)
+                    Mask_erode = load_mat(self.rootDir+'/data/Mask_erode_healthy{}.mat'.format(i), 'Mask_erode')
+                    Mask_erode = np.transpose(Mask_erode, (1, 0, 2))[30:230, 25:231, ...]
+                    Mask_erode = np.repeat(Mask_erode[..., np.newaxis], self.necho, axis=-1)
+                    self.iField[200*(i-1):200*i, ...] = iField / np.max(abs(iField[Mask==1]))
+                    self.Mask[200*(i-1):200*i, ...] = Mask
+
         elif split == 'val':
             print('Loading validation dataset')
             print('case: 5')
@@ -103,10 +121,10 @@ class kdata_multi_echo_MS(data.Dataset):
             self.iField[:200, ...] = iField / np.max(abs(iField[Mask==1]))
             self.Mask[:200, ...] = Mask
 
-            # to reconstruct LLR QSM
-            iField = load_mat(self.rootDir+'/data/iField_llr_loupe=-2_sub={}.mat'.format(subject), 'iField_llr')
-            iField = np.concatenate((iField[:, 103:, ...], iField[:, :103, ...]), axis=1)
-            self.iField[:200, ...] = iField
+            # # to reconstruct LLR QSM
+            # iField = load_mat(self.rootDir+'/data/iField_llr_loupe=-2_sub={}.mat'.format(subject), 'iField_llr')
+            # iField = np.concatenate((iField[:, 103:, ...], iField[:, :103, ...]), axis=1)
+            # self.iField[:200, ...] = iField
 
     def __len__(self):
 

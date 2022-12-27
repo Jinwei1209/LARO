@@ -393,7 +393,7 @@ class Logger():
         # mc_fusion = opt['mc_fusion']
         # t2redesign = opt['t2w_redesign']
         dataset = 0
-        mc_fusion = 1
+        mc_fusion = 0
         t2redesign = 0
 
         if(not os.path.exists(self.rootName)):

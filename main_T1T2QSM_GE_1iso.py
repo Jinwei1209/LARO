@@ -4,6 +4,7 @@
 import os
 import time
 import torch
+import torch.nn as nn
 import math
 import argparse
 import scipy.io as sio
@@ -58,17 +59,19 @@ if __name__ == '__main__':
     parser.add_argument('--test_sub', type=int, default=0)  # 0: iField1, 1: iField2, 2: iField3, 3: iField4
     parser.add_argument('--K', type=int, default=2)  # number of unrolls
     parser.add_argument('--loupe', type=int, default=2)  # -2: fixed learned mask across echos
-                                                         # -1: manually designed mask, 0 fixed learned mask, 
+                                                         # -1: manually designed mask for t1w and t2w (mGRE is loupe=-2)
                                                          # 1: mask learning, same mask across echos, 2: mask learning, mask for each echo
-    parser.add_argument('--dataset_id', type=int, default=8)  # 0: new4 of T1w+mGRE+T2w dataset (#1)
-    parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
-    parser.add_argument('--diff_lambdas', type=int, default=0)  # flag to use different lambdas for each contrast    
-    parser.add_argument('--padding', type=int, default=1)  # flag to pad k-space data
-    parser.add_argument('--nml_factor', type=float, default=1.0)  # Scale the normalization factor for better reconstruction
-
-    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
+    parser.add_argument('--dataset_id', type=int, default=13)  # 0: new4 of T1w+mGRE+T2w dataset (#1)
+    parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data  
+    parser.add_argument('--padding', type=int, default=0)  # flag to pad k-space data
     parser.add_argument('--mc_fusion', type=int, default=1)  # flag to fuse multi-contrast features
-    parser.add_argument('--t1w_only', type=int, default=0)  # flag to reconstruct T1w+QSM
+    parser.add_argument('--t1w_only', type=int, default=0)  # 1: 1 t1w image, 0 t2w image;
+                                                            # 0: 1 t1w image, 1 t2w image;
+                                                            #-1: 2 t1w image, 1 t2w image 
+
+    parser.add_argument('--diff_lambdas', type=int, default=0)  # flag to use different lambdas for each contrast  
+    parser.add_argument('--nml_factor', type=float, default=1.0)  # Scale the normalization factor for better reconstruction
+    parser.add_argument('--samplingRatio', type=float, default=0.1)  # Under-sampling ratio
     parser.add_argument('--bcrnn', type=int, default=1)  # 0: without bcrnn blcok, 1: with bcrnn block, 2: with bclstm block
     parser.add_argument('--solver', type=int, default=1)  # 0 for deep Quasi-newton, 1 for deep ADMM,
                                                           # 2 for TV Quasi-newton, 3 for TV ADMM.
@@ -92,8 +95,8 @@ if __name__ == '__main__':
     parser.add_argument('--precond', type=int, default=0)  # flag to use preconsitioning
     parser.add_argument('--att', type=int, default=0)  # flag to use attention-based denoiser
     parser.add_argument('--random', type=int, default=0)  # flag to multiply the input data with a random complex number
-    parser.add_argument('--normalizations', type=list, default=[50, 100, 75])  # normalization factors of [mGRE, T1w, T2w] images
-                                                                                # default [50, 100, 100] for dataset8, diff_lambdas=0
+    parser.add_argument('--normalizations', type=list, default=[50, 200, 200])  # normalization factors of [mGRE, T1w, T2w] images
+                                                                                # default [50, 100, 100] for dataset8/13 old(_), diff_lambdas=0
                                                  
     opt = {**vars(parser.parse_args())}
     for i in range(3):
@@ -143,7 +146,24 @@ if __name__ == '__main__':
 
     if opt['loupe'] == -2:
         # load fixed loupe optimized mask across echos
-        masks = np.real(readcfl(rootName+'/masks{}/mask_{}_echo'.format(opt['dataset_id']+1, opt['samplingRatio'])))
+        masks = np.real(readcfl(rootName+'/masks{}/mask_{}_echo_'.format(opt['dataset_id']+1, opt['samplingRatio'])))
+        masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
+        if opt['padding'] == 1:
+            masks = np.pad(masks, ((0, 0), (72, 72), (65, 65), (0, 0)))
+        masks = torch.tensor(masks, device=device).float()
+        # to complex data
+        masks = torch.cat((masks, torch.zeros(masks.shape).to(device)),-1) # (necho, nrow, ncol, 2)
+        # add coil dimension
+        masks = masks[None, ...] # (1, necho, nrow, ncol, 2)
+        masks = torch.cat(ncoil*[masks]) # (ncoil, necho, nrow, ncol, 2)
+        # add batch dimension
+        masks = masks[None, ...] # (1, ncoil, necho, nrow, ncol, 2)
+    elif opt['loupe'] == -1:
+        # load fixed loupe optimized mask across echos
+        masks = np.real(readcfl(rootName+'/masks{}/mask_{}_echo_'.format(opt['dataset_id']+1, opt['samplingRatio'])))
+        masks_t1t2 = np.real(readcfl(rootName+'/masks{}/mask_{}m_t1t2'.format(opt['dataset_id']+1, opt['samplingRatio'])))
+        masks[9, ...] = masks_t1t2
+        masks[10, ...] = masks_t1t2
         masks = masks[..., np.newaxis] # (necho, nrow, ncol, 1)
         if opt['padding'] == 1:
             masks = np.pad(masks, ((0, 0), (72, 72), (65, 65), (0, 0)))
@@ -198,7 +218,8 @@ if __name__ == '__main__':
             dataset_id=opt['dataset_id'],
             padding_flag=opt['padding'],
             normalizations=opt['normalizations'],
-            echo_cat=opt['echo_cat']
+            echo_cat=opt['echo_cat'],
+            necho_t1w=1-opt['t1w_only']
         )
         trainLoader = data.DataLoader(dataLoader, batch_size=batch_size, shuffle=True, num_workers=1)
 
@@ -209,7 +230,8 @@ if __name__ == '__main__':
             dataset_id=opt['dataset_id'],
             padding_flag=opt['padding'],
             normalizations=opt['normalizations'],
-            echo_cat=opt['echo_cat']
+            echo_cat=opt['echo_cat'],
+            necho_t1w=1-opt['t1w_only']
         )
         valLoader = data.DataLoader(dataLoader_val, batch_size=batch_size, shuffle=True, num_workers=1)
 
@@ -261,13 +283,15 @@ if __name__ == '__main__':
                 samplingRatio=opt['samplingRatio']
             )
         netG_dc.to(device)
-        if opt['loupe'] < 1 and opt['loupe'] > -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K=1_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
+        # if opt['loupe'] < 1 and opt['loupe'] > -2:
+        #     weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K=1_loupe=1_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}.pt'
+        #                 .format(opt['bcrnn'], opt['diff_lambdas'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
+        #     netG_dc.load_state_dict(weights_dict)
+        if opt['loupe'] == -2 or opt['loupe'] == -1:
+            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K=2_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_last.pt'
                         .format(opt['bcrnn'], opt['diff_lambdas'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
-            netG_dc.load_state_dict(weights_dict)
-        elif opt['loupe'] == -2:
-            weights_dict = torch.load(rootName+'/'+opt['weights_dir']+'/bcrnn={}_diff_lambdas={}_K=1_loupe=2_ratio={}_solver={}_mc_fusion={}_dataset={}_padding={}_last.pt'
-                        .format(opt['bcrnn'], opt['diff_lambdas'], opt['samplingRatio'], opt['solver'], opt['mc_fusion'], opt['dataset_id'], opt['padding']))
+            if opt['loupe'] == -1:
+                weights_dict['weight_parameters'] = nn.Parameter(torch.zeros(nrow, ncol), requires_grad=True)
             netG_dc.load_state_dict(weights_dict)
 
         # optimizer
@@ -487,7 +511,8 @@ if __name__ == '__main__':
             padding_flag=opt['padding'],
             subject=opt['test_sub'],
             normalizations=opt['normalizations'],
-            echo_cat=opt['echo_cat']
+            echo_cat=opt['echo_cat'],
+            necho_t1w=1-opt['t1w_only']
         )
         testLoader = data.DataLoader(dataLoader_test, batch_size=batch_size, shuffle=False)
 
@@ -572,17 +597,18 @@ if __name__ == '__main__':
 
             # run MEDIN
             if opt['padding'] == 1:
-                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter_1iso.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
-                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
+                        # + ' --GPU ' + ' --device ' + opt['gpu_id'] 
                         + ' --CSF ' + ' -of QR  -rl 0.35')
             else:
-                os.system('medi ' + rootName + '/results_QSM/iField.bin' 
+                os.system('/data2/Jinwei/MEDI.r125/medin ' + rootName + '/results_QSM/iField.bin' 
                         + ' --parameter ' + rootName + '/results_QSM/parameter_ori.txt'
                         + ' --temp ' + rootName +  '/results_QSM/'
-                        + ' --GPU ' + ' --device ' + opt['gpu_id'] 
-                        + ' --CSF ' + ' -of QR  -rl 0.6')
+                        # + ' --GPU ' + ' --device ' + opt['gpu_id']
+                        + ' -m ' + rootName + '/results_QSM/Mask_3thecho_sub3' # for sub=3 retro or sub=10 prosp
+                        + ' --CSF ' + ' -of QR  -rl 0.7')
             
             # read .bin files and save into .mat files
             QSM = np.fromfile(rootName+'/results_QSM/recon_QSM_09.bin', 'f4')

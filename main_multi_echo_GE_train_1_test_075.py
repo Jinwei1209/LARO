@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--prosp', type=int, default=0)  # flag to test on prospective data
     parser.add_argument('--flag_unet', type=int, default=1)  # flag to use unet as denoiser
     parser.add_argument('--padding', type=int, default=0)  # flag to use kspace padded mGRE data
-    parser.add_argument('--normalization', type=float, default=1.8)  # 2.5/1.8 for FA=15/25
+    parser.add_argument('--normalization', type=float, default=1.8)  # 2.5/1.8 for FA=15/25, but in manuscript, 1.8 was used for FA=15
 
     parser.add_argument('--interpolate', type=int, default=0)  # flag to do interpolation on the reconstructed mGRE
     parser.add_argument('--flag_complex', type=int, default=0)  # flag to use complex convolution

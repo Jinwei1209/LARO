@@ -23,6 +23,7 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         echo_cat = 1, # flag to concatenate echo dimension into channel
         batchSize = 1,
         nslice = 512,
+        num_subs = 8,
         augmentations = [None]
     ):
 
@@ -37,7 +38,7 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
         self.nslice = nslice
         if contrast == 'MultiEcho':
             if split == 'train':
-                self.nsamples = self.nslice * 8
+                self.nsamples = self.nslice * num_subs
             elif split == 'val':
                 self.nsamples = self.nslice
             elif split == 'test':
@@ -71,24 +72,33 @@ class kdata_multi_echo_CBIC_075(data.Dataset):
                     idx -= self.nslice
                     subject += 1
             if subject == 0:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/junghun/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/junghun/full_cc_slices_sense_echo/'
             elif subject == 1:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/dom/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/chao/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/chao/full_cc_slices_sense_echo/'
             elif subject == 2:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/alexey/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/alexey/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/alexey/full_cc_slices_sense_echo/'
             elif subject == 3:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/qihao/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/qihao/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/qihao/full_cc_slices_sense_echo/'
             elif subject == 4:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/jiahao/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/liangdong/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/liangdong/full_cc_slices_sense_echo/'
             elif subject == 5:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/chao/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/dom/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/dom/full_cc_slices_sense_echo/'
             elif subject == 6:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/kelly/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/kelly/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/kelly/full_cc_slices_sense_echo/'
             elif subject == 7:
-                dataFD_sense_echo = self.rootDir + '/data_cfl/junghun/full_cc_slices_sense_echo_pad/'
+                # dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei/full_cc_slices_sense_echo_pad/'
+                dataFD_sense_echo = self.rootDir + '/data_cfl/hangwei/full_cc_slices_sense_echo/'
 
         elif self.split == 'val':
-            dataFD_sense_echo = self.rootDir + '/data_cfl/thanh/full_cc_slices_sense_echo_pad/'
+            # dataFD_sense_echo = self.rootDir + '/data_cfl/thanh/full_cc_slices_sense_echo_pad/'
+            dataFD_sense_echo = self.rootDir + '/data_cfl/jiahao/full_cc_slices_sense_echo/'
         
         elif self.split == 'test':
             # dataFD_sense_echo = self.rootDir + '/data_cfl/' + self.subject + '/full_cc_slices_sense_echo_pad/'
